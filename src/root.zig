@@ -16,9 +16,11 @@ pub const Color = style_mod.Color;
 pub const StyleAttribute = style_mod.StyleAttribute;
 
 // Layout types
-pub const layout = @import("layout.zig");
-pub const Constraint = layout.Constraint;
-pub const Direction = layout.Direction;
+pub const layout_mod = @import("layout.zig");
+pub const Constraint = layout_mod.Constraint;
+pub const Direction = layout_mod.Direction;
+pub const layout = layout_mod.layout;
+pub const BoundedRects = layout_mod.BoundedRects;
 
 // Event types
 pub const event = @import("event.zig");
