@@ -41,10 +41,15 @@ pub const Command = action.Command;
 pub const cell_mod = @import("cell.zig");
 pub const Cell = cell_mod.Cell;
 
+// Buffer (2D cell grid)
+pub const buffer_mod = @import("buffer.zig");
+pub const Buffer = buffer_mod.Buffer;
+
 // Terminal backend
 pub const backend_mod = @import("backend.zig");
 pub const Backend = backend_mod.Backend;
 pub const BackendConfig = backend_mod.BackendConfig;
+pub const terminal_panic = backend_mod.panic;
 
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
@@ -127,6 +132,19 @@ test "cell re-export" {
 
     const styled_cell = Cell.styled('A', Style.init().bold());
     try std.testing.expect(styled_cell.style.hasAttribute(.bold));
+}
+
+test "buffer re-export" {
+    var buf = try Buffer.init(std.testing.allocator, 80, 24);
+    defer buf.deinit();
+
+    try std.testing.expectEqual(@as(u16, 80), buf.width);
+    try std.testing.expectEqual(@as(u16, 24), buf.height);
+
+    buf.set(5, 5, Cell.styled('X', Style.init().bold()));
+    const cell = buf.get(5, 5);
+    try std.testing.expectEqual(@as(u21, 'X'), cell.char);
+    try std.testing.expect(cell.style.hasAttribute(.bold));
 }
 
 test "backend re-export" {

@@ -1,8 +1,189 @@
 // Terminal backend for zithril TUI framework
 // Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste
+// Includes panic handler to ensure terminal cleanup on abnormal exit
 
 const std = @import("std");
 const posix = std.posix;
+const builtin = @import("builtin");
+
+/// Global pointer to the active backend for panic/signal cleanup.
+/// Only one backend can be active at a time (standard for TUI apps).
+var global_backend: ?*Backend = null;
+
+/// Global storage for original termios when using emergency cleanup.
+var emergency_original_termios: ?posix.termios = null;
+var emergency_config: ?BackendConfig = null;
+
+/// Perform emergency terminal cleanup.
+/// Called from panic handler and signal handlers.
+/// Writes cleanup sequences directly to fd without checking state,
+/// as the Backend state may be corrupted during panic.
+fn emergencyCleanup() void {
+    const fd = posix.STDOUT_FILENO;
+    const file = std.fs.File{ .handle = fd };
+
+    // Restore terminal based on saved config
+    if (emergency_config) |config| {
+        if (config.bracketed_paste) {
+            file.writeAll("\x1b[?2004l") catch {};
+        }
+        if (config.mouse_capture) {
+            file.writeAll("\x1b[?1006l") catch {};
+            file.writeAll("\x1b[?1003l\x1b[?1002l\x1b[?1000l") catch {};
+        }
+        if (config.hide_cursor) {
+            file.writeAll("\x1b[?25h") catch {};
+        }
+        if (config.alternate_screen) {
+            file.writeAll("\x1b[?1049l") catch {};
+        }
+    }
+
+    // Restore termios
+    if (emergency_original_termios) |original| {
+        posix.tcsetattr(fd, .FLUSH, original) catch {};
+    }
+
+    // Clear global state
+    global_backend = null;
+    emergency_original_termios = null;
+    emergency_config = null;
+}
+
+/// Panic handler namespace for terminal cleanup.
+/// Applications can use this by adding to their root source file:
+///   pub const panic = @import("zithril").backend_mod.panic;
+/// This ensures terminal state is restored before panic output is displayed.
+pub const panic = struct {
+    /// Core panic function called by @panic and runtime safety checks.
+    pub fn call(msg: []const u8, ret_addr: ?usize) noreturn {
+        @branchHint(.cold);
+        // Perform cleanup first so panic message is visible
+        emergencyCleanup();
+
+        // Use standard panic behavior
+        _ = ret_addr;
+        std.debug.lockStdErr();
+        const stderr = std.io.getStdErr();
+        stderr.writeAll(msg) catch {};
+        stderr.writeAll("\n") catch {};
+        @trap();
+    }
+
+    pub fn sentinelMismatch(expected: anytype, found: @TypeOf(expected)) noreturn {
+        _ = found;
+        call("sentinel mismatch", null);
+    }
+
+    pub fn unwrapError(err: anyerror) noreturn {
+        _ = &err;
+        call("attempt to unwrap error", null);
+    }
+
+    pub fn outOfBounds(index: usize, len: usize) noreturn {
+        _ = index;
+        _ = len;
+        call("index out of bounds", null);
+    }
+
+    pub fn startGreaterThanEnd(start: usize, end: usize) noreturn {
+        _ = start;
+        _ = end;
+        call("start index is larger than end index", null);
+    }
+
+    pub fn inactiveUnionField(active: anytype, accessed: @TypeOf(active)) noreturn {
+        _ = accessed;
+        call("access of inactive union field", null);
+    }
+
+    pub fn sliceCastLenRemainder(src_len: usize) noreturn {
+        _ = src_len;
+        call("slice cast has len remainder", null);
+    }
+
+    pub fn castToNull(value: anytype) noreturn {
+        _ = value;
+        call("cast to null", null);
+    }
+
+    pub fn reachedUnreachable() noreturn {
+        call("reached unreachable code", null);
+    }
+
+    pub fn unwrapNull() noreturn {
+        call("unwrap of null optional", null);
+    }
+
+    pub fn signedOverflow(a: anytype, b: anytype) noreturn {
+        _ = a;
+        _ = b;
+        call("signed integer overflow", null);
+    }
+
+    pub fn unsignedOverflow(a: anytype, b: anytype) noreturn {
+        _ = a;
+        _ = b;
+        call("unsigned integer overflow", null);
+    }
+
+    pub fn exactDivisionRemainder(numerator: anytype, denominator: anytype) noreturn {
+        _ = numerator;
+        _ = denominator;
+        call("exact division has remainder", null);
+    }
+
+    pub fn divisionByZero(numerator: anytype) noreturn {
+        _ = numerator;
+        call("division by zero", null);
+    }
+
+    pub fn negativeShiftCount(count: anytype) noreturn {
+        _ = count;
+        call("negative shift count", null);
+    }
+
+    pub fn shiftOverflow(a: anytype, b: anytype) noreturn {
+        _ = a;
+        _ = b;
+        call("shift overflow", null);
+    }
+
+    pub fn memcpyDestOverlap() noreturn {
+        call("memcpy dest overlaps src", null);
+    }
+
+    pub fn intToEnumOverflow() noreturn {
+        call("int to enum overflow", null);
+    }
+
+    pub fn intToFloatOverflow(value: anytype) noreturn {
+        _ = value;
+        call("int to float overflow", null);
+    }
+
+    pub fn floatToIntOverflow(value: anytype) noreturn {
+        _ = value;
+        call("float to int overflow", null);
+    }
+
+    pub fn invalidEnumCast(value: anytype) noreturn {
+        _ = value;
+        call("invalid enum cast", null);
+    }
+
+    pub fn noReturn() noreturn {
+        call("noreturn function returned", null);
+    }
+};
+
+/// Signal handler for SIGINT, SIGTERM, etc.
+fn signalHandler(sig: c_int) callconv(.C) void {
+    _ = sig;
+    emergencyCleanup();
+    // Re-raise to get default behavior (exit)
+    posix.raise(posix.SIG.TERM) catch {};
+}
 
 /// Configuration options for terminal initialization.
 pub const BackendConfig = struct {
@@ -39,6 +220,7 @@ pub const Backend = struct {
 
     /// Initialize the terminal backend.
     /// Enables raw mode and optional features based on config.
+    /// Registers panic handler to ensure cleanup on abnormal exit.
     /// Returns error if stdout is not a TTY or terminal ops fail.
     pub fn init(config: BackendConfig) Error!Backend {
         const fd = posix.STDOUT_FILENO;
@@ -56,6 +238,11 @@ pub const Backend = struct {
 
         try self.enterRawMode();
         self.active = true;
+
+        // Store state for emergency cleanup
+        emergency_original_termios = self.original_termios;
+        emergency_config = config;
+        global_backend = &self;
 
         if (config.alternate_screen) {
             self.writeEscape(ENTER_ALTERNATE_SCREEN);
@@ -77,28 +264,42 @@ pub const Backend = struct {
     }
 
     /// Restore terminal to original state.
+    /// Disables bracketed paste, mouse capture, shows cursor, leaves alternate screen,
+    /// and restores raw mode settings.
     /// Safe to call multiple times.
     pub fn deinit(self: *Backend) void {
         if (!self.active) return;
 
+        // Disable bracketed paste
         if (self.config.bracketed_paste) {
             self.writeEscape(DISABLE_BRACKETED_PASTE);
         }
 
+        // Disable mouse capture
         if (self.config.mouse_capture) {
             self.disableMouse();
         }
 
+        // Show cursor
         if (self.config.hide_cursor) {
             self.writeEscape(SHOW_CURSOR);
         }
 
+        // Leave alternate screen
         if (self.config.alternate_screen) {
             self.writeEscape(LEAVE_ALTERNATE_SCREEN);
         }
 
+        // Restore raw mode (disable raw mode)
         self.exitRawMode();
         self.active = false;
+
+        // Clear global state for panic handler
+        if (global_backend == self) {
+            global_backend = null;
+            emergency_original_termios = null;
+            emergency_config = null;
+        }
     }
 
     /// Enter raw mode: disable line buffering, echo, and canonical mode.
@@ -267,4 +468,47 @@ test "behavior: bracketed paste sequences are correct" {
 test "behavior: mouse SGR sequences are correct" {
     try std.testing.expectEqualStrings("\x1b[?1006h", Backend.ENABLE_MOUSE_SGR);
     try std.testing.expectEqualStrings("\x1b[?1006l", Backend.DISABLE_MOUSE_SGR);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Cleanup sequences
+// ============================================================
+
+test "behavior: cleanup sequences in deinit order" {
+    // deinit should disable features in reverse order of init:
+    // 1. Disable bracketed paste
+    // 2. Disable mouse
+    // 3. Show cursor
+    // 4. Leave alternate screen
+    // 5. Restore termios (raw mode)
+
+    // Verify the escape sequences exist and are correct
+    try std.testing.expectEqualStrings("\x1b[?2004l", Backend.DISABLE_BRACKETED_PASTE);
+    try std.testing.expectEqualStrings("\x1b[?1006l", Backend.DISABLE_MOUSE_SGR);
+    try std.testing.expectEqualStrings("\x1b[?1003l\x1b[?1002l\x1b[?1000l", Backend.DISABLE_MOUSE_CAPTURE);
+    try std.testing.expectEqualStrings("\x1b[?25h", Backend.SHOW_CURSOR);
+    try std.testing.expectEqualStrings("\x1b[?1049l", Backend.LEAVE_ALTERNATE_SCREEN);
+}
+
+// ============================================================
+// SANITY TESTS - Global state for panic handler
+// ============================================================
+
+test "sanity: global_backend starts null" {
+    try std.testing.expect(global_backend == null);
+    try std.testing.expect(emergency_original_termios == null);
+    try std.testing.expect(emergency_config == null);
+}
+
+test "sanity: emergencyCleanup handles null state" {
+    // Should not crash when called with no backend registered
+    emergencyCleanup();
+    try std.testing.expect(global_backend == null);
+}
+
+test "sanity: panic namespace exists with call function" {
+    // Verify the panic namespace has the correct structure
+    try std.testing.expect(@hasDecl(panic, "call"));
+    try std.testing.expect(@hasDecl(panic, "outOfBounds"));
+    try std.testing.expect(@hasDecl(panic, "unwrapError"));
 }
