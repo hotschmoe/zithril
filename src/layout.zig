@@ -81,7 +81,7 @@ pub const Constraint = union(enum) {
             .max => |n| @min(n, available),
             .ratio => |r| blk: {
                 if (r.den == 0) break :blk 0;
-                const result = (@as(u32, available) * @as(u32, r.num)) / @as(u32, r.den);
+                const result = (@as(u32, available) * r.num) / r.den;
                 break :blk @intCast(@min(result, available));
             },
             .flex => available,

@@ -178,9 +178,8 @@ pub const Size = struct {
         return .{ .width = width, .height = height };
     }
 
-    /// Calculate area.
     pub fn area(self: Size) u32 {
-        return @as(u32, self.width) * @as(u32, self.height);
+        return @as(u32, self.width) * self.height;
     }
 };
 
