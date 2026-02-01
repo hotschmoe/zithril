@@ -33,6 +33,15 @@ pub const Orientation = scrollbar.Orientation;
 pub const clear = @import("widgets/clear.zig");
 pub const Clear = clear.Clear;
 
+pub const scroll_view = @import("widgets/scroll_view.zig");
+pub const ScrollView = scroll_view.ScrollView;
+pub const ScrollState = scroll_view.ScrollState;
+pub const ScrollableList = scroll_view.ScrollableList;
+
+pub const text_input = @import("widgets/text_input.zig");
+pub const TextInput = text_input.TextInput;
+pub const TextInputState = text_input.TextInputState;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -43,4 +52,6 @@ test "widgets module" {
     _ = tabs;
     _ = scrollbar;
     _ = clear;
+    _ = scroll_view;
+    _ = text_input;
 }

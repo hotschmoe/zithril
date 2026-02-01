@@ -117,6 +117,11 @@ pub const Scrollbar = widgets.Scrollbar;
 pub const Orientation = widgets.Orientation;
 pub const Table = widgets.Table;
 pub const Clear = widgets.Clear;
+pub const ScrollView = widgets.ScrollView;
+pub const ScrollState = widgets.ScrollState;
+pub const ScrollableList = widgets.ScrollableList;
+pub const TextInput = widgets.TextInput;
+pub const TextInputState = widgets.TextInputState;
 
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
