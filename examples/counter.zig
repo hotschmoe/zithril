@@ -11,9 +11,9 @@ pub fn main() !void {
     var console = rich_zig.Console.init(allocator);
     defer console.deinit();
 
-    const style = zithril.Style.empty.bold().fg(.green);
+    const style = zithril.Style.init().bold().fg(.green);
     const segments = [_]rich_zig.Segment{
-        rich_zig.Segment.styled("Counter Example", style),
+        rich_zig.Segment.styled("Counter Example", style.toRichStyle()),
     };
     try console.printSegments(&segments);
     try console.print("(Full TUI implementation coming soon)");
