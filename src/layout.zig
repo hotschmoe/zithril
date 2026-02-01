@@ -208,6 +208,25 @@ test "regression: Constraint max with zero available" {
 
 const Rect = @import("geometry.zig").Rect;
 
+/// Shrink sizes for constraints matching the given tag. Returns remaining amount to shrink.
+fn shrinkByTag(
+    constraints: []const Constraint,
+    sizes: *[max_constraints]u16,
+    amount: u32,
+    target_tag: std.meta.Tag(Constraint),
+) u32 {
+    var remaining = amount;
+    for (constraints, 0..) |c, i| {
+        if (remaining == 0) break;
+        if (c == target_tag) {
+            const shrink: u16 = @intCast(@min(remaining, sizes[i]));
+            sizes[i] -= shrink;
+            remaining -= shrink;
+        }
+    }
+    return remaining;
+}
+
 /// Split an area according to constraints in the given direction.
 ///
 /// The constraint solver allocates space in this order:
@@ -308,57 +327,12 @@ pub fn layout(
     }
 
     if (total_allocated > total_space) {
-        const overflow: u32 = total_allocated - total_space;
-        var to_shrink = overflow;
-
-        // First: shrink flex items
-        for (constraints[0..count], 0..count) |c, i| {
+        var to_shrink: u32 = total_allocated - total_space;
+        // Shrink in priority order: flex, max, ratio, length, min
+        const shrink_order = [_]std.meta.Tag(Constraint){ .flex, .max, .ratio, .length, .min };
+        for (shrink_order) |target_tag| {
+            to_shrink = shrinkByTag(constraints[0..count], &sizes, to_shrink, target_tag);
             if (to_shrink == 0) break;
-            if (c == .flex) {
-                const shrink: u16 = @intCast(@min(to_shrink, sizes[i]));
-                sizes[i] -= shrink;
-                to_shrink -= shrink;
-            }
-        }
-
-        // Second: shrink max items (they're capped anyway)
-        for (constraints[0..count], 0..count) |c, i| {
-            if (to_shrink == 0) break;
-            if (c == .max) {
-                const shrink: u16 = @intCast(@min(to_shrink, sizes[i]));
-                sizes[i] -= shrink;
-                to_shrink -= shrink;
-            }
-        }
-
-        // Third: shrink ratio items
-        for (constraints[0..count], 0..count) |c, i| {
-            if (to_shrink == 0) break;
-            if (c == .ratio) {
-                const shrink: u16 = @intCast(@min(to_shrink, sizes[i]));
-                sizes[i] -= shrink;
-                to_shrink -= shrink;
-            }
-        }
-
-        // Fourth: shrink length items (last resort for fixed)
-        for (constraints[0..count], 0..count) |c, i| {
-            if (to_shrink == 0) break;
-            if (c == .length) {
-                const shrink: u16 = @intCast(@min(to_shrink, sizes[i]));
-                sizes[i] -= shrink;
-                to_shrink -= shrink;
-            }
-        }
-
-        // Fifth: shrink min items (absolute last resort)
-        for (constraints[0..count], 0..count) |c, i| {
-            if (to_shrink == 0) break;
-            if (c == .min) {
-                const shrink: u16 = @intCast(@min(to_shrink, sizes[i]));
-                sizes[i] -= shrink;
-                to_shrink -= shrink;
-            }
         }
     }
 
