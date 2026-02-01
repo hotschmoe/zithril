@@ -37,6 +37,15 @@ pub const action = @import("action.zig");
 pub const Action = action.Action;
 pub const Command = action.Command;
 
+// Cell type (buffer building block)
+pub const cell_mod = @import("cell.zig");
+pub const Cell = cell_mod.Cell;
+
+// Terminal backend
+pub const backend_mod = @import("backend.zig");
+pub const Backend = backend_mod.Backend;
+pub const BackendConfig = backend_mod.BackendConfig;
+
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
     try std.testing.expect(style.hasAttribute(.bold));
@@ -106,4 +115,31 @@ test "action re-export" {
 
     try std.testing.expect(Action.none_action.isNone());
     try std.testing.expect(Action.quit_action.isQuit());
+}
+
+test "cell re-export" {
+    const cell = Cell.init('X');
+    try std.testing.expectEqual(@as(u21, 'X'), cell.char);
+    try std.testing.expectEqual(@as(u8, 1), cell.width);
+
+    const wide_cell = Cell.init(0x4E2D);
+    try std.testing.expect(wide_cell.isWide());
+
+    const styled_cell = Cell.styled('A', Style.init().bold());
+    try std.testing.expect(styled_cell.style.hasAttribute(.bold));
+}
+
+test "backend re-export" {
+    const default_config = BackendConfig{};
+    try std.testing.expect(default_config.alternate_screen);
+    try std.testing.expect(default_config.hide_cursor);
+    try std.testing.expect(!default_config.mouse_capture);
+    try std.testing.expect(!default_config.bracketed_paste);
+
+    const custom_config = BackendConfig{
+        .mouse_capture = true,
+        .bracketed_paste = true,
+    };
+    try std.testing.expect(custom_config.mouse_capture);
+    try std.testing.expect(custom_config.bracketed_paste);
 }
