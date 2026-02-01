@@ -61,125 +61,147 @@ fn emergencyCleanup() void {
 /// Applications can use this by adding to their root source file:
 ///   pub const panic = @import("zithril").backend_mod.panic;
 /// This ensures terminal state is restored before panic output is displayed.
+///
+/// The panic namespace matches Zig 0.15's expected interface (std.debug.no_panic).
 pub const panic = struct {
     /// Core panic function called by @panic and runtime safety checks.
     pub fn call(msg: []const u8, ret_addr: ?usize) noreturn {
         @branchHint(.cold);
+        _ = ret_addr;
+
         // Perform cleanup first so panic message is visible
         emergencyCleanup();
 
-        // Use standard panic behavior
-        _ = ret_addr;
-        std.debug.lockStdErr();
-        const stderr = std.io.getStdErr();
+        // Write error message directly to stderr fd
+        const stderr_fd = std.posix.STDERR_FILENO;
+        const stderr = std.fs.File{ .handle = stderr_fd };
         stderr.writeAll(msg) catch {};
         stderr.writeAll("\n") catch {};
         @trap();
     }
 
-    pub fn sentinelMismatch(expected: anytype, found: @TypeOf(expected)) noreturn {
-        _ = found;
+    pub fn sentinelMismatch(_: anytype, _: anytype) noreturn {
+        @branchHint(.cold);
         call("sentinel mismatch", null);
     }
 
-    pub fn unwrapError(err: anyerror) noreturn {
-        _ = &err;
+    pub fn unwrapError(_: anyerror) noreturn {
+        @branchHint(.cold);
         call("attempt to unwrap error", null);
     }
 
-    pub fn outOfBounds(index: usize, len: usize) noreturn {
-        _ = index;
-        _ = len;
+    pub fn outOfBounds(_: usize, _: usize) noreturn {
+        @branchHint(.cold);
         call("index out of bounds", null);
     }
 
-    pub fn startGreaterThanEnd(start: usize, end: usize) noreturn {
-        _ = start;
-        _ = end;
+    pub fn startGreaterThanEnd(_: usize, _: usize) noreturn {
+        @branchHint(.cold);
         call("start index is larger than end index", null);
     }
 
-    pub fn inactiveUnionField(active: anytype, accessed: @TypeOf(active)) noreturn {
-        _ = accessed;
+    pub fn inactiveUnionField(_: anytype, _: anytype) noreturn {
+        @branchHint(.cold);
         call("access of inactive union field", null);
     }
 
-    pub fn sliceCastLenRemainder(src_len: usize) noreturn {
-        _ = src_len;
+    pub fn sliceCastLenRemainder(_: usize) noreturn {
+        @branchHint(.cold);
         call("slice cast has len remainder", null);
     }
 
-    pub fn castToNull(value: anytype) noreturn {
-        _ = value;
-        call("cast to null", null);
-    }
-
     pub fn reachedUnreachable() noreturn {
+        @branchHint(.cold);
         call("reached unreachable code", null);
     }
 
     pub fn unwrapNull() noreturn {
+        @branchHint(.cold);
         call("unwrap of null optional", null);
     }
 
-    pub fn signedOverflow(a: anytype, b: anytype) noreturn {
-        _ = a;
-        _ = b;
-        call("signed integer overflow", null);
+    pub fn castToNull() noreturn {
+        @branchHint(.cold);
+        call("cast to null", null);
     }
 
-    pub fn unsignedOverflow(a: anytype, b: anytype) noreturn {
-        _ = a;
-        _ = b;
-        call("unsigned integer overflow", null);
+    pub fn incorrectAlignment() noreturn {
+        @branchHint(.cold);
+        call("incorrect alignment", null);
     }
 
-    pub fn exactDivisionRemainder(numerator: anytype, denominator: anytype) noreturn {
-        _ = numerator;
-        _ = denominator;
-        call("exact division has remainder", null);
+    pub fn invalidErrorCode() noreturn {
+        @branchHint(.cold);
+        call("invalid error code", null);
     }
 
-    pub fn divisionByZero(numerator: anytype) noreturn {
-        _ = numerator;
+    pub fn integerOutOfBounds() noreturn {
+        @branchHint(.cold);
+        call("integer out of bounds", null);
+    }
+
+    pub fn integerOverflow() noreturn {
+        @branchHint(.cold);
+        call("integer overflow", null);
+    }
+
+    pub fn shlOverflow() noreturn {
+        @branchHint(.cold);
+        call("shift left overflow", null);
+    }
+
+    pub fn shrOverflow() noreturn {
+        @branchHint(.cold);
+        call("shift right overflow", null);
+    }
+
+    pub fn divideByZero() noreturn {
+        @branchHint(.cold);
         call("division by zero", null);
     }
 
-    pub fn negativeShiftCount(count: anytype) noreturn {
-        _ = count;
-        call("negative shift count", null);
+    pub fn exactDivisionRemainder() noreturn {
+        @branchHint(.cold);
+        call("exact division has remainder", null);
     }
 
-    pub fn shiftOverflow(a: anytype, b: anytype) noreturn {
-        _ = a;
-        _ = b;
-        call("shift overflow", null);
+    pub fn integerPartOutOfBounds() noreturn {
+        @branchHint(.cold);
+        call("integer part out of bounds", null);
     }
 
-    pub fn memcpyDestOverlap() noreturn {
-        call("memcpy dest overlaps src", null);
+    pub fn corruptSwitch() noreturn {
+        @branchHint(.cold);
+        call("corrupt switch", null);
     }
 
-    pub fn intToEnumOverflow() noreturn {
-        call("int to enum overflow", null);
+    pub fn shiftRhsTooBig() noreturn {
+        @branchHint(.cold);
+        call("shift rhs too big", null);
     }
 
-    pub fn intToFloatOverflow(value: anytype) noreturn {
-        _ = value;
-        call("int to float overflow", null);
+    pub fn invalidEnumValue() noreturn {
+        @branchHint(.cold);
+        call("invalid enum value", null);
     }
 
-    pub fn floatToIntOverflow(value: anytype) noreturn {
-        _ = value;
-        call("float to int overflow", null);
+    pub fn forLenMismatch() noreturn {
+        @branchHint(.cold);
+        call("for loop length mismatch", null);
     }
 
-    pub fn invalidEnumCast(value: anytype) noreturn {
-        _ = value;
-        call("invalid enum cast", null);
+    pub fn copyLenMismatch() noreturn {
+        @branchHint(.cold);
+        call("copy length mismatch", null);
     }
 
-    pub fn noReturn() noreturn {
+    pub fn memcpyAlias() noreturn {
+        @branchHint(.cold);
+        call("memcpy with overlapping memory", null);
+    }
+
+    pub fn noreturnReturned() noreturn {
+        @branchHint(.cold);
         call("noreturn function returned", null);
     }
 };
