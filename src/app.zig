@@ -5,10 +5,17 @@ const std = @import("std");
 const frame_mod = @import("frame.zig");
 const event_mod = @import("event.zig");
 const action_mod = @import("action.zig");
+const buffer_mod = @import("buffer.zig");
+const backend_mod = @import("backend.zig");
+const input_mod = @import("input.zig");
+const cell_mod = @import("cell.zig");
 
 pub const Frame = frame_mod.Frame;
 pub const Event = event_mod.Event;
 pub const Action = action_mod.Action;
+pub const Buffer = buffer_mod.Buffer;
+pub const Backend = backend_mod.Backend;
+pub const Input = input_mod.Input;
 
 /// App is the main runtime type, generic over the user's state type.
 /// The user provides their own State struct and function pointers for update and view.
@@ -108,6 +115,329 @@ pub fn App(comptime State: type) type {
         /// The view function should use frame.render() to draw widgets.
         pub fn view(self: *Self, frame: *Frame(DefaultMaxWidgets)) void {
             self.view_fn(&self.state, frame);
+        }
+
+        /// Error type for run operations.
+        pub const RunError = error{
+            OutOfMemory,
+            NotATty,
+            TerminalQueryFailed,
+            TerminalSetFailed,
+            IoError,
+        };
+
+        /// Run the main event loop until Action.quit is returned.
+        ///
+        /// Main loop:
+        /// 1. Poll for events (keyboard, mouse, resize, or tick timeout)
+        /// 2. Call update function with the event
+        /// 3. Check action - if .quit, exit loop
+        /// 4. Call view function to describe the UI
+        /// 5. Render by diffing buffers and writing changes to terminal
+        /// 6. Repeat
+        pub fn run(self: *Self, allocator: std.mem.Allocator) RunError!void {
+            // Initialize terminal backend
+            var backend = Backend.init(self.backendConfig()) catch |err| {
+                return switch (err) {
+                    error.NotATty => RunError.NotATty,
+                    error.TerminalQueryFailed => RunError.TerminalQueryFailed,
+                    error.TerminalSetFailed => RunError.TerminalSetFailed,
+                    error.IoError => RunError.IoError,
+                };
+            };
+            defer backend.deinit();
+
+            // Initialize input parser
+            var input = Input.init();
+
+            // Get initial terminal size
+            const initial_size = backend.getSize();
+
+            // Create double buffers for diffing
+            var current_buf = Buffer.init(allocator, initial_size.width, initial_size.height) catch {
+                return RunError.OutOfMemory;
+            };
+            defer current_buf.deinit();
+
+            var previous_buf = Buffer.init(allocator, initial_size.width, initial_size.height) catch {
+                return RunError.OutOfMemory;
+            };
+            defer previous_buf.deinit();
+
+            // Allocate update buffer for diff results
+            const max_updates = @as(usize, initial_size.width) * @as(usize, initial_size.height);
+            var updates = allocator.alloc(buffer_mod.CellUpdate, max_updates) catch {
+                return RunError.OutOfMemory;
+            };
+            defer allocator.free(updates);
+
+            // Calculate tick timeout in nanoseconds (0 means no timeout/poll mode)
+            const tick_timeout_ns: ?u64 = if (self.tick_rate_ms > 0)
+                @as(u64, self.tick_rate_ms) * std.time.ns_per_ms
+            else
+                null;
+
+            // Track last tick time for tick events
+            var last_tick: i128 = std.time.nanoTimestamp();
+
+            // Clear screen initially
+            backend.clearScreen();
+            backend.cursorHome();
+
+            // Initial render
+            {
+                current_buf.clear();
+                var frame = Frame(DefaultMaxWidgets).init(&current_buf);
+                self.view(&frame);
+                try renderBuffer(&backend, &current_buf, &previous_buf, updates);
+                @memcpy(previous_buf.cells, current_buf.cells);
+            }
+
+            // Main event loop
+            while (true) {
+                // Poll for events or wait for tick timeout
+                const maybe_event = try pollEvent(&input, &backend, tick_timeout_ns);
+
+                // Handle tick event generation
+                var event: Event = undefined;
+                if (maybe_event) |e| {
+                    event = e;
+                } else if (tick_timeout_ns != null) {
+                    const now = std.time.nanoTimestamp();
+                    if (now - last_tick >= @as(i128, tick_timeout_ns.?)) {
+                        event = Event{ .tick = {} };
+                        last_tick = now;
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+
+                // Handle resize events specially - resize buffers
+                if (event == .resize) {
+                    const new_size = event.resize;
+                    const new_max_updates = @as(usize, new_size.width) * @as(usize, new_size.height);
+
+                    current_buf.resize(new_size.width, new_size.height) catch {
+                        return RunError.OutOfMemory;
+                    };
+                    previous_buf.resize(new_size.width, new_size.height) catch {
+                        return RunError.OutOfMemory;
+                    };
+
+                    allocator.free(updates);
+                    updates = allocator.alloc(buffer_mod.CellUpdate, new_max_updates) catch {
+                        return RunError.OutOfMemory;
+                    };
+
+                    // Clear screen on resize
+                    backend.clearScreen();
+                    backend.cursorHome();
+                }
+
+                // Call update function
+                const action = self.update(event);
+
+                // Check for quit action
+                if (action.isQuit()) {
+                    break;
+                }
+
+                // TODO: Handle command actions in the future
+
+                // Clear current buffer and call view function
+                current_buf.clear();
+                var frame = Frame(DefaultMaxWidgets).init(&current_buf);
+                self.view(&frame);
+
+                // Render changes to terminal
+                try renderBuffer(&backend, &current_buf, &previous_buf, updates);
+
+                // Swap buffers (copy current to previous for next diff)
+                @memcpy(previous_buf.cells, current_buf.cells);
+            }
+        }
+
+        /// Poll for an input event from the terminal.
+        /// Returns null if no event is available within the timeout.
+        fn pollEvent(input: *Input, backend: *Backend, timeout_ns: ?u64) RunError!?Event {
+            _ = timeout_ns; // TODO: Implement proper polling with timeout
+
+            // Read available input bytes
+            var buf: [256]u8 = undefined;
+            const bytes_read = std.posix.read(std.posix.STDIN_FILENO, &buf) catch |err| {
+                switch (err) {
+                    error.WouldBlock => return null,
+                    else => return RunError.IoError,
+                }
+            };
+
+            if (bytes_read == 0) {
+                return null;
+            }
+
+            // Parse input bytes into events
+            if (input.parse(buf[0..bytes_read])) |parsed_event| {
+                _ = backend; // Backend used for future resize detection
+                return parsed_event;
+            }
+
+            return null;
+        }
+
+        /// Render buffer changes to the terminal.
+        fn renderBuffer(
+            backend: *Backend,
+            current: *Buffer,
+            previous: *Buffer,
+            update_buffer: []buffer_mod.CellUpdate,
+        ) RunError!void {
+            const changes = current.diff(previous.*, update_buffer);
+
+            if (changes.len == 0) {
+                return;
+            }
+
+            // Build output string with cursor movements and cell contents
+            var output_buf: [8192]u8 = undefined;
+            var output_len: usize = 0;
+
+            var last_x: ?u16 = null;
+            var last_y: ?u16 = null;
+
+            for (changes) |change| {
+                // Move cursor if not consecutive
+                const need_move = if (last_x == null or last_y == null)
+                    true
+                else if (last_y.? != change.y)
+                    true
+                else if (last_x.? + 1 != change.x)
+                    true
+                else
+                    false;
+
+                if (need_move) {
+                    // Add cursor position escape sequence
+                    const move_seq = std.fmt.bufPrint(
+                        output_buf[output_len..],
+                        "\x1b[{d};{d}H",
+                        .{ change.y + 1, change.x + 1 },
+                    ) catch break;
+                    output_len += move_seq.len;
+                }
+
+                // Add style escape sequence
+                const style_seq = renderCellStyle(
+                    output_buf[output_len..],
+                    change.cell,
+                ) catch break;
+                output_len += style_seq.len;
+
+                // Add character
+                if (change.cell.width > 0) {
+                    var char_buf: [4]u8 = undefined;
+                    const char_len = std.unicode.utf8Encode(change.cell.char, &char_buf) catch 1;
+                    if (output_len + char_len <= output_buf.len) {
+                        @memcpy(output_buf[output_len..][0..char_len], char_buf[0..char_len]);
+                        output_len += char_len;
+                    }
+                }
+
+                last_x = change.x;
+                last_y = change.y;
+            }
+
+            // Reset style at the end
+            if (output_len + 4 <= output_buf.len) {
+                @memcpy(output_buf[output_len..][0..4], "\x1b[0m");
+                output_len += 4;
+            }
+
+            // Write to terminal
+            backend.write(output_buf[0..output_len]) catch {
+                return RunError.IoError;
+            };
+            backend.flush();
+        }
+
+        /// Render a cell's style as an ANSI escape sequence.
+        fn renderCellStyle(buf: []u8, cell: cell_mod.Cell) error{NoSpaceLeft}![]u8 {
+            const style = cell.style;
+
+            // Use a fixed-size buffer for building the escape sequence
+            var fbs = std.io.fixedBufferStream(buf);
+            const writer = fbs.writer();
+
+            // Write SGR introducer
+            try writer.writeAll("\x1b[0");
+
+            // Add attributes
+            if (style.hasAttribute(.bold)) {
+                try writer.writeAll(";1");
+            }
+            if (style.hasAttribute(.dim)) {
+                try writer.writeAll(";2");
+            }
+            if (style.hasAttribute(.italic)) {
+                try writer.writeAll(";3");
+            }
+            if (style.hasAttribute(.underline)) {
+                try writer.writeAll(";4");
+            }
+            if (style.hasAttribute(.blink)) {
+                try writer.writeAll(";5");
+            }
+            if (style.hasAttribute(.reverse)) {
+                try writer.writeAll(";7");
+            }
+            if (style.hasAttribute(.strike)) {
+                try writer.writeAll(";9");
+            }
+
+            // Add foreground color if set
+            const fg = style.inner.foreground;
+            if (!fg.eql(@import("rich_zig").Color.default)) {
+                if (fg.color_type == .standard or fg.color_type == .eight_bit) {
+                    if (fg.number) |n| {
+                        if (n < 8) {
+                            try writer.print(";{d}", .{30 + n});
+                        } else if (n < 16) {
+                            try writer.print(";{d}", .{90 + n - 8});
+                        } else {
+                            try writer.print(";38;5;{d}", .{n});
+                        }
+                    }
+                } else if (fg.color_type == .truecolor) {
+                    if (fg.triplet) |t| {
+                        try writer.print(";38;2;{d};{d};{d}", .{ t.r, t.g, t.b });
+                    }
+                }
+            }
+
+            // Add background color if set
+            const bg = style.inner.background;
+            if (!bg.eql(@import("rich_zig").Color.default)) {
+                if (bg.color_type == .standard or bg.color_type == .eight_bit) {
+                    if (bg.number) |n| {
+                        if (n < 8) {
+                            try writer.print(";{d}", .{40 + n});
+                        } else if (n < 16) {
+                            try writer.print(";{d}", .{100 + n - 8});
+                        } else {
+                            try writer.print(";48;5;{d}", .{n});
+                        }
+                    }
+                } else if (bg.color_type == .truecolor) {
+                    if (bg.triplet) |t| {
+                        try writer.print(";48;2;{d};{d};{d}", .{ t.r, t.g, t.b });
+                    }
+                }
+            }
+
+            try writer.writeByte('m');
+
+            return fbs.getWritten();
         }
     };
 }
@@ -240,8 +570,6 @@ test "behavior: App with nested state" {
 }
 
 const ViewTestHelpers = struct {
-    const buffer_mod = @import("buffer.zig");
-    const Buffer = buffer_mod.Buffer;
 
     const RenderState = struct {
         rendered: bool = false,
@@ -266,7 +594,7 @@ test "behavior: App view receives mutable frame" {
         .view = ViewTestHelpers.renderView,
     });
 
-    var buf = try ViewTestHelpers.Buffer.init(std.testing.allocator, 80, 24);
+    var buf = try Buffer.init(std.testing.allocator, 80, 24);
     defer buf.deinit();
     var frame = Frame(App(ViewTestHelpers.RenderState).DefaultMaxWidgets).init(&buf);
 

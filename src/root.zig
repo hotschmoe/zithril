@@ -64,6 +64,10 @@ pub const detectColorSupport = backend_mod.detectColorSupport;
 pub const getTerminalSize = backend_mod.getTerminalSize;
 pub const terminal_panic = backend_mod.panic;
 
+// Input parsing
+pub const input_mod = @import("input.zig");
+pub const Input = input_mod.Input;
+
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
     try std.testing.expect(style.hasAttribute(.bold));
@@ -238,4 +242,14 @@ test "app re-export" {
     });
 
     try std.testing.expectEqual(@as(i32, 10), app.state.count);
+}
+
+test "input re-export" {
+    var parser = Input.init();
+    try std.testing.expectEqual(@as(usize, 0), parser.buffer_len);
+
+    // Parse a simple key
+    const parsed_event = parser.parse("a");
+    try std.testing.expect(parsed_event != null);
+    try std.testing.expect(parsed_event.? == .key);
 }
