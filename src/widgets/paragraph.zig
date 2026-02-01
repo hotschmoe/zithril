@@ -147,7 +147,6 @@ fn findWordWrapEnd(text: []const u8, max_width: u16) usize {
     return width;
 }
 
-
 // ============================================================
 // SANITY TESTS - Basic Paragraph functionality
 // ============================================================
