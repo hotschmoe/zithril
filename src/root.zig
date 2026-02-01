@@ -59,6 +59,7 @@ pub const backend_mod = @import("backend.zig");
 pub const Backend = backend_mod.Backend;
 pub const BackendConfig = backend_mod.BackendConfig;
 pub const ColorSupport = backend_mod.ColorSupport;
+pub const TerminalSize = backend_mod.TerminalSize;
 pub const detectColorSupport = backend_mod.detectColorSupport;
 pub const getTerminalSize = backend_mod.getTerminalSize;
 pub const terminal_panic = backend_mod.panic;

@@ -200,6 +200,12 @@ pub const ColorSupport = enum {
     }
 };
 
+/// Terminal size in cells.
+pub const TerminalSize = struct {
+    width: u16,
+    height: u16,
+};
+
 /// Configuration options for terminal initialization.
 pub const BackendConfig = struct {
     /// Enter alternate screen buffer (preserves original terminal content).
@@ -411,13 +417,8 @@ pub const Backend = struct {
     }
 
     /// Get terminal size (width, height).
-    pub fn getSize(self: *Backend) struct { width: u16, height: u16 } {
-        var ws: posix.winsize = undefined;
-        const result = posix.system.ioctl(self.fd, posix.T.IOCGWINSZ, @intFromPtr(&ws));
-        if (result == 0) {
-            return .{ .width = ws.col, .height = ws.row };
-        }
-        return .{ .width = 80, .height = 24 };
+    pub fn getSize(self: *Backend) TerminalSize {
+        return getSizeForFd(self.fd);
     }
 
     /// Detect terminal color support level.
@@ -493,17 +494,21 @@ pub fn detectColorSupport() ColorSupport {
     return .basic;
 }
 
-/// Get terminal size without requiring a Backend instance.
-/// Useful for initial configuration before Backend initialization.
-/// Returns default 80x24 if size cannot be determined.
-pub fn getTerminalSize() struct { width: u16, height: u16 } {
-    const fd = posix.STDOUT_FILENO;
+/// Internal: get terminal size for a specific file descriptor.
+fn getSizeForFd(fd: posix.fd_t) TerminalSize {
     var ws: posix.winsize = undefined;
     const result = posix.system.ioctl(fd, posix.T.IOCGWINSZ, @intFromPtr(&ws));
     if (result == 0) {
         return .{ .width = ws.col, .height = ws.row };
     }
     return .{ .width = 80, .height = 24 };
+}
+
+/// Get terminal size without requiring a Backend instance.
+/// Useful for initial configuration before Backend initialization.
+/// Returns default 80x24 if size cannot be determined.
+pub fn getTerminalSize() TerminalSize {
+    return getSizeForFd(posix.STDOUT_FILENO);
 }
 
 // ============================================================
