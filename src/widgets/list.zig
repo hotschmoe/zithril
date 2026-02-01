@@ -228,7 +228,7 @@ test "behavior: List applies item style" {
     var buf = try Buffer.init(std.testing.allocator, 20, 5);
     defer buf.deinit();
 
-    const items = [_][]const u8{ "Item" };
+    const items = [_][]const u8{"Item"};
     const list = List{
         .items = &items,
         .style = Style.init().italic(),
@@ -289,7 +289,7 @@ test "regression: List handles narrow width" {
     var buf = try Buffer.init(std.testing.allocator, 3, 5);
     defer buf.deinit();
 
-    const items = [_][]const u8{ "Long text" };
+    const items = [_][]const u8{"Long text"};
     const list = List{
         .items = &items,
         .highlight_symbol = "> ",

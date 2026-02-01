@@ -464,7 +464,6 @@ test "behavior: App with nested state" {
 }
 
 const ViewTestHelpers = struct {
-
     const RenderState = struct {
         rendered: bool = false,
     };

@@ -418,4 +418,3 @@ test "regression: findWordWrapEnd hard breaks long word" {
     // No space found, hard break at width
     try std.testing.expectEqual(@as(usize, 5), result);
 }
-
