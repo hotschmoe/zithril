@@ -5,18 +5,13 @@ const std = @import("std");
 const buffer_mod = @import("../buffer.zig");
 const geometry = @import("../geometry.zig");
 const style_mod = @import("../style.zig");
+const text_mod = @import("text.zig");
 
 pub const Buffer = buffer_mod.Buffer;
 pub const Cell = buffer_mod.Cell;
 pub const Rect = geometry.Rect;
 pub const Style = style_mod.Style;
-
-/// Text alignment for titles
-pub const Alignment = enum {
-    left,
-    center,
-    right,
-};
+pub const Alignment = text_mod.Alignment;
 
 /// Border style variants
 pub const BorderType = enum {
