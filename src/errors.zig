@@ -33,13 +33,10 @@ pub fn mapAllocError(err: std.mem.Allocator.Error) Error {
     return Error.OutOfMemory;
 }
 
-/// Maps a POSIX read/write error to our IoError.
-/// Some specific errors are mapped to more specific zithril errors.
+/// Maps a POSIX read error to our IoError.
 pub fn mapPosixError(err: std.posix.ReadError) Error {
-    return switch (err) {
-        error.WouldBlock, error.ConnectionResetByPeer, error.ConnectionTimedOut => Error.IoError,
-        else => Error.IoError,
-    };
+    _ = err;
+    return Error.IoError;
 }
 
 /// Maps a write error to our IoError.
