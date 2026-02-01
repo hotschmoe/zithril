@@ -10,6 +10,17 @@ pub const Cell = cell_mod.Cell;
 pub const Rect = geometry.Rect;
 pub const Style = style_mod.Style;
 
+/// Represents a single cell change in a buffer diff.
+/// Used for efficient incremental rendering - only cells that changed are output.
+pub const CellUpdate = struct {
+    /// X coordinate of the changed cell.
+    x: u16,
+    /// Y coordinate of the changed cell.
+    y: u16,
+    /// The new cell value at this position.
+    cell: Cell,
+};
+
 /// Buffer is a 2D grid of Cells representing the terminal screen.
 /// Cells are stored in row-major order: cells[y * width + x].
 /// Widgets render into the Buffer, which is then diffed and output to the terminal.
@@ -165,6 +176,65 @@ pub const Buffer = struct {
         self.width = new_width;
         self.height = new_height;
         @memset(self.cells, Cell.default);
+    }
+
+    /// Compute diff between this buffer and another buffer.
+    /// Returns a slice of CellUpdates representing cells that differ.
+    /// The updates array must be provided by the caller and should have
+    /// capacity for at least cellCount() elements in the worst case.
+    /// Only compares cells within the overlapping region of both buffers.
+    /// Unchanged cells are skipped for minimal output.
+    pub fn diff(self: Buffer, other: Buffer, updates: []CellUpdate) []CellUpdate {
+        const compare_width = @min(self.width, other.width);
+        const compare_height = @min(self.height, other.height);
+
+        var update_count: usize = 0;
+
+        var y: u16 = 0;
+        while (y < compare_height) : (y += 1) {
+            var x: u16 = 0;
+            while (x < compare_width) : (x += 1) {
+                const self_cell = self.get(x, y);
+                const other_cell = other.get(x, y);
+
+                if (!self_cell.eql(other_cell)) {
+                    if (update_count < updates.len) {
+                        updates[update_count] = .{
+                            .x = x,
+                            .y = y,
+                            .cell = self_cell,
+                        };
+                        update_count += 1;
+                    }
+                }
+            }
+        }
+
+        return updates[0..update_count];
+    }
+
+    /// Compute diff and return the number of changed cells.
+    /// Useful for determining if any changes occurred without allocating.
+    pub fn diffCount(self: Buffer, other: Buffer) usize {
+        const compare_width = @min(self.width, other.width);
+        const compare_height = @min(self.height, other.height);
+
+        var count: usize = 0;
+
+        var y: u16 = 0;
+        while (y < compare_height) : (y += 1) {
+            var x: u16 = 0;
+            while (x < compare_width) : (x += 1) {
+                const self_cell = self.get(x, y);
+                const other_cell = other.get(x, y);
+
+                if (!self_cell.eql(other_cell)) {
+                    count += 1;
+                }
+            }
+        }
+
+        return count;
     }
 };
 
@@ -428,4 +498,141 @@ test "regression: setString handles multi-byte UTF-8" {
     try std.testing.expectEqual(@as(u21, 'H'), buf.get(0, 0).char);
     try std.testing.expectEqual(@as(u21, 'i'), buf.get(1, 0).char);
     try std.testing.expectEqual(@as(u21, 0x00E9), buf.get(2, 0).char);
+}
+
+// ============================================================
+// DIFF TESTS - Buffer comparison and incremental updates
+// ============================================================
+
+test "sanity: Buffer.diff identical buffers returns empty" {
+    var buf1 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    var updates: [100]CellUpdate = undefined;
+    const result = buf1.diff(buf2, &updates);
+
+    try std.testing.expectEqual(@as(usize, 0), result.len);
+}
+
+test "sanity: Buffer.diff detects single cell change" {
+    var buf1 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    buf1.set(5, 5, Cell.init('X'));
+
+    var updates: [100]CellUpdate = undefined;
+    const result = buf1.diff(buf2, &updates);
+
+    try std.testing.expectEqual(@as(usize, 1), result.len);
+    try std.testing.expectEqual(@as(u16, 5), result[0].x);
+    try std.testing.expectEqual(@as(u16, 5), result[0].y);
+    try std.testing.expectEqual(@as(u21, 'X'), result[0].cell.char);
+}
+
+test "behavior: Buffer.diff detects multiple changes" {
+    var buf1 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    buf1.set(0, 0, Cell.init('A'));
+    buf1.set(5, 5, Cell.init('B'));
+    buf1.set(9, 9, Cell.init('C'));
+
+    var updates: [100]CellUpdate = undefined;
+    const result = buf1.diff(buf2, &updates);
+
+    try std.testing.expectEqual(@as(usize, 3), result.len);
+}
+
+test "behavior: Buffer.diff detects style changes" {
+    var buf1 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    buf1.set(3, 3, Cell.styled(' ', Style.init().bold()));
+
+    var updates: [100]CellUpdate = undefined;
+    const result = buf1.diff(buf2, &updates);
+
+    try std.testing.expectEqual(@as(usize, 1), result.len);
+    try std.testing.expect(result[0].cell.style.hasAttribute(.bold));
+}
+
+test "behavior: Buffer.diff skips unchanged cells" {
+    var buf1 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    buf1.set(0, 0, Cell.init('X'));
+    buf2.set(0, 0, Cell.init('X'));
+
+    buf1.set(5, 5, Cell.init('Y'));
+
+    var updates: [100]CellUpdate = undefined;
+    const result = buf1.diff(buf2, &updates);
+
+    try std.testing.expectEqual(@as(usize, 1), result.len);
+    try std.testing.expectEqual(@as(u16, 5), result[0].x);
+    try std.testing.expectEqual(@as(u16, 5), result[0].y);
+}
+
+test "behavior: Buffer.diffCount returns correct count" {
+    var buf1 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    buf1.set(0, 0, Cell.init('A'));
+    buf1.set(5, 5, Cell.init('B'));
+
+    try std.testing.expectEqual(@as(usize, 2), buf1.diffCount(buf2));
+}
+
+test "regression: Buffer.diff with different sizes compares overlap" {
+    var buf1 = try Buffer.init(std.testing.allocator, 20, 20);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    buf1.set(5, 5, Cell.init('X'));
+    buf1.set(15, 15, Cell.init('Y'));
+
+    var updates: [400]CellUpdate = undefined;
+    const result = buf1.diff(buf2, &updates);
+
+    try std.testing.expectEqual(@as(usize, 1), result.len);
+    try std.testing.expectEqual(@as(u16, 5), result[0].x);
+}
+
+test "regression: Buffer.diff with empty buffer" {
+    var buf1 = try Buffer.init(std.testing.allocator, 0, 0);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    var updates: [100]CellUpdate = undefined;
+    const result = buf1.diff(buf2, &updates);
+
+    try std.testing.expectEqual(@as(usize, 0), result.len);
+}
+
+test "regression: Buffer.diff limited by updates slice capacity" {
+    var buf1 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf1.deinit();
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 10);
+    defer buf2.deinit();
+
+    buf1.setString(0, 0, "ABCDEFGHIJ", Style.empty);
+
+    var updates: [5]CellUpdate = undefined;
+    const result = buf1.diff(buf2, &updates);
+
+    try std.testing.expectEqual(@as(usize, 5), result.len);
 }

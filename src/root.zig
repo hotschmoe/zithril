@@ -44,6 +44,11 @@ pub const Cell = cell_mod.Cell;
 // Buffer (2D cell grid)
 pub const buffer_mod = @import("buffer.zig");
 pub const Buffer = buffer_mod.Buffer;
+pub const CellUpdate = buffer_mod.CellUpdate;
+
+// Frame (rendering context)
+pub const frame_mod = @import("frame.zig");
+pub const Frame = frame_mod.Frame;
 
 // Terminal backend
 pub const backend_mod = @import("backend.zig");
@@ -160,4 +165,33 @@ test "backend re-export" {
     };
     try std.testing.expect(custom_config.mouse_capture);
     try std.testing.expect(custom_config.bracketed_paste);
+}
+
+test "frame re-export" {
+    var buf = try Buffer.init(std.testing.allocator, 100, 50);
+    defer buf.deinit();
+
+    var frame = Frame(16).init(&buf);
+
+    try std.testing.expectEqual(@as(u16, 100), frame.size().width);
+    try std.testing.expectEqual(@as(u16, 50), frame.size().height);
+
+    const chunks = frame.layout(frame.size(), Direction.vertical, &.{
+        Constraint.len(10),
+        Constraint.flexible(1),
+    });
+    try std.testing.expectEqual(@as(usize, 2), chunks.len);
+    try std.testing.expectEqual(@as(u16, 10), chunks.get(0).height);
+    try std.testing.expectEqual(@as(u16, 40), chunks.get(1).height);
+}
+
+test "cellupdate re-export" {
+    const update = CellUpdate{
+        .x = 5,
+        .y = 10,
+        .cell = Cell.init('X'),
+    };
+    try std.testing.expectEqual(@as(u16, 5), update.x);
+    try std.testing.expectEqual(@as(u16, 10), update.y);
+    try std.testing.expectEqual(@as(u21, 'X'), update.cell.char);
 }
