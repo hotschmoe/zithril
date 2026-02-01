@@ -1,11 +1,11 @@
 {
     "current_task_id": null,
-    "phase": "simplifying",
+    "phase": "idle",
     "output_file": null,
     "started_at": null,
-    "tasks_since_introspection": 4,
+    "tasks_since_introspection": 0,
     "plan_mode": true,
     "plan_phase": "executing",
     "current_plan_index": 0,
-    "planned_beads": ["bd-3gl", "bd-sr5"]
+    "planned_beads": ["bd-35j", "bd-2gz"]
 }
