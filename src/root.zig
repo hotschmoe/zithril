@@ -50,6 +50,10 @@ pub const CellUpdate = buffer_mod.CellUpdate;
 pub const frame_mod = @import("frame.zig");
 pub const Frame = frame_mod.Frame;
 
+// App runtime
+pub const app_mod = @import("app.zig");
+pub const App = app_mod.App;
+
 // Terminal backend
 pub const backend_mod = @import("backend.zig");
 pub const Backend = backend_mod.Backend;
@@ -194,4 +198,34 @@ test "cellupdate re-export" {
     try std.testing.expectEqual(@as(u16, 5), update.x);
     try std.testing.expectEqual(@as(u16, 10), update.y);
     try std.testing.expectEqual(@as(u21, 'X'), update.cell.char);
+}
+
+const AppTestHelpers = struct {
+    const TestState = struct {
+        count: i32 = 0,
+    };
+
+    fn testUpdate(state: *TestState, ev: Event) Action {
+        _ = ev;
+        state.count += 1;
+        return Action.none_action;
+    }
+
+    fn testView(state: *TestState, fr: *Frame(App(TestState).DefaultMaxWidgets)) void {
+        _ = state;
+        _ = fr;
+    }
+};
+
+test "app re-export" {
+    var app = App(AppTestHelpers.TestState).init(.{
+        .state = .{ .count = 10 },
+        .update = AppTestHelpers.testUpdate,
+        .view = AppTestHelpers.testView,
+    });
+
+    try std.testing.expectEqual(@as(i32, 10), app.state.count);
+
+    _ = app.update(Event{ .tick = {} });
+    try std.testing.expectEqual(@as(i32, 11), app.state.count);
 }
