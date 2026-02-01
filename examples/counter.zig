@@ -17,16 +17,14 @@ const State = struct {
 fn update(state: *State, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
-            // No modifiers for these keys
-            if (!key.modifiers.any()) {
-                switch (key.code) {
-                    .char => |c| {
-                        if (c == 'q') return .quit;
-                    },
-                    .up => state.count +|= 1,
-                    .down => state.count -|= 1,
-                    else => {},
-                }
+            switch (key.code) {
+                .char => |c| {
+                    if (c == 'q' and !key.modifiers.any()) return .quit;
+                    if (c == 'c' and key.modifiers.ctrl) return .quit;
+                },
+                .up => if (!key.modifiers.any()) { state.count +|= 1; },
+                .down => if (!key.modifiers.any()) { state.count -|= 1; },
+                else => {},
             }
         },
         else => {},
@@ -40,7 +38,7 @@ fn view(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidget
 
     // Draw a block with title
     const block = zithril.Block{
-        .title = "Counter",
+        .title = "Counter (up/down, q/Ctrl-C to quit)",
         .border = .rounded,
         .border_style = zithril.Style.init().fg(.cyan),
     };

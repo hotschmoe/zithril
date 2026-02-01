@@ -140,24 +140,23 @@ const State = struct {
 fn update(state: *State, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
-            if (!key.modifiers.any()) {
-                switch (key.code) {
-                    .char => |c| switch (c) {
-                        'q' => return .quit,
-                        'j' => handleDown(state),
-                        'k' => handleUp(state),
-                        else => {},
-                    },
-                    .up => handleUp(state),
-                    .down => handleDown(state),
-                    .tab => state.cycleFocus(),
-                    else => {},
-                }
-            } else if (key.modifiers.shift) {
-                switch (key.code) {
-                    .backtab => state.cycleFocus(),
-                    else => {},
-                }
+            switch (key.code) {
+                .char => |c| {
+                    if (key.modifiers.ctrl and c == 'c') return .quit;
+                    if (!key.modifiers.any()) {
+                        switch (c) {
+                            'q' => return .quit,
+                            'j' => handleDown(state),
+                            'k' => handleUp(state),
+                            else => {},
+                        }
+                    }
+                },
+                .up => if (!key.modifiers.any()) handleUp(state),
+                .down => if (!key.modifiers.any()) handleDown(state),
+                .tab => if (!key.modifiers.any()) state.cycleFocus(),
+                .backtab => if (key.modifiers.shift) state.cycleFocus(),
+                else => {},
             }
         },
         else => {},
@@ -387,7 +386,7 @@ fn renderStatusBar(state: *State, frame: *zithril.Frame(zithril.App(State).Defau
     frame.render(clear, area);
 
     // Status text
-    const status_text = "Ralph | Connected | q:Quit Tab:Focus j/k:Navigate";
+    const status_text = "Ralph | Connected | q/Ctrl-C:Quit Tab:Focus j/k:Navigate";
     const text = zithril.Text{
         .content = status_text,
         .style = zithril.Style.init().fg(.white).bg(.blue).bold(),

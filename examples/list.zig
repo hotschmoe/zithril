@@ -41,22 +41,25 @@ const State = struct {
 fn update(state: *State, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
-            if (!key.modifiers.any()) {
-                switch (key.code) {
-                    .char => |c| switch (c) {
-                        'q' => return .quit,
-                        'j' => state.selectNext(),
-                        'k' => state.selectPrev(),
-                        'g' => state.selectFirst(),
-                        'G' => state.selectLast(),
-                        else => {},
-                    },
-                    .up => state.selectPrev(),
-                    .down => state.selectNext(),
-                    .home => state.selectFirst(),
-                    .end => state.selectLast(),
-                    else => {},
-                }
+            switch (key.code) {
+                .char => |c| {
+                    if (key.modifiers.ctrl and c == 'c') return .quit;
+                    if (!key.modifiers.any()) {
+                        switch (c) {
+                            'q' => return .quit,
+                            'j' => state.selectNext(),
+                            'k' => state.selectPrev(),
+                            'g' => state.selectFirst(),
+                            'G' => state.selectLast(),
+                            else => {},
+                        }
+                    }
+                },
+                .up => if (!key.modifiers.any()) state.selectPrev(),
+                .down => if (!key.modifiers.any()) state.selectNext(),
+                .home => if (!key.modifiers.any()) state.selectFirst(),
+                .end => if (!key.modifiers.any()) state.selectLast(),
+                else => {},
             }
         },
         else => {},
@@ -70,7 +73,7 @@ fn view(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidget
 
     // Outer block with title
     const block = zithril.Block{
-        .title = "List Navigation (j/k or arrows, q to quit)",
+        .title = "List Navigation (j/k or arrows, q/Ctrl-C to quit)",
         .border = .rounded,
         .border_style = zithril.Style.init().fg(.cyan),
     };

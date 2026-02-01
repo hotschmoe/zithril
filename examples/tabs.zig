@@ -46,24 +46,27 @@ const State = struct {
 fn update(state: *State, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
-            if (!key.modifiers.any()) {
-                switch (key.code) {
-                    .char => |c| switch (c) {
-                        'q' => return .quit,
-                        'h', 'H' => state.prevTab(),
-                        'l', 'L' => state.nextTab(),
-                        '1' => state.selectTab(.overview),
-                        '2' => state.selectTab(.details),
-                        '3' => state.selectTab(.settings),
-                        '4' => state.selectTab(.help),
-                        else => {},
-                    },
-                    .left => state.prevTab(),
-                    .right => state.nextTab(),
-                    .tab => state.nextTab(),
-                    .backtab => state.prevTab(),
-                    else => {},
-                }
+            switch (key.code) {
+                .char => |c| {
+                    if (key.modifiers.ctrl and c == 'c') return .quit;
+                    if (!key.modifiers.any()) {
+                        switch (c) {
+                            'q' => return .quit,
+                            'h', 'H' => state.prevTab(),
+                            'l', 'L' => state.nextTab(),
+                            '1' => state.selectTab(.overview),
+                            '2' => state.selectTab(.details),
+                            '3' => state.selectTab(.settings),
+                            '4' => state.selectTab(.help),
+                            else => {},
+                        }
+                    }
+                },
+                .left => if (!key.modifiers.any()) state.prevTab(),
+                .right => if (!key.modifiers.any()) state.nextTab(),
+                .tab => if (!key.modifiers.any()) state.nextTab(),
+                .backtab => state.prevTab(),
+                else => {},
             }
         },
         else => {},
@@ -77,7 +80,7 @@ fn view(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidget
 
     // Main outer block
     const block = zithril.Block{
-        .title = "Tabs Example (1-4 or arrows, q to quit)",
+        .title = "Tabs Example (1-4 or arrows, q/Ctrl-C to quit)",
         .border = .rounded,
         .border_style = zithril.Style.init().fg(.cyan),
     };
