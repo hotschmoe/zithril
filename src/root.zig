@@ -101,6 +101,28 @@ pub const Input = input_mod.Input;
 pub const text_mod = @import("text.zig");
 pub const displayWidth = text_mod.displayWidth;
 
+// Animation helpers
+pub const animation = @import("animation.zig");
+pub const Animation = animation.Animation;
+pub const Easing = animation.Easing;
+pub const Keyframe = animation.Keyframe;
+pub const KeyframeAnimation = animation.KeyframeAnimation;
+pub const Duration = animation.Duration;
+pub const FrameTimer = animation.FrameTimer;
+pub const lerp = animation.lerp;
+pub const inverseLerp = animation.inverseLerp;
+pub const remap = animation.remap;
+pub const smoothstep = animation.smoothstep;
+pub const smootherstep = animation.smootherstep;
+
+// Terminal graphics protocols
+pub const graphics = @import("graphics.zig");
+pub const GraphicsProtocol = graphics.GraphicsProtocol;
+pub const GraphicsCapabilities = graphics.GraphicsCapabilities;
+pub const SixelEncoder = graphics.SixelEncoder;
+pub const KittyEncoder = graphics.KittyEncoder;
+pub const ITerm2Encoder = graphics.ITerm2Encoder;
+
 // Widgets
 pub const widgets = @import("widgets.zig");
 pub const Block = widgets.Block;
@@ -466,4 +488,50 @@ test "block render" {
 
     // Check title is rendered
     try std.testing.expectEqual(@as(u21, 'H'), buf.get(1, 0).char);
+}
+
+test "animation re-export" {
+    // Test Animation type
+    var anim = Animation.init(1000);
+    try std.testing.expectEqual(@as(u32, 1000), anim.duration_ms);
+    try std.testing.expect(!anim.isComplete());
+
+    _ = anim.update(500);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.5), anim.rawProgress(), 0.001);
+
+    // Test Easing
+    try std.testing.expectApproxEqAbs(@as(f32, 0.5), Easing.linear.apply(0.5), 0.001);
+
+    // Test Duration
+    const dur = Duration.fromSeconds(1.5);
+    try std.testing.expectEqual(@as(u32, 1500), dur.ms);
+
+    // Test FrameTimer
+    var timer = FrameTimer.init(60);
+    try std.testing.expectEqual(@as(u32, 16), timer.msPerFrame());
+
+    // Test interpolation helpers
+    try std.testing.expectApproxEqAbs(@as(f32, 50.0), lerp(0.0, 100.0, 0.5), 0.001);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.5), inverseLerp(0.0, 100.0, 50.0), 0.001);
+}
+
+test "graphics re-export" {
+    // Test GraphicsProtocol
+    try std.testing.expectEqualStrings("Sixel", GraphicsProtocol.sixel.name());
+    try std.testing.expectEqualStrings("Kitty", GraphicsProtocol.kitty.name());
+
+    // Test GraphicsCapabilities
+    const caps = GraphicsCapabilities.detect();
+    _ = caps.hasGraphics();
+
+    // Test SixelEncoder
+    const sixel = SixelEncoder.init();
+    try std.testing.expect(sixel.palette_size > 0);
+
+    // Test KittyEncoder
+    var kitty = KittyEncoder.init();
+    try std.testing.expectEqual(@as(u32, 1), kitty.nextImageId());
+
+    // Test ITerm2Encoder
+    _ = ITerm2Encoder.init();
 }
