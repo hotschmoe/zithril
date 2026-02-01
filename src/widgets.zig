@@ -20,10 +20,18 @@ pub const paragraph = @import("widgets/paragraph.zig");
 pub const Paragraph = paragraph.Paragraph;
 pub const Wrap = paragraph.Wrap;
 
+pub const table = @import("widgets/table.zig");
+pub const Table = table.Table;
+
+pub const tabs = @import("widgets/tabs.zig");
+pub const Tabs = tabs.Tabs;
+
 test "widgets module" {
     _ = block;
     _ = text;
     _ = list;
     _ = gauge;
     _ = paragraph;
+    _ = table;
+    _ = tabs;
 }
