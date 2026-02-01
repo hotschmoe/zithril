@@ -10,7 +10,6 @@ pub const Buffer = buffer_mod.Buffer;
 pub const Cell = buffer_mod.Cell;
 pub const Rect = geometry.Rect;
 pub const Style = style_mod.Style;
-pub const Color = style_mod.Color;
 
 /// Navigable list widget with items, selection highlighting, and scroll support.
 ///

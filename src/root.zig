@@ -82,6 +82,8 @@ pub const widgets = @import("widgets.zig");
 pub const Block = widgets.Block;
 pub const BorderType = widgets.BorderType;
 pub const BorderChars = widgets.BorderChars;
+pub const Text = widgets.Text;
+pub const List = widgets.List;
 pub const Alignment = widgets.Alignment;
 
 test "style wrapper" {
