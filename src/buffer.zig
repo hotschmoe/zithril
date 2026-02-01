@@ -2,7 +2,6 @@
 // A 2D grid of Cells that widgets render into
 
 const std = @import("std");
-pub const rich_zig = @import("rich_zig");
 const cell_mod = @import("cell.zig");
 const geometry = @import("geometry.zig");
 const style_mod = @import("style.zig");

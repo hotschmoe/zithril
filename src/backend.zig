@@ -4,7 +4,6 @@
 
 const std = @import("std");
 const posix = std.posix;
-const builtin = @import("builtin");
 
 /// Global pointer to the active backend for panic/signal cleanup.
 /// Only one backend can be active at a time (standard for TUI apps).
@@ -176,14 +175,6 @@ pub const panic = struct {
         call("noreturn function returned", null);
     }
 };
-
-/// Signal handler for SIGINT, SIGTERM, etc.
-fn signalHandler(sig: c_int) callconv(.C) void {
-    _ = sig;
-    emergencyCleanup();
-    // Re-raise to get default behavior (exit)
-    posix.raise(posix.SIG.TERM) catch {};
-}
 
 /// Configuration options for terminal initialization.
 pub const BackendConfig = struct {
