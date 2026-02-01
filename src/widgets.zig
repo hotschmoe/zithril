@@ -13,8 +13,12 @@ pub const Alignment = text.Alignment;
 pub const list = @import("widgets/list.zig");
 pub const List = list.List;
 
+pub const gauge = @import("widgets/gauge.zig");
+pub const Gauge = gauge.Gauge;
+
 test "widgets module" {
     _ = block;
     _ = text;
     _ = list;
+    _ = gauge;
 }

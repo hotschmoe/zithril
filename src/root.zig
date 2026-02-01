@@ -4,6 +4,14 @@
 const std = @import("std");
 pub const rich_zig = @import("rich_zig");
 
+// Error types
+pub const errors = @import("errors.zig");
+pub const Error = errors.Error;
+pub const ErrorContext = errors.ErrorContext;
+pub const mapAllocError = errors.mapAllocError;
+pub const withContext = errors.withContext;
+pub const withContextHere = errors.withContextHere;
+
 // Geometry types
 pub const geometry = @import("geometry.zig");
 pub const Rect = geometry.Rect;
@@ -84,6 +92,7 @@ pub const BorderType = widgets.BorderType;
 pub const BorderChars = widgets.BorderChars;
 pub const Text = widgets.Text;
 pub const List = widgets.List;
+pub const Gauge = widgets.Gauge;
 pub const Alignment = widgets.Alignment;
 
 test "style wrapper" {
