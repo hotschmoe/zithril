@@ -58,6 +58,9 @@ pub const App = app_mod.App;
 pub const backend_mod = @import("backend.zig");
 pub const Backend = backend_mod.Backend;
 pub const BackendConfig = backend_mod.BackendConfig;
+pub const ColorSupport = backend_mod.ColorSupport;
+pub const detectColorSupport = backend_mod.detectColorSupport;
+pub const getTerminalSize = backend_mod.getTerminalSize;
 pub const terminal_panic = backend_mod.panic;
 
 test "style wrapper" {
@@ -169,6 +172,22 @@ test "backend re-export" {
     };
     try std.testing.expect(custom_config.mouse_capture);
     try std.testing.expect(custom_config.bracketed_paste);
+}
+
+test "backend queries re-export" {
+    // Test ColorSupport enum
+    try std.testing.expectEqual(@as(u32, 16), ColorSupport.basic.colorCount());
+    try std.testing.expectEqual(@as(u32, 256), ColorSupport.extended.colorCount());
+    try std.testing.expectEqual(@as(u32, 16_777_216), ColorSupport.true_color.colorCount());
+
+    // Test detectColorSupport function exists and returns valid value
+    const color_support = detectColorSupport();
+    try std.testing.expect(color_support == .basic or color_support == .extended or color_support == .true_color);
+
+    // Test getTerminalSize function exists and returns valid dimensions
+    const size = getTerminalSize();
+    try std.testing.expect(size.width > 0);
+    try std.testing.expect(size.height > 0);
 }
 
 test "frame re-export" {

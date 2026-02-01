@@ -17,6 +17,10 @@ pub const Action = action_mod.Action;
 /// - state: Instance of the user's State type
 /// - update_fn: Function pointer for handling events, returns an Action
 /// - view_fn: Function pointer for rendering the UI
+/// - tick_rate_ms: Timer interval for tick events (0 = disabled)
+/// - mouse_capture: Enable mouse event reporting
+/// - paste_bracket: Enable bracketed paste mode
+/// - alternate_screen: Use alternate screen buffer
 pub fn App(comptime State: type) type {
     return struct {
         const Self = @This();
@@ -36,7 +40,23 @@ pub fn App(comptime State: type) type {
         /// The frame provides layout and render methods.
         view_fn: *const fn (*State, *Frame(DefaultMaxWidgets)) void,
 
-        /// Configuration options.
+        /// Timer interval in milliseconds for tick events.
+        /// Set to 0 to disable tick events.
+        tick_rate_ms: u32,
+
+        /// Enable mouse event reporting.
+        /// When true, the terminal backend will capture mouse events.
+        mouse_capture: bool,
+
+        /// Enable bracketed paste mode.
+        /// Distinguishes pasted text from typed text.
+        paste_bracket: bool,
+
+        /// Use alternate screen buffer.
+        /// Preserves original terminal content on exit.
+        alternate_screen: bool,
+
+        /// Configuration options for App initialization.
         pub const Config = struct {
             /// Initial state instance.
             state: State,
@@ -44,6 +64,14 @@ pub fn App(comptime State: type) type {
             update: *const fn (*State, Event) Action,
             /// View function pointer.
             view: *const fn (*State, *Frame(DefaultMaxWidgets)) void,
+            /// Timer interval in milliseconds for tick events (0 = disabled).
+            tick_rate_ms: u32 = 0,
+            /// Enable mouse event reporting.
+            mouse_capture: bool = false,
+            /// Enable bracketed paste mode.
+            paste_bracket: bool = false,
+            /// Use alternate screen buffer.
+            alternate_screen: bool = true,
         };
 
         /// Initialize an App with the given configuration.
@@ -52,6 +80,21 @@ pub fn App(comptime State: type) type {
                 .state = config.state,
                 .update_fn = config.update,
                 .view_fn = config.view,
+                .tick_rate_ms = config.tick_rate_ms,
+                .mouse_capture = config.mouse_capture,
+                .paste_bracket = config.paste_bracket,
+                .alternate_screen = config.alternate_screen,
+            };
+        }
+
+        /// Returns a BackendConfig derived from this App's configuration.
+        /// Used by the event loop to initialize the terminal backend.
+        pub fn backendConfig(self: Self) @import("backend.zig").BackendConfig {
+            return .{
+                .alternate_screen = self.alternate_screen,
+                .hide_cursor = true,
+                .mouse_capture = self.mouse_capture,
+                .bracketed_paste = self.paste_bracket,
             };
         }
 
@@ -287,4 +330,71 @@ test "regression: App handles all event types in update" {
 
     _ = app.update(Event{ .tick = {} });
     try std.testing.expect(app.state.last_event_type == .tick);
+}
+
+// ============================================================
+// CONFIG TESTS - Runtime configuration options
+// ============================================================
+
+test "config: App.Config has correct defaults" {
+    const config = App(TestHelpers.SimpleState).Config{
+        .state = .{},
+        .update = TestHelpers.simpleUpdate,
+        .view = TestHelpers.simpleView,
+    };
+
+    try std.testing.expectEqual(@as(u32, 0), config.tick_rate_ms);
+    try std.testing.expect(!config.mouse_capture);
+    try std.testing.expect(!config.paste_bracket);
+    try std.testing.expect(config.alternate_screen);
+}
+
+test "config: App stores configuration values" {
+    const app = App(TestHelpers.SimpleState).init(.{
+        .state = .{},
+        .update = TestHelpers.simpleUpdate,
+        .view = TestHelpers.simpleView,
+        .tick_rate_ms = 100,
+        .mouse_capture = true,
+        .paste_bracket = true,
+        .alternate_screen = false,
+    });
+
+    try std.testing.expectEqual(@as(u32, 100), app.tick_rate_ms);
+    try std.testing.expect(app.mouse_capture);
+    try std.testing.expect(app.paste_bracket);
+    try std.testing.expect(!app.alternate_screen);
+}
+
+test "config: backendConfig translates App config to BackendConfig" {
+    const app = App(TestHelpers.SimpleState).init(.{
+        .state = .{},
+        .update = TestHelpers.simpleUpdate,
+        .view = TestHelpers.simpleView,
+        .mouse_capture = true,
+        .paste_bracket = true,
+        .alternate_screen = false,
+    });
+
+    const backend_config = app.backendConfig();
+
+    try std.testing.expect(!backend_config.alternate_screen);
+    try std.testing.expect(backend_config.hide_cursor);
+    try std.testing.expect(backend_config.mouse_capture);
+    try std.testing.expect(backend_config.bracketed_paste);
+}
+
+test "config: backendConfig uses defaults correctly" {
+    const app = App(TestHelpers.SimpleState).init(.{
+        .state = .{},
+        .update = TestHelpers.simpleUpdate,
+        .view = TestHelpers.simpleView,
+    });
+
+    const backend_config = app.backendConfig();
+
+    try std.testing.expect(backend_config.alternate_screen);
+    try std.testing.expect(backend_config.hide_cursor);
+    try std.testing.expect(!backend_config.mouse_capture);
+    try std.testing.expect(!backend_config.bracketed_paste);
 }

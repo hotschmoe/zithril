@@ -176,6 +176,30 @@ pub const panic = struct {
     }
 };
 
+/// Color support levels detected from terminal capabilities.
+pub const ColorSupport = enum {
+    /// Basic 8/16 colors (standard ANSI).
+    basic,
+    /// 256 color palette (xterm-256color).
+    extended,
+    /// 24-bit true color (RGB).
+    true_color,
+
+    /// Returns the number of colors supported.
+    pub fn colorCount(self: ColorSupport) u32 {
+        return switch (self) {
+            .basic => 16,
+            .extended => 256,
+            .true_color => 16_777_216,
+        };
+    }
+
+    /// Returns true if this support level includes the given level.
+    pub fn supports(self: ColorSupport, level: ColorSupport) bool {
+        return @intFromEnum(self) >= @intFromEnum(level);
+    }
+};
+
 /// Configuration options for terminal initialization.
 pub const BackendConfig = struct {
     /// Enter alternate screen buffer (preserves original terminal content).
@@ -396,6 +420,13 @@ pub const Backend = struct {
         return .{ .width = 80, .height = 24 };
     }
 
+    /// Detect terminal color support level.
+    /// Checks environment variables COLORTERM and TERM to determine capability.
+    /// Returns the highest detected color support level.
+    pub fn getColorSupport(_: *Backend) ColorSupport {
+        return detectColorSupport();
+    }
+
     // ANSI escape sequences
     const ENTER_ALTERNATE_SCREEN = "\x1b[?1049h";
     const LEAVE_ALTERNATE_SCREEN = "\x1b[?1049l";
@@ -412,6 +443,68 @@ pub const Backend = struct {
     const ENABLE_BRACKETED_PASTE = "\x1b[?2004h";
     const DISABLE_BRACKETED_PASTE = "\x1b[?2004l";
 };
+
+/// Detect terminal color support from environment variables.
+/// This is a standalone function that doesn't require a Backend instance.
+/// Checks COLORTERM and TERM environment variables to determine capability.
+pub fn detectColorSupport() ColorSupport {
+    // Check COLORTERM first - most reliable indicator of true color
+    if (std.posix.getenv("COLORTERM")) |colorterm| {
+        if (std.mem.eql(u8, colorterm, "truecolor") or std.mem.eql(u8, colorterm, "24bit")) {
+            return .true_color;
+        }
+    }
+
+    // Check TERM for terminal type hints
+    if (std.posix.getenv("TERM")) |term| {
+        // True color indicators in TERM
+        if (std.mem.indexOf(u8, term, "truecolor") != null or
+            std.mem.indexOf(u8, term, "24bit") != null or
+            std.mem.indexOf(u8, term, "direct") != null)
+        {
+            return .true_color;
+        }
+
+        // 256 color indicators
+        if (std.mem.indexOf(u8, term, "256color") != null or
+            std.mem.indexOf(u8, term, "256") != null)
+        {
+            return .extended;
+        }
+
+        // Known modern terminals that support true color
+        if (std.mem.startsWith(u8, term, "xterm") or
+            std.mem.startsWith(u8, term, "screen") or
+            std.mem.startsWith(u8, term, "tmux") or
+            std.mem.startsWith(u8, term, "vte") or
+            std.mem.startsWith(u8, term, "gnome") or
+            std.mem.startsWith(u8, term, "konsole") or
+            std.mem.startsWith(u8, term, "alacritty") or
+            std.mem.startsWith(u8, term, "kitty") or
+            std.mem.startsWith(u8, term, "iterm"))
+        {
+            // These terminals typically support at least 256 colors
+            // Many support true color but we're conservative
+            return .extended;
+        }
+    }
+
+    // Default to basic 16-color support
+    return .basic;
+}
+
+/// Get terminal size without requiring a Backend instance.
+/// Useful for initial configuration before Backend initialization.
+/// Returns default 80x24 if size cannot be determined.
+pub fn getTerminalSize() struct { width: u16, height: u16 } {
+    const fd = posix.STDOUT_FILENO;
+    var ws: posix.winsize = undefined;
+    const result = posix.system.ioctl(fd, posix.T.IOCGWINSZ, @intFromPtr(&ws));
+    if (result == 0) {
+        return .{ .width = ws.col, .height = ws.row };
+    }
+    return .{ .width = 80, .height = 24 };
+}
 
 // ============================================================
 // SANITY TESTS - Backend configuration
@@ -502,4 +595,50 @@ test "sanity: panic namespace exists with call function" {
     try std.testing.expect(@hasDecl(panic, "call"));
     try std.testing.expect(@hasDecl(panic, "outOfBounds"));
     try std.testing.expect(@hasDecl(panic, "unwrapError"));
+}
+
+// ============================================================
+// SANITY TESTS - Color support detection
+// ============================================================
+
+test "sanity: ColorSupport enum values" {
+    try std.testing.expect(@intFromEnum(ColorSupport.basic) < @intFromEnum(ColorSupport.extended));
+    try std.testing.expect(@intFromEnum(ColorSupport.extended) < @intFromEnum(ColorSupport.true_color));
+}
+
+test "sanity: ColorSupport.colorCount returns correct values" {
+    try std.testing.expectEqual(@as(u32, 16), ColorSupport.basic.colorCount());
+    try std.testing.expectEqual(@as(u32, 256), ColorSupport.extended.colorCount());
+    try std.testing.expectEqual(@as(u32, 16_777_216), ColorSupport.true_color.colorCount());
+}
+
+test "sanity: ColorSupport.supports comparison" {
+    // basic supports only basic
+    try std.testing.expect(ColorSupport.basic.supports(.basic));
+    try std.testing.expect(!ColorSupport.basic.supports(.extended));
+    try std.testing.expect(!ColorSupport.basic.supports(.true_color));
+
+    // extended supports basic and extended
+    try std.testing.expect(ColorSupport.extended.supports(.basic));
+    try std.testing.expect(ColorSupport.extended.supports(.extended));
+    try std.testing.expect(!ColorSupport.extended.supports(.true_color));
+
+    // true_color supports all
+    try std.testing.expect(ColorSupport.true_color.supports(.basic));
+    try std.testing.expect(ColorSupport.true_color.supports(.extended));
+    try std.testing.expect(ColorSupport.true_color.supports(.true_color));
+}
+
+test "behavior: detectColorSupport returns valid enum" {
+    // Just verify it returns one of the valid enum values without crashing
+    const support = detectColorSupport();
+    try std.testing.expect(support == .basic or support == .extended or support == .true_color);
+}
+
+test "behavior: getTerminalSize returns reasonable values" {
+    // Just verify it returns values without crashing
+    // In a non-TTY test environment, it returns default 80x24
+    const size = getTerminalSize();
+    try std.testing.expect(size.width > 0);
+    try std.testing.expect(size.height > 0);
 }
