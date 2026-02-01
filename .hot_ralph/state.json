@@ -1,6 +1,6 @@
 {
     "current_task_id": null,
-    "phase": "idle",
+    "phase": "simplifying",
     "output_file": null,
     "started_at": null,
     "tasks_since_introspection": 0,
