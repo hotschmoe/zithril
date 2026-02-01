@@ -1,7 +1,10 @@
 // Event types for zithril TUI framework
-// Input events from keyboard, mouse, terminal resize, and ticks
+// Input events from keyboard, mouse, terminal resize, ticks, and command results
 
 const std = @import("std");
+const action_mod = @import("action.zig");
+
+pub const CommandResult = action_mod.CommandResult;
 
 /// Event union representing all possible input events.
 /// The main event loop polls for these and passes them to the update function.
@@ -17,6 +20,10 @@ pub const Event = union(enum) {
 
     /// Timer tick event (for animations, polling).
     tick: void,
+
+    /// Result from a previously submitted command.
+    /// Delivered when a Command completes execution.
+    command_result: CommandResult,
 };
 
 /// Keyboard event with key code and modifier state.
@@ -210,6 +217,14 @@ test "sanity: Event.resize construction" {
 test "sanity: Event.tick construction" {
     const event = Event{ .tick = {} };
     try std.testing.expect(event == .tick);
+}
+
+test "sanity: Event.command_result construction" {
+    const result = CommandResult.success(42, null);
+    const event = Event{ .command_result = result };
+    try std.testing.expect(event == .command_result);
+    try std.testing.expectEqual(@as(u32, 42), event.command_result.id);
+    try std.testing.expect(event.command_result.isSuccess());
 }
 
 test "sanity: KeyCode char creation" {

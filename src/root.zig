@@ -46,10 +46,19 @@ pub const Mouse = event.Mouse;
 pub const MouseKind = event.MouseKind;
 pub const Size = event.Size;
 
+// Mouse utilities
+pub const mouse_util = @import("mouse.zig");
+pub const HitRegion = mouse_util.HitRegion;
+pub const HitTester = mouse_util.HitTester;
+pub const HoverState = mouse_util.HoverState;
+pub const DragState = mouse_util.DragState;
+pub const ScrollAccumulator = mouse_util.ScrollAccumulator;
+
 // Action types
 pub const action = @import("action.zig");
 pub const Action = action.Action;
 pub const Command = action.Command;
+pub const CommandResult = action.CommandResult;
 
 // Cell type (buffer building block)
 pub const cell_mod = @import("cell.zig");
@@ -166,6 +175,39 @@ test "event re-export" {
     try std.testing.expect(f5_key != null);
 }
 
+test "mouse utilities re-export" {
+    // Test HitTester
+    var tester = HitTester(u32, 8).init();
+    try std.testing.expect(tester.register(1, Rect.init(0, 0, 20, 10)));
+    try std.testing.expect(tester.register(2, Rect.init(30, 0, 20, 10)));
+
+    try std.testing.expectEqual(@as(?u32, 1), tester.hitTest(Mouse.init(10, 5, .down)));
+    try std.testing.expectEqual(@as(?u32, 2), tester.hitTest(Mouse.init(40, 5, .down)));
+    try std.testing.expectEqual(@as(?u32, null), tester.hitTest(Mouse.init(25, 5, .down)));
+
+    // Test HoverState
+    var hover = HoverState{};
+    const rect = Rect.init(10, 10, 20, 20);
+    try std.testing.expect(!hover.isHovering());
+    const transition = hover.update(rect, Mouse.init(15, 15, .move));
+    try std.testing.expect(transition == .entered);
+    try std.testing.expect(hover.isHovering());
+
+    // Test DragState
+    var drag = DragState{};
+    _ = drag.handleMouse(Mouse.init(10, 10, .down));
+    try std.testing.expect(drag.active);
+    _ = drag.handleMouse(Mouse.init(20, 20, .drag));
+    try std.testing.expect(drag.hasMoved());
+    const sel = drag.selectionRect();
+    try std.testing.expect(sel != null);
+    try std.testing.expectEqual(@as(u16, 11), sel.?.width);
+
+    // Test ScrollAccumulator
+    var scroll = ScrollAccumulator{};
+    try std.testing.expectEqual(@as(?i32, -1), scroll.handleMouse(Mouse.init(0, 0, .scroll_up)));
+}
+
 test "action re-export" {
     const none_action = Action{ .none = {} };
     try std.testing.expect(none_action.isNone());
@@ -178,6 +220,15 @@ test "action re-export" {
 
     try std.testing.expect(Action.none_action.isNone());
     try std.testing.expect(Action.quit_action.isQuit());
+
+    // Test CommandResult
+    const result = CommandResult.success(42, null);
+    try std.testing.expect(result.isSuccess());
+    try std.testing.expectEqual(@as(u32, 42), result.id);
+
+    // Test command_result event
+    const result_event = Event{ .command_result = result };
+    try std.testing.expect(result_event == .command_result);
 }
 
 test "cell re-export" {

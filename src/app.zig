@@ -511,7 +511,7 @@ test "regression: App with empty state struct" {
 }
 
 const EventTrackingHelpers = struct {
-    const EventType = enum { none, key, mouse, resize, tick };
+    const EventType = enum { none, key, mouse, resize, tick, command_result };
 
     const TrackingState = struct {
         last_event_type: EventType = .none,
@@ -523,6 +523,7 @@ const EventTrackingHelpers = struct {
             .mouse => .mouse,
             .resize => .resize,
             .tick => .tick,
+            .command_result => .command_result,
         };
         return Action.none_action;
     }
