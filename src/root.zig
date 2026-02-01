@@ -20,6 +20,16 @@ pub const layout = @import("layout.zig");
 pub const Constraint = layout.Constraint;
 pub const Direction = layout.Direction;
 
+// Event types
+pub const event = @import("event.zig");
+pub const Event = event.Event;
+pub const Key = event.Key;
+pub const KeyCode = event.KeyCode;
+pub const Modifiers = event.Modifiers;
+pub const Mouse = event.Mouse;
+pub const MouseKind = event.MouseKind;
+pub const Size = event.Size;
+
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
     try std.testing.expect(style.hasAttribute(.bold));
@@ -51,4 +61,28 @@ test "layout re-export" {
     try std.testing.expectEqual(@as(u16, 100), c5.apply(100));
 
     try std.testing.expect(Direction.horizontal != Direction.vertical);
+}
+
+test "event re-export" {
+    const key_event = Event{ .key = .{ .code = .escape, .modifiers = Modifiers.ctrl_only() } };
+    try std.testing.expect(key_event == .key);
+    try std.testing.expect(key_event.key.code == .escape);
+    try std.testing.expect(key_event.key.modifiers.ctrl);
+
+    const mouse_event = Event{ .mouse = Mouse.init(5, 10, .down) };
+    try std.testing.expect(mouse_event == .mouse);
+    try std.testing.expect(mouse_event.mouse.kind == .down);
+
+    const resize_event = Event{ .resize = Size.init(120, 40) };
+    try std.testing.expect(resize_event == .resize);
+    try std.testing.expectEqual(@as(u16, 120), resize_event.resize.width);
+
+    const tick_event = Event{ .tick = {} };
+    try std.testing.expect(tick_event == .tick);
+
+    const char_key = KeyCode.fromChar('q');
+    try std.testing.expect(char_key.isChar());
+
+    const f5_key = KeyCode.fromF(5);
+    try std.testing.expect(f5_key != null);
 }
