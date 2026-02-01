@@ -2,7 +2,7 @@
 
 *Light as a feather, hard as dragon scales.*
 
-A Zig TUI framework for building terminal user interfaces. Immediate mode rendering, zero hidden state, built on [rich_zig](https://github.com/your-username/rich_zig).
+A Zig TUI framework for building terminal user interfaces. Immediate mode rendering, zero hidden state, built on [rich_zig](https://github.com/hotschmoe/rich_zig).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -545,7 +545,7 @@ Inspired by:
 - [OpenTUI](https://github.com/anomalyco/opentui) (TypeScript) — Modern TUI patterns
 
 Built on:
-- [rich_zig](https://github.com/your-username/rich_zig) — Terminal rendering primitives
+- [rich_zig](https://github.com/hotschmoe/rich_zig) — Terminal rendering primitives
 
 ## License
 
