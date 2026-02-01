@@ -2,7 +2,6 @@
 // Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste
 
 const std = @import("std");
-const builtin = @import("builtin");
 const posix = std.posix;
 
 /// Configuration options for terminal initialization.
