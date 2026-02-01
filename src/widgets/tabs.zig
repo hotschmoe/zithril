@@ -5,6 +5,7 @@ const std = @import("std");
 const buffer_mod = @import("../buffer.zig");
 const geometry = @import("../geometry.zig");
 const style_mod = @import("../style.zig");
+const text_mod = @import("../text.zig");
 
 pub const Buffer = buffer_mod.Buffer;
 pub const Cell = buffer_mod.Cell;
@@ -50,7 +51,7 @@ pub const Tabs = struct {
             const available_width = area.right() -| x;
             if (available_width == 0) break;
 
-            const title_len = textDisplayWidth(title);
+            const title_len = text_mod.displayWidth(title);
             const render_len = @min(title_len, available_width);
 
             if (render_len > 0) {
@@ -62,7 +63,7 @@ pub const Tabs = struct {
             // Render divider after tab (except for last tab)
             if (idx + 1 < self.titles.len and x < area.right()) {
                 const divider_available = area.right() -| x;
-                const divider_len = textDisplayWidth(self.divider);
+                const divider_len = text_mod.displayWidth(self.divider);
                 const divider_render_len = @min(divider_len, divider_available);
 
                 if (divider_render_len > 0) {
@@ -91,27 +92,6 @@ pub const Tabs = struct {
     }
 };
 
-/// Calculate the display width of a string.
-fn textDisplayWidth(str: []const u8) u16 {
-    var width: u16 = 0;
-    var iter = std.unicode.Utf8View.initUnchecked(str).iterator();
-    while (iter.nextCodepoint()) |cp| {
-        width +|= if (isWideCodepoint(cp)) 2 else 1;
-    }
-    return width;
-}
-
-/// Check if a codepoint is a wide character (CJK, etc.)
-fn isWideCodepoint(cp: u21) bool {
-    return (cp >= 0x4E00 and cp <= 0x9FFF) or
-        (cp >= 0x3400 and cp <= 0x4DBF) or
-        (cp >= 0x20000 and cp <= 0x2A6DF) or
-        (cp >= 0xF900 and cp <= 0xFAFF) or
-        (cp >= 0xFF00 and cp <= 0xFF60) or
-        (cp >= 0xFFE0 and cp <= 0xFFE6) or
-        (cp >= 0x3000 and cp <= 0x303F) or
-        (cp >= 0x1100 and cp <= 0x11FF);
-}
 
 // ============================================================
 // SANITY TESTS - Basic Tabs functionality

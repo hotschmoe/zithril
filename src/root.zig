@@ -85,6 +85,10 @@ pub const terminal_panic = backend_mod.panic;
 pub const input_mod = @import("input.zig");
 pub const Input = input_mod.Input;
 
+// Text utilities
+pub const text_mod = @import("text.zig");
+pub const displayWidth = text_mod.displayWidth;
+
 // Widgets
 pub const widgets = @import("widgets.zig");
 pub const Block = widgets.Block;

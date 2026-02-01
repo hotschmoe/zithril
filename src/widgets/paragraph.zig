@@ -5,6 +5,7 @@ const std = @import("std");
 const buffer_mod = @import("../buffer.zig");
 const geometry = @import("../geometry.zig");
 const style_mod = @import("../style.zig");
+const text_mod = @import("../text.zig");
 
 pub const Buffer = buffer_mod.Buffer;
 pub const Rect = geometry.Rect;
@@ -105,7 +106,7 @@ pub const Paragraph = struct {
     fn renderLine(self: Paragraph, line: []const u8, x: u16, y: u16, width: u16, buf: *Buffer) void {
         if (line.len == 0) return;
 
-        const text_len = textDisplayWidth(line);
+        const text_len = text_mod.displayWidth(line);
         const visible_len = @min(text_len, width);
 
         if (visible_len == 0) return;
@@ -146,28 +147,6 @@ fn findWordWrapEnd(text: []const u8, max_width: u16) usize {
     return width;
 }
 
-/// Calculate the display width of a string (counting grapheme columns).
-/// Simple implementation: counts codepoints, treating wide chars as width 2.
-fn textDisplayWidth(str: []const u8) u16 {
-    var width: u16 = 0;
-    var iter = std.unicode.Utf8View.initUnchecked(str).iterator();
-    while (iter.nextCodepoint()) |cp| {
-        width +|= if (isWideCodepoint(cp)) 2 else 1;
-    }
-    return width;
-}
-
-/// Check if a codepoint is a wide character (CJK, etc.)
-fn isWideCodepoint(cp: u21) bool {
-    return (cp >= 0x4E00 and cp <= 0x9FFF) or // CJK Unified Ideographs
-        (cp >= 0x3400 and cp <= 0x4DBF) or // CJK Extension A
-        (cp >= 0x20000 and cp <= 0x2A6DF) or // CJK Extension B
-        (cp >= 0xF900 and cp <= 0xFAFF) or // CJK Compatibility
-        (cp >= 0xFF00 and cp <= 0xFF60) or // Fullwidth forms
-        (cp >= 0xFFE0 and cp <= 0xFFE6) or // Fullwidth symbols
-        (cp >= 0x3000 and cp <= 0x303F) or // CJK Punctuation
-        (cp >= 0x1100 and cp <= 0x11FF); // Hangul Jamo
-}
 
 // ============================================================
 // SANITY TESTS - Basic Paragraph functionality
@@ -441,12 +420,3 @@ test "regression: findWordWrapEnd hard breaks long word" {
     try std.testing.expectEqual(@as(usize, 5), result);
 }
 
-test "regression: textDisplayWidth handles ASCII" {
-    const w = textDisplayWidth("Hello");
-    try std.testing.expectEqual(@as(u16, 5), w);
-}
-
-test "regression: textDisplayWidth handles wide chars" {
-    const w = textDisplayWidth("\u{4E2D}");
-    try std.testing.expectEqual(@as(u16, 2), w);
-}
