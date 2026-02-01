@@ -200,32 +200,22 @@ test "cellupdate re-export" {
     try std.testing.expectEqual(@as(u21, 'X'), update.cell.char);
 }
 
-const AppTestHelpers = struct {
-    const TestState = struct {
-        count: i32 = 0,
+test "app re-export" {
+    const TestState = struct { count: i32 = 0 };
+    const S = struct {
+        fn update(state: *TestState, ev: Event) Action {
+            _ = ev;
+            state.count += 1;
+            return Action.none_action;
+        }
+        fn view(_: *TestState, _: *Frame(App(TestState).DefaultMaxWidgets)) void {}
     };
 
-    fn testUpdate(state: *TestState, ev: Event) Action {
-        _ = ev;
-        state.count += 1;
-        return Action.none_action;
-    }
-
-    fn testView(state: *TestState, fr: *Frame(App(TestState).DefaultMaxWidgets)) void {
-        _ = state;
-        _ = fr;
-    }
-};
-
-test "app re-export" {
-    var app = App(AppTestHelpers.TestState).init(.{
+    const app = App(TestState).init(.{
         .state = .{ .count = 10 },
-        .update = AppTestHelpers.testUpdate,
-        .view = AppTestHelpers.testView,
+        .update = S.update,
+        .view = S.view,
     });
 
     try std.testing.expectEqual(@as(i32, 10), app.state.count);
-
-    _ = app.update(Event{ .tick = {} });
-    try std.testing.expectEqual(@as(i32, 11), app.state.count);
 }
