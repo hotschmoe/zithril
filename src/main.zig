@@ -1,27 +1,34 @@
 const std = @import("std");
 const zithril = @import("zithril");
+const rich_zig = @import("rich_zig");
 
 pub fn main() !void {
-    // Prints to stderr, ignoring potential errors.
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-    try zithril.bufferedPrint();
-}
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-test "simple test" {
-    const gpa = std.testing.allocator;
-    var list: std.ArrayList(i32) = .empty;
-    defer list.deinit(gpa); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(gpa, 42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
-}
+    var console = rich_zig.Console.init(allocator);
+    defer console.deinit();
 
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
-        }
+    try console.print("");
+    try console.printRenderable(rich_zig.Rule.init().withTitle("zithril").withCharacters("="));
+    try console.print("");
+
+    try console.print("[bold cyan]zithril[/] - Zig TUI Framework");
+    try console.print("Built on [bold]rich_zig[/] for terminal rendering");
+    try console.print("");
+
+    // Demonstrate zithril re-exports
+    const style = zithril.Style.empty.bold().fg(.green);
+    const segments = [_]rich_zig.Segment{
+        rich_zig.Segment.styled("Style re-export works: ", rich_zig.Style.empty),
+        rich_zig.Segment.styled("green bold", style),
     };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
+    try console.printSegments(&segments);
+    try console.print("");
+}
+
+test "main module imports" {
+    _ = zithril.Style;
+    _ = rich_zig.Style;
 }
