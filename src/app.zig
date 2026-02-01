@@ -199,20 +199,16 @@ pub fn App(comptime State: type) type {
                 const maybe_event = try pollEvent(&input, &backend, tick_timeout_ns);
 
                 // Handle tick event generation
-                var event: Event = undefined;
-                if (maybe_event) |e| {
-                    event = e;
-                } else if (tick_timeout_ns != null) {
+                const event: Event = if (maybe_event) |e|
+                    e
+                else if (tick_timeout_ns) |timeout| blk: {
                     const now = std.time.nanoTimestamp();
-                    if (now - last_tick >= @as(i128, tick_timeout_ns.?)) {
-                        event = Event{ .tick = {} };
+                    if (now - last_tick >= @as(i128, timeout)) {
                         last_tick = now;
-                    } else {
-                        continue;
+                        break :blk Event{ .tick = {} };
                     }
-                } else {
                     continue;
-                }
+                } else continue;
 
                 // Handle resize events specially - resize buffers
                 if (event == .resize) {
@@ -307,17 +303,11 @@ pub fn App(comptime State: type) type {
             var last_y: ?u16 = null;
 
             for (changes) |change| {
-                // Move cursor if not consecutive
-                const need_move = if (last_x == null or last_y == null)
-                    true
-                else if (last_y.? != change.y)
-                    true
-                else if (last_x.? + 1 != change.x)
-                    true
-                else
-                    false;
+                // Move cursor if not consecutive (different row or non-adjacent column)
+                const consecutive = last_x != null and last_y != null and
+                    last_y.? == change.y and last_x.? + 1 == change.x;
 
-                if (need_move) {
+                if (!consecutive) {
                     // Add cursor position escape sequence
                     const move_seq = std.fmt.bufPrint(
                         output_buf[output_len..],

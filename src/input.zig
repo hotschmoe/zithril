@@ -122,20 +122,16 @@ pub const Input = struct {
         }
 
         // Parse arrow keys and simple sequences
-        if (bytes.len >= 1) {
-            return switch (bytes[0]) {
-                'A' => Event{ .key = .{ .code = .up } },
-                'B' => Event{ .key = .{ .code = .down } },
-                'C' => Event{ .key = .{ .code = .right } },
-                'D' => Event{ .key = .{ .code = .left } },
-                'H' => Event{ .key = .{ .code = .home } },
-                'F' => Event{ .key = .{ .code = .end } },
-                'Z' => Event{ .key = .{ .code = .backtab } }, // Shift+Tab
-                else => self.parseCsiParams(bytes),
-            };
-        }
-
-        return null;
+        return switch (bytes[0]) {
+            'A' => Event{ .key = .{ .code = .up } },
+            'B' => Event{ .key = .{ .code = .down } },
+            'C' => Event{ .key = .{ .code = .right } },
+            'D' => Event{ .key = .{ .code = .left } },
+            'H' => Event{ .key = .{ .code = .home } },
+            'F' => Event{ .key = .{ .code = .end } },
+            'Z' => Event{ .key = .{ .code = .backtab } }, // Shift+Tab
+            else => self.parseCsiParams(bytes),
+        };
     }
 
     /// Parse CSI sequences with parameters.
