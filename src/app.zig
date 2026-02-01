@@ -282,7 +282,8 @@ pub fn App(comptime State: type) type {
             return null;
         }
 
-        /// Render buffer changes to the terminal.
+        /// Render buffer changes to the terminal using buffered Output.
+        /// Uses rich_zig's ANSI rendering for proper color and attribute output.
         fn renderBuffer(
             backend: *Backend,
             current: *Buffer,
@@ -295,9 +296,8 @@ pub fn App(comptime State: type) type {
                 return;
             }
 
-            // Build output string with cursor movements and cell contents
-            var output_buf: [8192]u8 = undefined;
-            var output_len: usize = 0;
+            // Use buffered output with rich_zig ANSI rendering
+            var out = backend_mod.DefaultOutput.init(backend.fd);
 
             var last_x: ?u16 = null;
             var last_y: ?u16 = null;
@@ -308,30 +308,19 @@ pub fn App(comptime State: type) type {
                     last_y.? == change.y and last_x.? + 1 == change.x;
 
                 if (!consecutive) {
-                    // Add cursor position escape sequence
-                    const move_seq = std.fmt.bufPrint(
-                        output_buf[output_len..],
-                        "\x1b[{d};{d}H",
-                        .{ change.y + 1, change.x + 1 },
-                    ) catch break;
-                    output_len += move_seq.len;
+                    out.cursorTo(change.x, change.y);
                 }
 
-                // Add style escape sequence
-                const style_seq = renderCellStyle(
-                    output_buf[output_len..],
-                    change.cell,
-                ) catch break;
-                output_len += style_seq.len;
+                // Set style using rich_zig ANSI rendering
+                if (!change.cell.style.isEmpty()) {
+                    out.setStyle(change.cell.style);
+                } else {
+                    out.resetStyle();
+                }
 
-                // Add character
+                // Write character
                 if (change.cell.width > 0) {
-                    var char_buf: [4]u8 = undefined;
-                    const char_len = std.unicode.utf8Encode(change.cell.char, &char_buf) catch 1;
-                    if (output_len + char_len <= output_buf.len) {
-                        @memcpy(output_buf[output_len..][0..char_len], char_buf[0..char_len]);
-                        output_len += char_len;
-                    }
+                    out.writeChar(change.cell.char, @import("style.zig").Style.empty);
                 }
 
                 last_x = change.x;
@@ -339,95 +328,10 @@ pub fn App(comptime State: type) type {
             }
 
             // Reset style at the end
-            if (output_len + 4 <= output_buf.len) {
-                @memcpy(output_buf[output_len..][0..4], "\x1b[0m");
-                output_len += 4;
-            }
+            out.resetStyle();
 
-            // Write to terminal
-            backend.write(output_buf[0..output_len]) catch {
-                return RunError.IoError;
-            };
-            backend.flush();
-        }
-
-        /// Render a cell's style as an ANSI escape sequence.
-        fn renderCellStyle(buf: []u8, cell: cell_mod.Cell) error{NoSpaceLeft}![]u8 {
-            const style = cell.style;
-
-            // Use a fixed-size buffer for building the escape sequence
-            var fbs = std.io.fixedBufferStream(buf);
-            const writer = fbs.writer();
-
-            // Write SGR introducer
-            try writer.writeAll("\x1b[0");
-
-            // Add attributes
-            if (style.hasAttribute(.bold)) {
-                try writer.writeAll(";1");
-            }
-            if (style.hasAttribute(.dim)) {
-                try writer.writeAll(";2");
-            }
-            if (style.hasAttribute(.italic)) {
-                try writer.writeAll(";3");
-            }
-            if (style.hasAttribute(.underline)) {
-                try writer.writeAll(";4");
-            }
-            if (style.hasAttribute(.blink)) {
-                try writer.writeAll(";5");
-            }
-            if (style.hasAttribute(.reverse)) {
-                try writer.writeAll(";7");
-            }
-            if (style.hasAttribute(.strike)) {
-                try writer.writeAll(";9");
-            }
-
-            // Add foreground color if set
-            const fg = style.inner.foreground;
-            if (!fg.eql(@import("rich_zig").Color.default)) {
-                if (fg.color_type == .standard or fg.color_type == .eight_bit) {
-                    if (fg.number) |n| {
-                        if (n < 8) {
-                            try writer.print(";{d}", .{30 + n});
-                        } else if (n < 16) {
-                            try writer.print(";{d}", .{90 + n - 8});
-                        } else {
-                            try writer.print(";38;5;{d}", .{n});
-                        }
-                    }
-                } else if (fg.color_type == .truecolor) {
-                    if (fg.triplet) |t| {
-                        try writer.print(";38;2;{d};{d};{d}", .{ t.r, t.g, t.b });
-                    }
-                }
-            }
-
-            // Add background color if set
-            const bg = style.inner.background;
-            if (!bg.eql(@import("rich_zig").Color.default)) {
-                if (bg.color_type == .standard or bg.color_type == .eight_bit) {
-                    if (bg.number) |n| {
-                        if (n < 8) {
-                            try writer.print(";{d}", .{40 + n});
-                        } else if (n < 16) {
-                            try writer.print(";{d}", .{100 + n - 8});
-                        } else {
-                            try writer.print(";48;5;{d}", .{n});
-                        }
-                    }
-                } else if (bg.color_type == .truecolor) {
-                    if (bg.triplet) |t| {
-                        try writer.print(";48;2;{d};{d};{d}", .{ t.r, t.g, t.b });
-                    }
-                }
-            }
-
-            try writer.writeByte('m');
-
-            return fbs.getWritten();
+            // Flush buffered output to terminal
+            out.flush();
         }
     };
 }

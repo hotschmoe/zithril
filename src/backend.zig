@@ -1,9 +1,17 @@
 // Terminal backend for zithril TUI framework
 // Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste
+// Provides buffered output with rich_zig integration for ANSI rendering
 // Includes panic handler to ensure terminal cleanup on abnormal exit
 
 const std = @import("std");
 const posix = std.posix;
+const rich_zig = @import("rich_zig");
+const style_mod = @import("style.zig");
+pub const Style = style_mod.Style;
+pub const Color = style_mod.Color;
+pub const ColorSystem = style_mod.ColorSystem;
+pub const Segment = style_mod.Segment;
+pub const ControlCode = style_mod.ControlCode;
 
 /// Global pointer to the active backend for panic/signal cleanup.
 /// Only one backend can be active at a time (standard for TUI apps).
@@ -511,6 +519,245 @@ pub fn getTerminalSize() TerminalSize {
     return getSizeForFd(posix.STDOUT_FILENO);
 }
 
+/// Buffered terminal output with rich_zig integration.
+/// Accumulates output in a buffer and flushes to the terminal efficiently.
+/// Provides cursor positioning, clearing, and styled text output.
+pub fn Output(comptime buffer_size: usize) type {
+    return struct {
+        const Self = @This();
+
+        /// Internal buffer for accumulating output.
+        buffer: [buffer_size]u8 = undefined,
+        /// Current position in the buffer.
+        pos: usize = 0,
+        /// File descriptor for output.
+        fd: posix.fd_t,
+        /// Detected color system for ANSI rendering.
+        color_system: ColorSystem,
+        /// Last style written (for optimization).
+        last_style: ?Style = null,
+
+        /// Initialize output with detected color support.
+        pub fn init(fd: posix.fd_t) Self {
+            return .{
+                .fd = fd,
+                .color_system = colorSupportToSystem(detectColorSupport()),
+            };
+        }
+
+        /// Initialize output with explicit color system.
+        pub fn initWithColorSystem(fd: posix.fd_t, color_system: ColorSystem) Self {
+            return .{
+                .fd = fd,
+                .color_system = color_system,
+            };
+        }
+
+        /// Write raw bytes to the buffer.
+        pub fn writeRaw(self: *Self, data: []const u8) void {
+            for (data) |byte| {
+                if (self.pos < buffer_size) {
+                    self.buffer[self.pos] = byte;
+                    self.pos += 1;
+                } else {
+                    self.flushInternal();
+                    if (self.pos < buffer_size) {
+                        self.buffer[self.pos] = byte;
+                        self.pos += 1;
+                    }
+                }
+            }
+        }
+
+        /// Write a single byte to the buffer.
+        pub fn writeByte(self: *Self, byte: u8) void {
+            if (self.pos < buffer_size) {
+                self.buffer[self.pos] = byte;
+                self.pos += 1;
+            } else {
+                self.flushInternal();
+                if (self.pos < buffer_size) {
+                    self.buffer[self.pos] = byte;
+                    self.pos += 1;
+                }
+            }
+        }
+
+        /// Get a writer interface for use with std.fmt.
+        pub fn writer(self: *Self) std.io.GenericWriter(*Self, error{}, writeFn) {
+            return .{ .context = self };
+        }
+
+        fn writeFn(self: *Self, data: []const u8) error{}!usize {
+            self.writeRaw(data);
+            return data.len;
+        }
+
+        /// Move cursor to home position (0, 0).
+        pub fn cursorHome(self: *Self) void {
+            self.writeRaw("\x1b[H");
+        }
+
+        /// Move cursor to specific position (0-indexed).
+        pub fn cursorTo(self: *Self, x: u16, y: u16) void {
+            var buf: [32]u8 = undefined;
+            const seq = std.fmt.bufPrint(&buf, "\x1b[{d};{d}H", .{ y + 1, x + 1 }) catch return;
+            self.writeRaw(seq);
+        }
+
+        /// Move cursor up by n rows.
+        pub fn cursorUp(self: *Self, n: u16) void {
+            if (n == 0) return;
+            var buf: [16]u8 = undefined;
+            const seq = std.fmt.bufPrint(&buf, "\x1b[{d}A", .{n}) catch return;
+            self.writeRaw(seq);
+        }
+
+        /// Move cursor down by n rows.
+        pub fn cursorDown(self: *Self, n: u16) void {
+            if (n == 0) return;
+            var buf: [16]u8 = undefined;
+            const seq = std.fmt.bufPrint(&buf, "\x1b[{d}B", .{n}) catch return;
+            self.writeRaw(seq);
+        }
+
+        /// Move cursor forward by n columns.
+        pub fn cursorForward(self: *Self, n: u16) void {
+            if (n == 0) return;
+            var buf: [16]u8 = undefined;
+            const seq = std.fmt.bufPrint(&buf, "\x1b[{d}C", .{n}) catch return;
+            self.writeRaw(seq);
+        }
+
+        /// Move cursor backward by n columns.
+        pub fn cursorBackward(self: *Self, n: u16) void {
+            if (n == 0) return;
+            var buf: [16]u8 = undefined;
+            const seq = std.fmt.bufPrint(&buf, "\x1b[{d}D", .{n}) catch return;
+            self.writeRaw(seq);
+        }
+
+        /// Clear the entire screen.
+        pub fn clearScreen(self: *Self) void {
+            self.writeRaw("\x1b[2J");
+        }
+
+        /// Clear from cursor to end of screen.
+        pub fn clearToEndOfScreen(self: *Self) void {
+            self.writeRaw("\x1b[0J");
+        }
+
+        /// Clear from cursor to start of screen.
+        pub fn clearToStartOfScreen(self: *Self) void {
+            self.writeRaw("\x1b[1J");
+        }
+
+        /// Clear the current line.
+        pub fn clearLine(self: *Self) void {
+            self.writeRaw("\x1b[2K");
+        }
+
+        /// Clear from cursor to end of line.
+        pub fn clearToEndOfLine(self: *Self) void {
+            self.writeRaw("\x1b[0K");
+        }
+
+        /// Clear from cursor to start of line.
+        pub fn clearToStartOfLine(self: *Self) void {
+            self.writeRaw("\x1b[1K");
+        }
+
+        /// Show the cursor.
+        pub fn showCursor(self: *Self) void {
+            self.writeRaw("\x1b[?25h");
+        }
+
+        /// Hide the cursor.
+        pub fn hideCursor(self: *Self) void {
+            self.writeRaw("\x1b[?25l");
+        }
+
+        /// Set the text style using rich_zig ANSI rendering.
+        pub fn setStyle(self: *Self, style: Style) void {
+            // Skip if same as last style
+            if (self.last_style) |last| {
+                if (last.eql(style)) return;
+            }
+
+            style.renderAnsi(self.color_system, self.writer()) catch {};
+            self.last_style = style;
+        }
+
+        /// Reset to default style.
+        pub fn resetStyle(self: *Self) void {
+            self.writeRaw("\x1b[0m");
+            self.last_style = null;
+        }
+
+        /// Write styled text (sets style, writes text, does not reset).
+        pub fn writeStyled(self: *Self, text: []const u8, style: Style) void {
+            if (!style.isEmpty()) {
+                self.setStyle(style);
+            }
+            self.writeRaw(text);
+        }
+
+        /// Write a character with the given style.
+        pub fn writeChar(self: *Self, char: u21, style: Style) void {
+            if (!style.isEmpty()) {
+                self.setStyle(style);
+            }
+            var utf8_buf: [4]u8 = undefined;
+            const len = std.unicode.utf8Encode(char, &utf8_buf) catch 1;
+            self.writeRaw(utf8_buf[0..len]);
+        }
+
+        /// Write a segment (styled text span from rich_zig).
+        pub fn writeSegment(self: *Self, segment: Segment) void {
+            segment.render(self.writer(), self.color_system) catch {};
+        }
+
+        /// Execute a control code.
+        pub fn writeControl(self: *Self, control: ControlCode) void {
+            control.toEscapeSequence(self.writer()) catch {};
+        }
+
+        /// Flush buffered output to the terminal.
+        pub fn flush(self: *Self) void {
+            self.flushInternal();
+        }
+
+        fn flushInternal(self: *Self) void {
+            if (self.pos == 0) return;
+            const file = std.fs.File{ .handle = self.fd };
+            file.writeAll(self.buffer[0..self.pos]) catch {};
+            self.pos = 0;
+        }
+
+        /// Get remaining buffer capacity.
+        pub fn remaining(self: Self) usize {
+            return buffer_size - self.pos;
+        }
+
+        /// Check if buffer is empty.
+        pub fn isEmpty(self: Self) bool {
+            return self.pos == 0;
+        }
+    };
+}
+
+/// Default output type with 8KB buffer.
+pub const DefaultOutput = Output(8192);
+
+/// Convert ColorSupport enum to rich_zig's ColorSystem.
+pub fn colorSupportToSystem(support: ColorSupport) ColorSystem {
+    return switch (support) {
+        .basic => .standard,
+        .extended => .eight_bit,
+        .true_color => .truecolor,
+    };
+}
+
 // ============================================================
 // SANITY TESTS - Backend configuration
 // ============================================================
@@ -646,4 +893,246 @@ test "behavior: getTerminalSize returns reasonable values" {
     const size = getTerminalSize();
     try std.testing.expect(size.width > 0);
     try std.testing.expect(size.height > 0);
+}
+
+// ============================================================
+// SANITY TESTS - Output buffering
+// ============================================================
+
+test "sanity: Output buffer initialization" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+    try std.testing.expect(out.isEmpty());
+    try std.testing.expectEqual(@as(usize, 256), out.remaining());
+}
+
+test "sanity: Output.writeRaw buffers data" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.writeRaw("Hello");
+    try std.testing.expect(!out.isEmpty());
+    try std.testing.expectEqual(@as(usize, 251), out.remaining());
+}
+
+test "sanity: Output.writeByte buffers single byte" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.writeByte('X');
+    try std.testing.expectEqual(@as(usize, 255), out.remaining());
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Output cursor control
+// ============================================================
+
+test "behavior: Output.cursorHome writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.cursorHome();
+    try std.testing.expectEqualStrings("\x1b[H", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.cursorTo writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.cursorTo(5, 10);
+    try std.testing.expectEqualStrings("\x1b[11;6H", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.cursorUp writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.cursorUp(3);
+    try std.testing.expectEqualStrings("\x1b[3A", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.cursorDown writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.cursorDown(5);
+    try std.testing.expectEqualStrings("\x1b[5B", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.cursorForward writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.cursorForward(2);
+    try std.testing.expectEqualStrings("\x1b[2C", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.cursorBackward writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.cursorBackward(4);
+    try std.testing.expectEqualStrings("\x1b[4D", out.buffer[0..out.pos]);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Output screen clearing
+// ============================================================
+
+test "behavior: Output.clearScreen writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.clearScreen();
+    try std.testing.expectEqualStrings("\x1b[2J", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.clearToEndOfScreen writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.clearToEndOfScreen();
+    try std.testing.expectEqualStrings("\x1b[0J", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.clearLine writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.clearLine();
+    try std.testing.expectEqualStrings("\x1b[2K", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.clearToEndOfLine writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.clearToEndOfLine();
+    try std.testing.expectEqualStrings("\x1b[0K", out.buffer[0..out.pos]);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Output cursor visibility
+// ============================================================
+
+test "behavior: Output.showCursor writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.showCursor();
+    try std.testing.expectEqualStrings("\x1b[?25h", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.hideCursor writes correct sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.hideCursor();
+    try std.testing.expectEqualStrings("\x1b[?25l", out.buffer[0..out.pos]);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Output style rendering
+// ============================================================
+
+test "behavior: Output.setStyle uses rich_zig rendering" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    const style = Style.init().bold().fg(.red);
+    out.setStyle(style);
+
+    const written = out.buffer[0..out.pos];
+    // Should contain ANSI escape sequence
+    try std.testing.expect(written[0] == 0x1b);
+    try std.testing.expect(written[1] == '[');
+    try std.testing.expect(written[written.len - 1] == 'm');
+}
+
+test "behavior: Output.resetStyle writes reset sequence" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.resetStyle();
+    try std.testing.expectEqualStrings("\x1b[0m", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.setStyle skips duplicate styles" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    const style = Style.init().bold();
+    out.setStyle(style);
+    const first_len = out.pos;
+
+    out.setStyle(style);
+    // Should not write anything new
+    try std.testing.expectEqual(first_len, out.pos);
+}
+
+test "behavior: Output.writeStyled combines style and text" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    const style = Style.init().bold();
+    out.writeStyled("Hello", style);
+
+    const written = out.buffer[0..out.pos];
+    // Should contain the text "Hello"
+    try std.testing.expect(std.mem.indexOf(u8, written, "Hello") != null);
+}
+
+test "behavior: Output.writeChar writes styled character" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.writeChar('X', Style.empty);
+    try std.testing.expectEqualStrings("X", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.writeChar handles UTF-8" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.writeChar(0x4E2D, Style.empty); // CJK character
+    try std.testing.expectEqual(@as(usize, 3), out.pos); // 3-byte UTF-8
+}
+
+// ============================================================
+// BEHAVIOR TESTS - ColorSupport to ColorSystem conversion
+// ============================================================
+
+test "behavior: colorSupportToSystem conversion" {
+    try std.testing.expectEqual(ColorSystem.standard, colorSupportToSystem(.basic));
+    try std.testing.expectEqual(ColorSystem.eight_bit, colorSupportToSystem(.extended));
+    try std.testing.expectEqual(ColorSystem.truecolor, colorSupportToSystem(.true_color));
+}
+
+// ============================================================
+// REGRESSION TESTS - Output edge cases
+// ============================================================
+
+test "regression: Output.cursorUp with zero does nothing" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.cursorUp(0);
+    try std.testing.expect(out.isEmpty());
+}
+
+test "regression: Output.cursorDown with zero does nothing" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    out.cursorDown(0);
+    try std.testing.expect(out.isEmpty());
+}
+
+test "regression: Output writer interface works with fmt" {
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(posix.STDOUT_FILENO, .truecolor);
+
+    const w = out.writer();
+    try std.fmt.format(w, "Value: {d}", .{42});
+    try std.testing.expectEqualStrings("Value: 42", out.buffer[0..out.pos]);
 }

@@ -14,6 +14,12 @@ pub const style_mod = @import("style.zig");
 pub const Style = style_mod.Style;
 pub const Color = style_mod.Color;
 pub const StyleAttribute = style_mod.StyleAttribute;
+pub const ColorSystem = style_mod.ColorSystem;
+pub const ColorType = style_mod.ColorType;
+pub const ColorTriplet = style_mod.ColorTriplet;
+pub const Segment = style_mod.Segment;
+pub const ControlCode = style_mod.ControlCode;
+pub const ControlType = style_mod.ControlType;
 
 // Layout types
 pub const layout_mod = @import("layout.zig");
@@ -60,8 +66,11 @@ pub const Backend = backend_mod.Backend;
 pub const BackendConfig = backend_mod.BackendConfig;
 pub const ColorSupport = backend_mod.ColorSupport;
 pub const TerminalSize = backend_mod.TerminalSize;
+pub const Output = backend_mod.Output;
+pub const DefaultOutput = backend_mod.DefaultOutput;
 pub const detectColorSupport = backend_mod.detectColorSupport;
 pub const getTerminalSize = backend_mod.getTerminalSize;
+pub const colorSupportToSystem = backend_mod.colorSupportToSystem;
 pub const terminal_panic = backend_mod.panic;
 
 // Input parsing
@@ -193,6 +202,57 @@ test "backend queries re-export" {
     const size = getTerminalSize();
     try std.testing.expect(size.width > 0);
     try std.testing.expect(size.height > 0);
+
+    // Test colorSupportToSystem conversion
+    try std.testing.expectEqual(ColorSystem.standard, colorSupportToSystem(.basic));
+    try std.testing.expectEqual(ColorSystem.eight_bit, colorSupportToSystem(.extended));
+    try std.testing.expectEqual(ColorSystem.truecolor, colorSupportToSystem(.true_color));
+}
+
+test "output re-export" {
+    // Test Output type exists and can be instantiated
+    const TestOutput = Output(256);
+    var out = TestOutput.initWithColorSystem(std.posix.STDOUT_FILENO, ColorSystem.truecolor);
+    try std.testing.expect(out.isEmpty());
+
+    // Test DefaultOutput type exists
+    try std.testing.expect(@sizeOf(DefaultOutput) > 0);
+}
+
+test "segment re-export" {
+    // Test Segment type from rich_zig
+    const seg = Segment.plain("Hello");
+    try std.testing.expectEqualStrings("Hello", seg.text);
+    try std.testing.expectEqual(@as(usize, 5), seg.cellLength());
+}
+
+test "control code re-export" {
+    // Test ControlCode type from rich_zig
+    var buf: [32]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const ctrl = ControlCode{ .cursor_move_to = .{ .x = 10, .y = 5 } };
+    try ctrl.toEscapeSequence(stream.writer());
+    try std.testing.expectEqualStrings("\x1b[5;10H", stream.getWritten());
+}
+
+test "color system re-export" {
+    // Test ColorSystem from rich_zig
+    try std.testing.expect(ColorSystem.truecolor.supports(.standard));
+    try std.testing.expect(ColorSystem.truecolor.supports(.eight_bit));
+    try std.testing.expect(!ColorSystem.standard.supports(.truecolor));
+}
+
+test "style ansi rendering re-export" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().bold().fg(.red);
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    const written = stream.getWritten();
+    try std.testing.expect(written.len > 0);
+    try std.testing.expect(written[0] == 0x1b);
 }
 
 test "frame re-export" {

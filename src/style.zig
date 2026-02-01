@@ -165,7 +165,46 @@ pub const Style = struct {
     pub fn fromRichStyle(rich_style: rich_zig.Style) Style {
         return .{ .inner = rich_style };
     }
+
+    /// Render this style as ANSI escape codes to a writer.
+    /// Uses rich_zig's ANSI rendering for proper color and attribute output.
+    pub fn renderAnsi(self: Style, color_system: ColorSystem, writer: anytype) !void {
+        try self.inner.renderAnsi(color_system, writer);
+    }
+
+    /// Write the ANSI reset sequence to restore default styling.
+    pub fn renderReset(writer: anytype) !void {
+        try rich_zig.Style.renderReset(writer);
+    }
+
+    /// Get the foreground color if set.
+    pub fn getForeground(self: Style) ?Color {
+        return self.inner.color;
+    }
+
+    /// Get the background color if set.
+    pub fn getBackground(self: Style) ?Color {
+        return self.inner.bgcolor;
+    }
 };
+
+/// Re-export rich_zig's ColorSystem for color capability detection.
+pub const ColorSystem = rich_zig.ColorSystem;
+
+/// Re-export rich_zig's ColorType for color type identification.
+pub const ColorType = rich_zig.ColorType;
+
+/// Re-export rich_zig's ColorTriplet for RGB values.
+pub const ColorTriplet = rich_zig.ColorTriplet;
+
+/// Re-export rich_zig's Segment for styled text spans.
+pub const Segment = rich_zig.Segment;
+
+/// Re-export rich_zig's ControlCode for terminal control sequences.
+pub const ControlCode = rich_zig.ControlCode;
+
+/// Re-export rich_zig's ControlType for control code classification.
+pub const ControlType = rich_zig.ControlType;
 
 // ============================================================
 // SANITY TESTS - Basic functionality
@@ -335,4 +374,128 @@ test "behavior: Color equality" {
 
     try std.testing.expect(c1.eql(c2));
     try std.testing.expect(!c1.eql(c3));
+}
+
+// ============================================================
+// ANSI RENDERING TESTS - rich_zig integration
+// ============================================================
+
+test "behavior: Style.renderAnsi produces valid ANSI" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().bold().fg(.red);
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    const written = stream.getWritten();
+    // Should start with ESC[ and end with 'm'
+    try std.testing.expect(written.len > 2);
+    try std.testing.expect(written[0] == 0x1b);
+    try std.testing.expect(written[1] == '[');
+    try std.testing.expect(written[written.len - 1] == 'm');
+}
+
+test "behavior: Style.renderReset produces reset sequence" {
+    var buf: [16]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    try Style.renderReset(stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[0m", stream.getWritten());
+}
+
+test "behavior: Style.renderAnsi truecolor RGB" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().fg(Color.fromRgb(255, 128, 64));
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    const written = stream.getWritten();
+    try std.testing.expectEqualStrings("\x1b[38;2;255;128;64m", written);
+}
+
+test "behavior: Style.getForeground returns color" {
+    const style = Style.init().fg(.red);
+    const fg = style.getForeground();
+    try std.testing.expect(fg != null);
+    try std.testing.expect(fg.?.eql(.red));
+}
+
+test "behavior: Style.getBackground returns color" {
+    const style = Style.init().bg(.blue);
+    const bg = style.getBackground();
+    try std.testing.expect(bg != null);
+    try std.testing.expect(bg.?.eql(.blue));
+}
+
+// ============================================================
+// COLOR SYSTEM TESTS
+// ============================================================
+
+test "sanity: ColorSystem supports comparison" {
+    try std.testing.expect(ColorSystem.truecolor.supports(.standard));
+    try std.testing.expect(ColorSystem.truecolor.supports(.eight_bit));
+    try std.testing.expect(ColorSystem.truecolor.supports(.truecolor));
+    try std.testing.expect(!ColorSystem.standard.supports(.truecolor));
+}
+
+// ============================================================
+// SEGMENT TESTS - styled text spans
+// ============================================================
+
+test "sanity: Segment.plain creates unstyled segment" {
+    const seg = Segment.plain("Hello");
+    try std.testing.expectEqualStrings("Hello", seg.text);
+    try std.testing.expect(seg.style == null);
+}
+
+test "sanity: Segment.styled creates styled segment" {
+    const style = Style.init().bold();
+    const seg = Segment.styled("World", style.inner);
+    try std.testing.expectEqualStrings("World", seg.text);
+    try std.testing.expect(seg.style != null);
+    try std.testing.expect(seg.style.?.hasAttribute(.bold));
+}
+
+test "behavior: Segment.cellLength returns correct width" {
+    const seg = Segment.plain("Hello");
+    try std.testing.expectEqual(@as(usize, 5), seg.cellLength());
+}
+
+test "behavior: Segment.render outputs styled text" {
+    var buf: [256]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().bold();
+    const seg = Segment.styled("Hi", style.inner);
+    try seg.render(stream.writer(), .truecolor);
+
+    const written = stream.getWritten();
+    // Should contain the text "Hi" and styling codes
+    try std.testing.expect(std.mem.indexOf(u8, written, "Hi") != null);
+}
+
+// ============================================================
+// CONTROL CODE TESTS
+// ============================================================
+
+test "sanity: ControlCode cursor movement" {
+    var buf: [64]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const ctrl = ControlCode{ .cursor_move_to = .{ .x = 10, .y = 5 } };
+    try ctrl.toEscapeSequence(stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[5;10H", stream.getWritten());
+}
+
+test "sanity: ControlCode clear screen" {
+    var buf: [16]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const ctrl = ControlCode{ .clear = {} };
+    try ctrl.toEscapeSequence(stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[2J", stream.getWritten());
 }
