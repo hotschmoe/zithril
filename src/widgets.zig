@@ -26,6 +26,13 @@ pub const Table = table.Table;
 pub const tabs = @import("widgets/tabs.zig");
 pub const Tabs = tabs.Tabs;
 
+pub const scrollbar = @import("widgets/scrollbar.zig");
+pub const Scrollbar = scrollbar.Scrollbar;
+pub const Orientation = scrollbar.Orientation;
+
+pub const clear = @import("widgets/clear.zig");
+pub const Clear = clear.Clear;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -34,4 +41,6 @@ test "widgets module" {
     _ = paragraph;
     _ = table;
     _ = tabs;
+    _ = scrollbar;
+    _ = clear;
 }
