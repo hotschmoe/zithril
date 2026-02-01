@@ -123,6 +123,17 @@ pub const SixelEncoder = graphics.SixelEncoder;
 pub const KittyEncoder = graphics.KittyEncoder;
 pub const ITerm2Encoder = graphics.ITerm2Encoder;
 
+// Testing utilities
+pub const testing = @import("testing.zig");
+pub const TestRecorder = testing.TestRecorder;
+pub const TestPlayer = testing.TestPlayer;
+pub const MockBackend = testing.MockBackend;
+pub const Snapshot = testing.Snapshot;
+pub const bufferToAnnotatedText = testing.bufferToAnnotatedText;
+pub const expectCell = testing.expectCell;
+pub const expectCellStyle = testing.expectCellStyle;
+pub const expectString = testing.expectString;
+
 // Widgets
 pub const widgets = @import("widgets.zig");
 pub const Block = widgets.Block;
@@ -534,4 +545,50 @@ test "graphics re-export" {
 
     // Test ITerm2Encoder
     _ = ITerm2Encoder.init();
+}
+
+test "testing utilities re-export" {
+    // Test TestRecorder
+    var recorder = TestRecorder(256).init();
+    try std.testing.expectEqual(@as(usize, 0), recorder.len());
+
+    const key_ev = testing.keyEvent('a');
+    try std.testing.expect(recorder.recordSimple(key_ev));
+    try std.testing.expectEqual(@as(usize, 1), recorder.len());
+
+    // Test TestPlayer
+    var player = TestPlayer(256).init(recorder.getEvents());
+    try std.testing.expect(!player.isDone());
+    _ = player.next();
+    try std.testing.expect(player.isDone());
+
+    // Test MockBackend
+    var mock = try MockBackend.init(std.testing.allocator, 80, 24);
+    defer mock.deinit();
+
+    try std.testing.expectEqual(@as(u16, 80), mock.width);
+    try std.testing.expectEqual(@as(u16, 24), mock.height);
+
+    try mock.write("Test");
+    try std.testing.expectEqualStrings("Test", mock.getOutput());
+
+    // Test Snapshot
+    var buf = try Buffer.init(std.testing.allocator, 10, 2);
+    defer buf.deinit();
+
+    buf.setString(0, 0, "Hello", Style.empty);
+
+    var snapshot = try Snapshot.fromBuffer(std.testing.allocator, buf);
+    defer snapshot.deinit();
+
+    try std.testing.expect(std.mem.indexOf(u8, snapshot.text, "Hello") != null);
+
+    // Test helper functions
+    try expectCell(buf, 0, 0, 'H');
+    try expectString(buf, 0, 0, "Hello");
+
+    // Test bufferToAnnotatedText
+    const annotated = try bufferToAnnotatedText(std.testing.allocator, buf);
+    defer std.testing.allocator.free(annotated);
+    try std.testing.expect(std.mem.indexOf(u8, annotated, "10x2") != null);
 }
