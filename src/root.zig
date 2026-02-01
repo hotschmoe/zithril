@@ -77,6 +77,13 @@ pub const terminal_panic = backend_mod.panic;
 pub const input_mod = @import("input.zig");
 pub const Input = input_mod.Input;
 
+// Widgets
+pub const widgets = @import("widgets.zig");
+pub const Block = widgets.Block;
+pub const BorderType = widgets.BorderType;
+pub const BorderChars = widgets.BorderChars;
+pub const Alignment = widgets.Alignment;
+
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
     try std.testing.expect(style.hasAttribute(.bold));
@@ -312,4 +319,46 @@ test "input re-export" {
     const parsed_event = parser.parse("a");
     try std.testing.expect(parsed_event != null);
     try std.testing.expect(parsed_event.? == .key);
+}
+
+test "widgets re-export" {
+    // Test Block widget is accessible
+    const block = Block{
+        .title = "Test",
+        .border = BorderType.rounded,
+        .title_alignment = Alignment.center,
+    };
+    try std.testing.expectEqualStrings("Test", block.title.?);
+    try std.testing.expect(block.border == .rounded);
+    try std.testing.expect(block.title_alignment == .center);
+
+    // Test BorderChars
+    const chars = BorderType.plain.chars();
+    try std.testing.expectEqual(@as(u21, '+'), chars.top_left);
+
+    // Test Block.inner
+    const area = Rect.init(0, 0, 20, 10);
+    const inner_area = block.inner(area);
+    try std.testing.expectEqual(@as(u16, 1), inner_area.x);
+    try std.testing.expectEqual(@as(u16, 18), inner_area.width);
+}
+
+test "block render" {
+    var buf = try Buffer.init(std.testing.allocator, 20, 10);
+    defer buf.deinit();
+
+    const block = Block{
+        .title = "Hello",
+        .border = .rounded,
+        .border_style = Style.init().fg(.cyan),
+    };
+
+    var frame = Frame(16).init(&buf);
+    frame.render(block, frame.size());
+
+    // Check top-left corner is rounded
+    try std.testing.expectEqual(@as(u21, 0x256D), buf.get(0, 0).char);
+
+    // Check title is rendered
+    try std.testing.expectEqual(@as(u21, 'H'), buf.get(1, 0).char);
 }

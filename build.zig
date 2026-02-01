@@ -63,6 +63,9 @@ pub fn build(b: *std.Build) void {
     // Examples - each example gets its own build target
     const examples = [_][]const u8{
         "counter",
+        "list",
+        "tabs",
+        "ralph",
     };
 
     var prev_step: *std.Build.Step = b.getInstallStep();
