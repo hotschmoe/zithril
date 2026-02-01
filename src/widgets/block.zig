@@ -133,9 +133,6 @@ pub const Block = struct {
         const top = area.y;
         const bottom_y = area.bottom() -| 1;
 
-        // Only draw if we have at least 1x1 area
-        if (area.width < 1 or area.height < 1) return;
-
         // Draw corners
         buf.set(left, top, Cell.styled(chars.top_left, style));
 
@@ -153,10 +150,11 @@ pub const Block = struct {
 
         // Draw horizontal lines (top and bottom)
         if (area.width > 2) {
+            const draw_bottom = area.height > 1;
             var x = left + 1;
             while (x < right) : (x += 1) {
                 buf.set(x, top, Cell.styled(chars.horizontal, style));
-                if (area.height > 1) {
+                if (draw_bottom) {
                     buf.set(x, bottom_y, Cell.styled(chars.horizontal, style));
                 }
             }
@@ -164,10 +162,11 @@ pub const Block = struct {
 
         // Draw vertical lines (left and right sides)
         if (area.height > 2) {
+            const draw_right = area.width > 1;
             var y = top + 1;
             while (y < bottom_y) : (y += 1) {
                 buf.set(left, y, Cell.styled(chars.vertical, style));
-                if (area.width > 1) {
+                if (draw_right) {
                     buf.set(right, y, Cell.styled(chars.vertical, style));
                 }
             }
