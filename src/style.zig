@@ -264,3 +264,75 @@ test "integration: Style to/from rich_zig" {
     const back = Style.fromRichStyle(rich_style);
     try std.testing.expect(back.eql(zithril_style));
 }
+
+// ============================================================
+// COLOR TESTS - Verify Color type matches SPEC.md
+// ============================================================
+
+test "sanity: Color.default exists" {
+    const c = Color.default;
+    try std.testing.expect(c.eql(Color.default));
+}
+
+test "sanity: Color basic 8 colors exist" {
+    const colors = [_]Color{
+        Color.black,
+        Color.red,
+        Color.green,
+        Color.yellow,
+        Color.blue,
+        Color.magenta,
+        Color.cyan,
+        Color.white,
+    };
+    for (colors, 0..) |color, i| {
+        try std.testing.expect(color.number.? == i);
+    }
+}
+
+test "sanity: Color bright variants exist" {
+    const bright_colors = [_]Color{
+        Color.bright_black,
+        Color.bright_red,
+        Color.bright_green,
+        Color.bright_yellow,
+        Color.bright_blue,
+        Color.bright_magenta,
+        Color.bright_cyan,
+        Color.bright_white,
+    };
+    for (bright_colors, 0..) |color, i| {
+        try std.testing.expect(color.number.? == i + 8);
+    }
+}
+
+test "sanity: Color.from256 for 256-color palette" {
+    const c = Color.from256(196);
+    try std.testing.expect(c.number.? == 196);
+    try std.testing.expect(c.color_type == .eight_bit);
+}
+
+test "sanity: Color.fromRgb for true color" {
+    const c = Color.fromRgb(255, 128, 64);
+    try std.testing.expect(c.triplet.?.r == 255);
+    try std.testing.expect(c.triplet.?.g == 128);
+    try std.testing.expect(c.triplet.?.b == 64);
+    try std.testing.expect(c.color_type == .truecolor);
+}
+
+test "behavior: Color used in Style.fg and Style.bg" {
+    const style = Style.init()
+        .fg(Color.fromRgb(255, 0, 0))
+        .bg(Color.from256(21));
+
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Color equality" {
+    const c1 = Color.fromRgb(100, 100, 100);
+    const c2 = Color.fromRgb(100, 100, 100);
+    const c3 = Color.fromRgb(100, 100, 101);
+
+    try std.testing.expect(c1.eql(c2));
+    try std.testing.expect(!c1.eql(c3));
+}

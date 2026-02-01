@@ -15,6 +15,11 @@ pub const Style = style_mod.Style;
 pub const Color = style_mod.Color;
 pub const StyleAttribute = style_mod.StyleAttribute;
 
+// Layout types
+pub const layout = @import("layout.zig");
+pub const Constraint = layout.Constraint;
+pub const Direction = layout.Direction;
+
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
     try std.testing.expect(style.hasAttribute(.bold));
@@ -30,4 +35,20 @@ test "geometry re-export" {
 
     const pos = Position.init(10, 20);
     try std.testing.expectEqual(@as(u16, 10), pos.x);
+}
+
+test "layout re-export" {
+    const c1 = Constraint.len(10);
+    const c2 = Constraint.minSize(20);
+    const c3 = Constraint.maxSize(30);
+    const c4 = Constraint.fractional(1, 3);
+    const c5 = Constraint.flexible(2);
+
+    try std.testing.expectEqual(@as(u16, 10), c1.apply(100));
+    try std.testing.expectEqual(@as(u16, 20), c2.apply(100));
+    try std.testing.expectEqual(@as(u16, 30), c3.apply(100));
+    try std.testing.expectEqual(@as(u16, 33), c4.apply(100));
+    try std.testing.expectEqual(@as(u16, 100), c5.apply(100));
+
+    try std.testing.expect(Direction.horizontal != Direction.vertical);
 }
