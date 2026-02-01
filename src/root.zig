@@ -74,9 +74,12 @@ pub const Backend = backend_mod.Backend;
 pub const BackendConfig = backend_mod.BackendConfig;
 pub const ColorSupport = backend_mod.ColorSupport;
 pub const TerminalSize = backend_mod.TerminalSize;
+pub const TerminalType = backend_mod.TerminalType;
+pub const TerminalCapabilities = backend_mod.TerminalCapabilities;
 pub const Output = backend_mod.Output;
 pub const DefaultOutput = backend_mod.DefaultOutput;
 pub const detectColorSupport = backend_mod.detectColorSupport;
+pub const detectTerminalType = backend_mod.detectTerminalType;
 pub const getTerminalSize = backend_mod.getTerminalSize;
 pub const colorSupportToSystem = backend_mod.colorSupportToSystem;
 pub const terminal_panic = backend_mod.panic;
@@ -236,11 +239,35 @@ test "backend queries re-export" {
 test "output re-export" {
     // Test Output type exists and can be instantiated
     const TestOutput = Output(256);
-    var out = TestOutput.initWithColorSystem(std.posix.STDOUT_FILENO, ColorSystem.truecolor);
+    const builtin = @import("builtin");
+    const handle = if (builtin.os.tag == .windows)
+        (std.os.windows.GetStdHandle(std.os.windows.STD_OUTPUT_HANDLE) catch unreachable)
+    else
+        std.posix.STDOUT_FILENO;
+    var out = TestOutput.initWithColorSystem(handle, ColorSystem.truecolor);
     try std.testing.expect(out.isEmpty());
 
     // Test DefaultOutput type exists
     try std.testing.expect(@sizeOf(DefaultOutput) > 0);
+}
+
+test "terminal type re-export" {
+    // Test TerminalType enum is accessible
+    const term_type = detectTerminalType();
+    _ = term_type;
+
+    // Test feature detection methods
+    try std.testing.expect(TerminalType.windows_terminal.supportsTrueColor());
+    try std.testing.expect(TerminalType.iterm2.supportsTrueColor());
+    try std.testing.expect(TerminalType.kitty.supportsTrueColor());
+    try std.testing.expect(!TerminalType.cmd_exe.supportsTrueColor());
+
+    // Test TerminalCapabilities
+    const caps = TerminalCapabilities.fromTerminalType(.xterm, .extended);
+    try std.testing.expect(caps.terminal_type == .xterm);
+    try std.testing.expect(caps.color_support == .extended);
+    try std.testing.expect(caps.unicode);
+    try std.testing.expect(caps.mouse);
 }
 
 test "segment re-export" {
