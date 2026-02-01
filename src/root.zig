@@ -32,6 +32,11 @@ pub const Mouse = event.Mouse;
 pub const MouseKind = event.MouseKind;
 pub const Size = event.Size;
 
+// Action types
+pub const action = @import("action.zig");
+pub const Action = action.Action;
+pub const Command = action.Command;
+
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
     try std.testing.expect(style.hasAttribute(.bold));
@@ -87,4 +92,18 @@ test "event re-export" {
 
     const f5_key = KeyCode.fromF(5);
     try std.testing.expect(f5_key != null);
+}
+
+test "action re-export" {
+    const none_action = Action{ .none = {} };
+    try std.testing.expect(none_action.isNone());
+
+    const quit_action = Action{ .quit = {} };
+    try std.testing.expect(quit_action.isQuit());
+
+    const cmd_action = Action{ .command = Command.empty() };
+    try std.testing.expect(cmd_action.isCommand());
+
+    try std.testing.expect(Action.none_action.isNone());
+    try std.testing.expect(Action.quit_action.isQuit());
 }
