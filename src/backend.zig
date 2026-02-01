@@ -556,31 +556,21 @@ pub fn Output(comptime buffer_size: usize) type {
         /// Write raw bytes to the buffer.
         pub fn writeRaw(self: *Self, data: []const u8) void {
             for (data) |byte| {
-                if (self.pos < buffer_size) {
-                    self.buffer[self.pos] = byte;
-                    self.pos += 1;
-                } else {
+                if (self.pos >= buffer_size) {
                     self.flushInternal();
-                    if (self.pos < buffer_size) {
-                        self.buffer[self.pos] = byte;
-                        self.pos += 1;
-                    }
                 }
+                self.buffer[self.pos] = byte;
+                self.pos += 1;
             }
         }
 
         /// Write a single byte to the buffer.
         pub fn writeByte(self: *Self, byte: u8) void {
-            if (self.pos < buffer_size) {
-                self.buffer[self.pos] = byte;
-                self.pos += 1;
-            } else {
+            if (self.pos >= buffer_size) {
                 self.flushInternal();
-                if (self.pos < buffer_size) {
-                    self.buffer[self.pos] = byte;
-                    self.pos += 1;
-                }
             }
+            self.buffer[self.pos] = byte;
+            self.pos += 1;
         }
 
         /// Get a writer interface for use with std.fmt.

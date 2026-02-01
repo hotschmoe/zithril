@@ -320,7 +320,7 @@ pub fn App(comptime State: type) type {
 
                 // Write character
                 if (change.cell.width > 0) {
-                    out.writeChar(change.cell.char, @import("style.zig").Style.empty);
+                    out.writeChar(change.cell.char, backend_mod.Style.empty);
                 }
 
                 last_x = change.x;
