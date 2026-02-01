@@ -93,6 +93,8 @@ pub const BorderChars = widgets.BorderChars;
 pub const Text = widgets.Text;
 pub const List = widgets.List;
 pub const Gauge = widgets.Gauge;
+pub const Paragraph = widgets.Paragraph;
+pub const Wrap = widgets.Wrap;
 pub const Alignment = widgets.Alignment;
 
 test "style wrapper" {

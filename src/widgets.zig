@@ -16,9 +16,14 @@ pub const List = list.List;
 pub const gauge = @import("widgets/gauge.zig");
 pub const Gauge = gauge.Gauge;
 
+pub const paragraph = @import("widgets/paragraph.zig");
+pub const Paragraph = paragraph.Paragraph;
+pub const Wrap = paragraph.Wrap;
+
 test "widgets module" {
     _ = block;
     _ = text;
     _ = list;
     _ = gauge;
+    _ = paragraph;
 }
