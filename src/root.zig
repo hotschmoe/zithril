@@ -103,6 +103,11 @@ pub const Gauge = widgets.Gauge;
 pub const Paragraph = widgets.Paragraph;
 pub const Wrap = widgets.Wrap;
 pub const Alignment = widgets.Alignment;
+pub const Tabs = widgets.Tabs;
+pub const Scrollbar = widgets.Scrollbar;
+pub const Orientation = widgets.Orientation;
+pub const Table = widgets.Table;
+pub const Clear = widgets.Clear;
 
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);

@@ -297,7 +297,7 @@ pub fn App(comptime State: type) type {
             }
 
             // Use buffered output with rich_zig ANSI rendering
-            var out = backend_mod.DefaultOutput.init(backend.fd);
+            var out = backend_mod.DefaultOutput.init(backend.handle);
 
             var last_x: ?u16 = null;
             var last_y: ?u16 = null;
