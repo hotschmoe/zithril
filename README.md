@@ -537,6 +537,21 @@ zig build run-example-ralph
 - [ ] Sixel/Kitty image support
 - [ ] Recording/playback for tests
 
+## Contributing to rich_zig
+
+zithril is built on [rich_zig](https://github.com/hotschmoe/rich_zig). If you encounter issues or need features in the rendering layer, file issues upstream:
+
+```bash
+# Report a bug
+gh issue create --repo hotschmoe/rich_zig --title "Bug: ..." --body "..."
+
+# Request a feature
+gh issue create --repo hotschmoe/rich_zig --title "Feature: ..." --body "..."
+
+# Update dependency after upstream fix
+zig fetch --save git+https://github.com/hotschmoe/rich_zig
+```
+
 ## Credits
 
 Inspired by:

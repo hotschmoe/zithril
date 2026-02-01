@@ -389,6 +389,58 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
 
 ---
 
+## Upstream Dependency: rich_zig
+
+zithril depends on [rich_zig](https://github.com/hotschmoe/rich_zig) for terminal rendering primitives. We own this repo and can file issues upstream when needed.
+
+### When to File Upstream Issues
+
+File an issue on rich_zig when you encounter:
+- Missing functionality needed by zithril (new style attributes, color modes, etc.)
+- Bugs in rich_zig's rendering, parsing, or terminal handling
+- API improvements that would benefit zithril's design
+- Performance issues in the rendering layer
+
+### Creating Issues with gh
+
+```bash
+# Create a bug report
+gh issue create --repo hotschmoe/rich_zig \
+  --title "Bug: description" \
+  --body "Detailed explanation of the issue"
+
+# Create a feature request
+gh issue create --repo hotschmoe/rich_zig \
+  --title "Feature: description" \
+  --body "What and why"
+
+# List open issues
+gh issue list --repo hotschmoe/rich_zig
+
+# View issue details
+gh issue view <number> --repo hotschmoe/rich_zig
+```
+
+### Cross-Reference Pattern
+
+When filing upstream, reference zithril context:
+
+```
+**Context**: Working on zithril TUI framework
+**Need**: [what zithril needs from rich_zig]
+**Current behavior**: [what happens now]
+**Expected behavior**: [what should happen]
+```
+
+After rich_zig releases a fix, update zithril's dependency:
+
+```bash
+zig fetch --save git+https://github.com/hotschmoe/rich_zig
+zig build test
+```
+
+---
+
 ## Version Updates (SemVer)
 
 When making commits, update `version` in `build.zig.zon`:
