@@ -2,6 +2,7 @@
 // Generic application type parameterized by user state
 
 const std = @import("std");
+const builtin = @import("builtin");
 const frame_mod = @import("frame.zig");
 const event_mod = @import("event.zig");
 const action_mod = @import("action.zig");
@@ -9,6 +10,9 @@ const buffer_mod = @import("buffer.zig");
 const backend_mod = @import("backend.zig");
 const input_mod = @import("input.zig");
 const cell_mod = @import("cell.zig");
+
+const is_windows = builtin.os.tag == .windows;
+const windows = if (is_windows) std.os.windows else void;
 
 pub const Frame = frame_mod.Frame;
 pub const Event = event_mod.Event;
@@ -262,11 +266,24 @@ pub fn App(comptime State: type) type {
 
             // Read available input bytes
             var buf: [256]u8 = undefined;
-            const bytes_read = std.posix.read(std.posix.STDIN_FILENO, &buf) catch |err| {
-                switch (err) {
-                    error.WouldBlock => return null,
-                    else => return RunError.IoError,
-                }
+            const bytes_read = if (is_windows) blk: {
+                const stdin_handle = windows.GetStdHandle(windows.STD_INPUT_HANDLE) catch {
+                    return RunError.IoError;
+                };
+                const file = std.fs.File{ .handle = stdin_handle };
+                break :blk file.read(&buf) catch |err| {
+                    switch (err) {
+                        error.WouldBlock => return null,
+                        else => return RunError.IoError,
+                    }
+                };
+            } else blk: {
+                break :blk std.posix.read(std.posix.STDIN_FILENO, &buf) catch |err| {
+                    switch (err) {
+                        error.WouldBlock => return null,
+                        else => return RunError.IoError,
+                    }
+                };
             };
 
             if (bytes_read == 0) {
