@@ -10,14 +10,11 @@ pub const Cell = cell_mod.Cell;
 pub const Rect = geometry.Rect;
 pub const Style = style_mod.Style;
 
-/// Represents a single cell change in a buffer diff.
-/// Used for efficient incremental rendering - only cells that changed are output.
+/// A single cell change in a buffer diff.
+/// Used for incremental rendering - only changed cells are output.
 pub const CellUpdate = struct {
-    /// X coordinate of the changed cell.
     x: u16,
-    /// Y coordinate of the changed cell.
     y: u16,
-    /// The new cell value at this position.
     cell: Cell,
 };
 

@@ -45,7 +45,7 @@ pub fn Frame(comptime max_widgets: usize) type {
         }
 
         /// Returns the full terminal area.
-        pub fn size(self: *Self) Rect {
+        pub fn size(self: Self) Rect {
             return self.size_;
         }
 
