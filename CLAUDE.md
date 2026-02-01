@@ -129,145 +129,218 @@ we love you, Claude! do your best today
 <!-- Add your project's toolchain, architecture, workflows here -->
 <!-- This section will not be touched by haj.sh -->
 
-# rich_zig - Terminal Rich Text Library
+# zithril - Zig TUI Framework
 
-A full-featured Zig port of Python's Rich library. Provides beautiful terminal output with styled text, tables, panels, progress bars, trees, and more.
+*Light as a feather, hard as dragon scales.*
 
-- **Version**: 0.10.0
+A Zig TUI framework for building terminal user interfaces. Immediate mode rendering, zero hidden state, built on rich_zig.
+
 - **Minimum Zig**: 0.15.2
-- **No external dependencies** - uses only Zig standard library
+- **Dependencies**: rich_zig (terminal rendering primitives)
+
+---
+
+## Philosophy
+
+- **Explicit over implicit** - You own all state. The framework never allocates behind your back.
+- **Immediate mode** - Describe your entire UI every frame. No widget tree, no retained state.
+- **Composition over inheritance** - Widgets are structs with a `render` function.
+- **Built for Zig** - Comptime layouts, error unions, no hidden control flow.
 
 ---
 
 ## Zig Toolchain
 
 ```bash
-zig build              # Build library and executable
-zig build run          # Run the comprehensive demo
-zig build test         # Run all tests
-zig build test -Doptimize=ReleaseSafe  # Test with optimization
-zig fmt src/           # Format before commits
+zig build                    # Build library
+zig build run-example-counter   # Run counter example
+zig build run-example-ralph     # Run reference app
+zig build test               # Run all tests
+zig fmt src/                 # Format before commits
 ```
 
 ---
 
-## Project Layout
+## Architecture
 
 ```
-rich_zig/
-├── build.zig           # Build configuration
-├── build.zig.zon       # Package manifest
-├── src/
-│   ├── root.zig        # Library root (public API)
-│   ├── main.zig        # Demo executable
-│   │
-│   ├── color.zig       # Color types and conversion
-│   ├── style.zig       # Text styling attributes
-│   ├── segment.zig     # Atomic rendering unit
-│   ├── cells.zig       # Unicode width calculation
-│   │
-│   ├── markup.zig      # BBCode-like syntax parsing
-│   ├── text.zig        # Styled text with spans
-│   ├── box.zig         # Box drawing styles
-│   │
-│   ├── terminal.zig    # Terminal detection
-│   ├── console.zig     # Main console interface
-│   ├── emoji.zig       # Emoji support
-│   │
-│   └── renderables/    # Complex UI components
-│       ├── mod.zig
-│       ├── panel.zig
-│       ├── table.zig
-│       ├── rule.zig
-│       ├── progress.zig
-│       ├── tree.zig
-│       ├── padding.zig
-│       ├── align.zig
-│       ├── columns.zig
-│       ├── layout.zig
-│       ├── live.zig
-│       ├── json.zig
-│       └── syntax.zig
-│
-└── .claude/
-    ├── agents/         # Claude agents
-    ├── skills/         # Claude skills (/test)
-    └── settings.local.json
+    Event --> Update --> View --> Render
+      ^                            |
+      |____________________________|
+```
+
+- **Event**: Keyboard, mouse, resize, or tick
+- **Update**: Your function. Modify state, return an action (.none, .quit, .command)
+- **View**: Your function. Call frame.render() to describe the UI
+- **Render**: zithril diffs and draws only what changed
+
+---
+
+## Layer Stack
+
+```
++--------------------------------------------------+
+|              YOUR APPLICATION                     |
+|  State --> update(Event) --> Action              |
+|  State --> view(Frame) --> (renders widgets)     |
++--------------------------------------------------+
+                      |
+                      v
++--------------------------------------------------+
+|                  zithril                          |
+|  App        Event loop, terminal setup/teardown  |
+|  Frame      Layout methods, render dispatch      |
+|  Layout     Constraint solver                    |
+|  Buffer     Cell grid with diff support          |
+|  Widgets    Block, List, Table, Gauge, Text...   |
++--------------------------------------------------+
+                      |
+                      v
++--------------------------------------------------+
+|                  rich_zig                         |
+|  Style, Color, Text spans, ANSI rendering        |
++--------------------------------------------------+
+                      |
+                      v
++--------------------------------------------------+
+|              Terminal Backend                     |
+|  Raw mode, alternate screen, input events        |
++--------------------------------------------------+
 ```
 
 ---
 
-## Architecture: 4 Phases
+## Core Types
 
-**Phase 1 - Core Types**: `color`, `style`, `segment`, `cells`
-**Phase 2 - Text/Markup**: `markup`, `text`, `box`
-**Phase 3 - Terminal/Console**: `terminal`, `console`, `emoji`
-**Phase 4 - Renderables**: `panel`, `table`, `rule`, `progress`, `tree`, `layout`, `json`, `syntax`, etc.
+### Constraint (layout)
 
-All renderables implement: `render(width, allocator) ![]Segment`
+| Constraint | Description |
+|------------|-------------|
+| `.length(n)` | Exactly n cells |
+| `.min(n)` | At least n cells |
+| `.max(n)` | At most n cells |
+| `.flex(n)` | Proportional share (like CSS flex-grow) |
+| `.ratio(a, b)` | Fraction a/b of available space |
+
+### Event
+
+- `.key` - KeyCode + modifiers (ctrl, alt, shift)
+- `.mouse` - Position + kind (down, up, drag, scroll)
+- `.resize` - New width/height
+- `.tick` - Timer for animations/polling
+
+### Action
+
+- `.none` - Continue running
+- `.quit` - Exit the app
+- `.command` - Async operation (future)
 
 ---
 
 ## Key Patterns
 
-### Explicit Allocators
-
-All public APIs take `allocator: std.mem.Allocator`. No global state.
+### App Structure
 
 ```zig
-var panel = Panel.fromText(allocator, "content");
-defer panel.deinit();
-```
+const State = struct {
+    count: i32 = 0,
+};
 
-### Builder Pattern (Fluent API)
-
-```zig
-const panel = Panel.fromText(alloc, "content")
-    .withTitle("Title")
-    .withWidth(30)
-    .withStyle(box.rounded);
-```
-
-### Error Handling
-
-```zig
-fn loadConfig(path: []const u8) !Config {
-    const file = try fs.open(path);
-    defer file.close();
-    return try parseConfig(file);
+pub fn main() !void {
+    var app = zithril.App(State).init(.{
+        .state = .{},
+        .update = update,
+        .view = view,
+    });
+    try app.run();
 }
 
-// Explicit error sets for API boundaries
-const ConfigError = error{ FileNotFound, ParseFailed, InvalidFormat };
-```
-
-### Optional Handling
-
-```zig
-// Prefer if/orelse over .? when handling is needed
-if (items.get(index)) |item| {
-    // safe to use item
-} else {
-    // handle missing case
+fn update(state: *State, event: zithril.Event) zithril.Action {
+    switch (event) {
+        .key => |key| switch (key.code) {
+            .char => |c| if (c == 'q') return .quit,
+            else => {},
+        },
+        else => {},
+    }
+    return .none;
 }
 
-// Use orelse for defaults
-const value = optional orelse default_value;
-
-// Use .? only when null is truly unexpected (will panic)
-const ptr = maybe_ptr.?;
+fn view(state: *State, frame: *zithril.Frame) void {
+    frame.render(zithril.Block{ .title = "App" }, frame.size());
+}
 ```
 
-### Memory Safety
+### Widget Interface
+
+Widgets are structs with a `render` function:
 
 ```zig
-// Always use defer for cleanup
-const buffer = try allocator.alloc(u8, size);
-defer allocator.free(buffer);
+const MyWidget = struct {
+    title: []const u8,
+    highlighted: bool = false,
 
-// Prefer slices over raw pointers
-fn process(data: []const u8) void { ... }
+    pub fn render(self: MyWidget, area: zithril.Rect, buf: *zithril.Buffer) void {
+        const style = if (self.highlighted)
+            zithril.Style{ .fg = .yellow, .bold = true }
+        else
+            zithril.Style{};
+        buf.set_string(area.x, area.y, self.title, style);
+    }
+};
 ```
+
+### Layout Composition
+
+```zig
+fn view(state: *State, frame: *zithril.Frame) void {
+    const chunks = frame.layout(frame.size(), .vertical, &.{
+        .length(3),     // Header: exactly 3 rows
+        .flex(1),       // Content: fill remaining
+        .length(1),     // Footer: exactly 1 row
+    });
+
+    frame.render(Header{}, chunks[0]);
+    frame.render(Content{ .items = state.items }, chunks[1]);
+    frame.render(StatusBar{}, chunks[2]);
+}
+```
+
+### Focus Management (manual)
+
+```zig
+const Focus = enum { sidebar, main, popup };
+
+const State = struct {
+    focus: Focus = .sidebar,
+};
+
+fn update(state: *State, event: zithril.Event) zithril.Action {
+    if (event == .key and event.key.code == .tab) {
+        state.focus = switch (state.focus) {
+            .sidebar => .main,
+            .main => .sidebar,
+            .popup => .popup,
+        };
+    }
+    return .none;
+}
+```
+
+---
+
+## Built-in Widgets
+
+| Widget | Purpose |
+|--------|---------|
+| `Block` | Borders and titles |
+| `Text` | Single-line styled text |
+| `Paragraph` | Multi-line with wrapping |
+| `List` | Navigable item list |
+| `Table` | Rows/columns with headers |
+| `Gauge` | Progress bar |
+| `Tabs` | Tab headers |
+| `Scrollbar` | Scroll indicator |
 
 ---
 
@@ -326,67 +399,15 @@ When making commits, update `version` in `build.zig.zon`:
 
 ---
 
-## Issue Tracking: beads_rust (br)
+## Roadmap
 
-Local-first, non-invasive issue tracker stored in `.beads/`. No external services required.
-
-### Core Commands
-
-```bash
-br init                    # Initialize in current repo
-br create "Title"          # Create issue (prompts for details)
-br q "Quick note"          # Quick capture with minimal ID
-br list                    # Show all open issues
-br ready                   # Show unblocked, actionable work
-br show <id>               # Display issue details
-br close <id>              # Mark complete
-```
-
-### Issue Properties
-
-```bash
-br create "Bug title" --type bug --priority 1
-br update <id> --status in_progress
-br update <id> --priority 2
-br label add <id> "refactor"
-br dep add <child-id> <parent-id>   # child blocked by parent
-```
-
-**Priority**: 0=critical, 1=high, 2=medium, 3=low, 4=backlog
-**Status**: open, in_progress, closed, deferred
-**Type**: bug, feature, task
-
-### Filtering
-
-```bash
-br list --status open --priority 1
-br list --type bug --assignee user@example.com
-br list --label "refactor"
-br blocked                  # Issues waiting on dependencies
-```
-
-### Sync for Git
-
-```bash
-br sync --flush-only        # Export DB to .beads/issues.jsonl
-br sync --import-only       # Import JSONL back to DB
-```
-
-**Workflow**: After modifying issues, run `br sync --flush-only` then commit `.beads/`.
-
-### Machine-Readable Output
-
-```bash
-br list --json              # JSON output for scripting
-br ready --json             # Actionable items as JSON
-br show <id> --json         # Single issue as JSON
-```
-
-### Storage
-
-```
-.beads/
-  beads.db      # SQLite database (local state)
-  issues.jsonl  # Git-friendly export (commit this)
-```
+- [x] Core rendering loop
+- [x] Basic widgets (Block, Text, List, Table, Gauge)
+- [x] Constraint-based layout
+- [x] Keyboard input
+- [ ] Mouse support
+- [ ] Scrollable containers
+- [ ] Text input widget
+- [ ] Command/async pattern
+- [ ] Animation helpers
 
