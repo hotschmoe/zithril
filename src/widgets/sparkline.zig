@@ -75,7 +75,7 @@ pub const Sparkline = struct {
                 .right_to_left => area.x +| area.width -| 1 -| @as(u16, @intCast(i)),
             };
 
-            const bar_char = self.valueToBarChar(value, effective_max);
+            const bar_char = valueToBarChar(value, effective_max);
             buf.set(x, area.y, Cell.styled(bar_char, self.style));
         }
     }
@@ -90,8 +90,7 @@ pub const Sparkline = struct {
     }
 
     /// Convert a value to the appropriate bar character.
-    fn valueToBarChar(self: Sparkline, value: f64, max_val: f64) u21 {
-        _ = self;
+    fn valueToBarChar(value: f64, max_val: f64) u21 {
         if (value <= 0 or max_val <= 0) return BAR_CHARS[0];
 
         // Normalize value to 0.0-1.0 range, clamping to max
@@ -100,14 +99,6 @@ pub const Sparkline = struct {
         // Convert to bar index (0-8)
         const bar_index: usize = @intFromFloat(@round(normalized * 8.0));
         return BAR_CHARS[@min(bar_index, 8)];
-    }
-
-    /// Create a sparkline from a slice of u64 values.
-    pub fn fromU64(data: []const u64) Sparkline {
-        // This is a convenience for when you have integer data.
-        // Note: caller must ensure the f64 slice outlives the sparkline.
-        _ = data;
-        return .{};
     }
 
     /// Create a sparkline with percentage-based max (100.0).
@@ -153,36 +144,30 @@ test "sanity: Sparkline with custom style" {
 // ============================================================
 
 test "behavior: valueToBarChar returns correct characters" {
-    const sparkline = Sparkline{};
-
     // 0% = empty
-    try std.testing.expectEqual(@as(u21, ' '), sparkline.valueToBarChar(0.0, 100.0));
+    try std.testing.expectEqual(@as(u21, ' '), Sparkline.valueToBarChar(0.0, 100.0));
 
     // 100% = full block
-    try std.testing.expectEqual(@as(u21, 0x2588), sparkline.valueToBarChar(100.0, 100.0));
+    try std.testing.expectEqual(@as(u21, 0x2588), Sparkline.valueToBarChar(100.0, 100.0));
 
     // 50% = half block (index 4)
-    try std.testing.expectEqual(@as(u21, 0x2584), sparkline.valueToBarChar(50.0, 100.0));
+    try std.testing.expectEqual(@as(u21, 0x2584), Sparkline.valueToBarChar(50.0, 100.0));
 
     // 25% = quarter block (index 2)
-    try std.testing.expectEqual(@as(u21, 0x2582), sparkline.valueToBarChar(25.0, 100.0));
+    try std.testing.expectEqual(@as(u21, 0x2582), Sparkline.valueToBarChar(25.0, 100.0));
 
     // 75% = three quarters block (index 6)
-    try std.testing.expectEqual(@as(u21, 0x2586), sparkline.valueToBarChar(75.0, 100.0));
+    try std.testing.expectEqual(@as(u21, 0x2586), Sparkline.valueToBarChar(75.0, 100.0));
 }
 
 test "behavior: valueToBarChar clamps values exceeding max" {
-    const sparkline = Sparkline{};
-
     // Value > max should clamp to full block
-    try std.testing.expectEqual(@as(u21, 0x2588), sparkline.valueToBarChar(150.0, 100.0));
+    try std.testing.expectEqual(@as(u21, 0x2588), Sparkline.valueToBarChar(150.0, 100.0));
 }
 
 test "behavior: valueToBarChar handles negative values" {
-    const sparkline = Sparkline{};
-
     // Negative values should return empty
-    try std.testing.expectEqual(@as(u21, ' '), sparkline.valueToBarChar(-10.0, 100.0));
+    try std.testing.expectEqual(@as(u21, ' '), Sparkline.valueToBarChar(-10.0, 100.0));
 }
 
 test "behavior: findMax returns maximum value" {
