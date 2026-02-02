@@ -111,6 +111,9 @@ pub const GameState = struct {
     // Currently selected component for placement
     selected_component: ComponentType,
 
+    // Selected input/output index for contacts/coils (0=A, 1=B, etc.)
+    selected_index: u8,
+
     // Game mode
     mode: Mode,
 
@@ -119,6 +122,10 @@ pub const GameState = struct {
 
     // Current simulation row being shown
     sim_row: usize,
+
+    // UI state
+    show_help: bool,
+    show_level_select: bool,
 
     pub fn init(allocator: Allocator) !GameState {
         // Start with level 0
@@ -136,9 +143,12 @@ pub const GameState = struct {
             .diagram = diagram,
             .cursor = .{ .x = 1, .y = 0 },
             .selected_component = .contact_no,
+            .selected_index = 0,
             .mode = .editing,
             .results = results,
             .sim_row = 0,
+            .show_help = false,
+            .show_level_select = false,
         };
     }
 
@@ -167,6 +177,9 @@ pub const GameState = struct {
         self.cursor = .{ .x = 1, .y = 0 };
         self.mode = .editing;
         self.sim_row = 0;
+        self.selected_index = 0;
+        self.show_help = false;
+        self.show_level_select = false;
     }
 
     pub fn runSimulation(self: *GameState) void {
@@ -193,7 +206,39 @@ pub fn update(state: **GameState, event: zithril.Event) zithril.Action {
     const self = state.*;
     switch (event) {
         .key => |key| {
-            // Global keys
+            // Handle overlay-specific input first
+            if (self.show_help) {
+                // Any key closes help
+                self.show_help = false;
+                return .none;
+            }
+
+            if (self.show_level_select) {
+                switch (key.code) {
+                    .char => |c| {
+                        if (c >= '1' and c <= '9') {
+                            const level_num: usize = @intCast(c - '1');
+                            if (level_num < levels.count()) {
+                                self.loadLevel(level_num) catch {};
+                                self.show_level_select = false;
+                            }
+                        } else if (c == '0') {
+                            // 0 = level 10
+                            if (levels.count() >= 10) {
+                                self.loadLevel(9) catch {};
+                                self.show_level_select = false;
+                            }
+                        } else if (c == 'l' or c == 'L') {
+                            self.show_level_select = false;
+                        }
+                    },
+                    .escape => self.show_level_select = false,
+                    else => {},
+                }
+                return .none;
+            }
+
+            // Normal game input
             switch (key.code) {
                 .char => |c| {
                     switch (c) {
@@ -203,14 +248,32 @@ pub fn update(state: **GameState, event: zithril.Event) zithril.Action {
                             self.loadLevel(self.level_index) catch {};
                         },
                         'n', 'N' => {
-                            // Next level (only if solved)
-                            if (self.mode == .solved) {
+                            // Next level (only if solved or allow skipping)
+                            if (self.mode == .solved or self.level_index + 1 < levels.count()) {
                                 self.loadLevel(self.level_index + 1) catch {};
+                            }
+                        },
+                        'p', 'P' => {
+                            // Previous level
+                            if (self.level_index > 0) {
+                                self.loadLevel(self.level_index - 1) catch {};
                             }
                         },
                         ' ' => {
                             // Space: place component at cursor
                             placeComponent(self);
+                        },
+                        '?' => {
+                            // Toggle help overlay
+                            self.show_help = true;
+                        },
+                        'l', 'L' => {
+                            // Toggle level select
+                            self.show_level_select = true;
+                        },
+                        '0'...'9' => {
+                            // Set selected index for contacts/coils
+                            self.selected_index = @intCast(c - '0');
                         },
                         else => {},
                     }
@@ -234,6 +297,11 @@ pub fn update(state: **GameState, event: zithril.Event) zithril.Action {
                 },
                 .down => {
                     if (self.cursor.y < self.diagram.height - 1) self.cursor.y += 1;
+                },
+                .escape => {
+                    // Close any overlay or exit edit mode
+                    self.show_help = false;
+                    self.show_level_select = false;
                 },
                 else => {},
             }
@@ -265,14 +333,15 @@ fn placeComponent(state: *GameState) void {
     // Don't allow editing rails (first and last columns)
     if (x == 0 or x == state.diagram.width - 1) return;
 
+    const idx = state.selected_index;
     const cell: Cell = switch (state.selected_component) {
         .wire_horizontal => .wire_h,
         .wire_vertical => .wire_v,
-        .contact_no => .{ .contact_no = 0 },
-        .contact_nc => .{ .contact_nc = 0 },
-        .coil => .{ .coil = 0 },
-        .coil_latch => .{ .coil_latch = 0 },
-        .coil_unlatch => .{ .coil_unlatch = 0 },
+        .contact_no => .{ .contact_no = idx },
+        .contact_nc => .{ .contact_nc = idx },
+        .coil => .{ .coil = idx },
+        .coil_latch => .{ .coil_latch = idx },
+        .coil_unlatch => .{ .coil_unlatch = idx },
         .junction => .junction,
         .empty => .empty,
     };
@@ -288,6 +357,7 @@ pub const FrameType = zithril.Frame(zithril.App(*GameState).DefaultMaxWidgets);
 pub fn view(state: **GameState, frame: *FrameType) void {
     const self = state.*;
     const area = frame.size();
+    const level = self.currentLevel();
 
     // Main layout: header, content, footer
     const main_chunks = frame.layout(area, .vertical, &.{
@@ -299,7 +369,7 @@ pub fn view(state: **GameState, frame: *FrameType) void {
     // Header: level info and status
     frame.render(widgets.HeaderWidget{
         .level = self.level_index + 1,
-        .title = self.currentLevel().name,
+        .title = level.name,
         .mode = self.mode,
     }, main_chunks.get(0));
 
@@ -314,16 +384,40 @@ pub fn view(state: **GameState, frame: *FrameType) void {
         .diagram = &self.diagram,
         .cursor = self.cursor,
         .editing = self.mode == .editing,
+        .input_names = level.input_names,
+        .output_names = level.output_names,
     }, content_chunks.get(0));
 
     // Truth table panel
     frame.render(widgets.TruthTableWidget{
-        .level = self.currentLevel(),
+        .level = level,
         .results = self.results,
     }, content_chunks.get(1));
 
     // Footer: controls and component palette
     frame.render(widgets.PaletteWidget{
         .selected = self.selected_component,
+        .selected_index = self.selected_index,
+        .input_names = level.input_names,
+        .output_names = level.output_names,
     }, main_chunks.get(2));
+
+    // Overlays (rendered on top)
+    if (self.mode == .solved) {
+        frame.render(widgets.VictoryOverlay{
+            .level = self.level_index + 1,
+            .has_next = self.level_index + 1 < levels.count(),
+        }, area);
+    }
+
+    if (self.show_help) {
+        frame.render(widgets.HelpOverlay{}, area);
+    }
+
+    if (self.show_level_select) {
+        frame.render(widgets.LevelSelectOverlay{
+            .current_level = self.level_index,
+            .total_levels = levels.count(),
+        }, area);
+    }
 }

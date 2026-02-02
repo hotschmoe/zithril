@@ -53,12 +53,17 @@ const Colors = struct {
     const contact_no = Style.init().fg(.green);
     const contact_nc = Style.init().fg(.yellow);
     const coil = Style.init().fg(.red);
+    const coil_latch = Style.init().fg(.magenta);
+    const coil_unlatch = Style.init().fg(.cyan);
     const cursor = Style.init().fg(.black).bg(.cyan);
     const powered = Style.init().fg(.green).bold();
     const pass = Style.init().fg(.green);
     const fail = Style.init().fg(.red);
     const header = Style.init().fg(.cyan).bold();
     const hint = Style.init().fg(Color.from256(245)); // gray
+    const overlay_bg = Style.init().bg(Color.from256(236)); // dark gray
+    const overlay_border = Style.init().fg(.cyan);
+    const highlight = Style.init().fg(.yellow).bold();
 };
 
 /// Header widget showing level info and mode
@@ -114,6 +119,8 @@ pub const DiagramWidget = struct {
     diagram: *const Diagram,
     cursor: Position,
     editing: bool,
+    input_names: []const []const u8,
+    output_names: []const []const u8,
 
     pub fn render(self: DiagramWidget, area: Rect, buf: *Buffer) void {
         // Draw border
@@ -142,18 +149,19 @@ pub const DiagramWidget = struct {
                 const cell = self.diagram.get(x, y);
                 const is_cursor = self.editing and x == self.cursor.x and y == self.cursor.y;
 
-                renderLadderCell(buf, screen_x, screen_y, cell, is_cursor);
+                self.renderLadderCell(buf, screen_x, screen_y, cell, is_cursor);
             }
         }
 
         // Help text at bottom
         if (inner.height > self.diagram.height + 1) {
             const help_y = inner.y + @as(u16, @intCast(self.diagram.height)) + 1;
-            buf.setString(inner.x, help_y, "Arrows:Move  Space:Place  Tab:Component  Enter:Test", Colors.hint);
+            buf.setString(inner.x, help_y, "?:Help  L:Levels  0-9:Index  P/N:Prev/Next", Colors.hint);
         }
     }
 
-    fn renderLadderCell(buf: *Buffer, x: u16, y: u16, cell: LadderCell, is_cursor: bool) void {
+    fn renderLadderCell(self: DiagramWidget, buf: *Buffer, x: u16, y: u16, cell: LadderCell, is_cursor: bool) void {
+        var str_buf: [3]u8 = undefined;
         const str: []const u8 = switch (cell) {
             .empty => "   ",
             .wire_h => "---",
@@ -161,11 +169,42 @@ pub const DiagramWidget = struct {
             .junction => "-+-",
             .rail_left => "|  ",
             .rail_right => "  |",
-            .contact_no => "[ ]",
-            .contact_nc => "[/]",
-            .coil => "( )",
-            .coil_latch => "(L)",
-            .coil_unlatch => "(U)",
+            .contact_no => |idx| blk: {
+                str_buf[0] = '[';
+                str_buf[1] = self.getInputLabel(idx);
+                str_buf[2] = ']';
+                break :blk &str_buf;
+            },
+            .contact_nc => |idx| blk: {
+                str_buf[0] = '[';
+                str_buf[1] = '/';
+                str_buf[2] = ']';
+                // Show label in middle if possible, otherwise just show /
+                const label = self.getInputLabel(idx);
+                if (label != '?') {
+                    str_buf[1] = label;
+                    // Use overline style or different color to indicate NC
+                }
+                break :blk &str_buf;
+            },
+            .coil => |idx| blk: {
+                str_buf[0] = '(';
+                str_buf[1] = self.getOutputLabel(idx);
+                str_buf[2] = ')';
+                break :blk &str_buf;
+            },
+            .coil_latch => |idx| blk: {
+                str_buf[0] = '(';
+                str_buf[1] = self.getOutputLabel(idx);
+                str_buf[2] = ')';
+                break :blk &str_buf;
+            },
+            .coil_unlatch => |idx| blk: {
+                str_buf[0] = '(';
+                str_buf[1] = self.getOutputLabel(idx);
+                str_buf[2] = ')';
+                break :blk &str_buf;
+            },
         };
 
         const style: Style = if (is_cursor)
@@ -175,11 +214,29 @@ pub const DiagramWidget = struct {
             .wire_h, .wire_v, .junction => Colors.wire,
             .contact_no => Colors.contact_no,
             .contact_nc => Colors.contact_nc,
-            .coil, .coil_latch, .coil_unlatch => Colors.coil,
+            .coil => Colors.coil,
+            .coil_latch => Colors.coil_latch,
+            .coil_unlatch => Colors.coil_unlatch,
             .empty => Style.empty,
         };
 
         buf.setString(x, y, str, style);
+    }
+
+    fn getInputLabel(self: DiagramWidget, idx: u8) u8 {
+        if (idx < self.input_names.len and self.input_names[idx].len > 0) {
+            return self.input_names[idx][0];
+        }
+        // Fallback: A, B, C, ...
+        return if (idx < 26) 'A' + idx else '?';
+    }
+
+    fn getOutputLabel(self: DiagramWidget, idx: u8) u8 {
+        if (idx < self.output_names.len and self.output_names[idx].len > 0) {
+            return self.output_names[idx][0];
+        }
+        // Fallback: Y, Z, ...
+        return if (idx < 2) 'Y' + idx else '?';
     }
 };
 
@@ -266,6 +323,9 @@ pub const TruthTableWidget = struct {
 /// Component palette widget (footer)
 pub const PaletteWidget = struct {
     selected: ComponentType,
+    selected_index: u8,
+    input_names: []const []const u8,
+    output_names: []const []const u8,
 
     pub fn render(self: PaletteWidget, area: Rect, buf: *Buffer) void {
         // Draw border
@@ -304,9 +364,39 @@ pub const PaletteWidget = struct {
             x_offset += 4; // 3 chars + 1 space
         }
 
+        // Show selected index and current label
+        if (x_offset + 12 <= inner.width) {
+            const label = self.getCurrentLabel();
+            var idx_buf: [12]u8 = undefined;
+            const idx_str = std.fmt.bufPrint(&idx_buf, " Idx:{d}={c}", .{
+                self.selected_index,
+                label,
+            }) catch " Idx:?";
+            buf.setString(inner.x + x_offset, inner.y, idx_str, Colors.highlight);
+        }
+
         // Controls hint
         if (inner.height > 1) {
-            buf.setString(inner.x, inner.y + 1, "R:Reset  N:Next  Q:Quit", Colors.hint);
+            buf.setString(inner.x, inner.y + 1, "R:Reset  P/N:Prev/Next  Q:Quit  Tab:Cycle  ?:Help", Colors.hint);
+        }
+    }
+
+    fn getCurrentLabel(self: PaletteWidget) u8 {
+        // For contacts, use input names; for coils, use output names
+        const is_coil = self.selected == .coil or
+            self.selected == .coil_latch or
+            self.selected == .coil_unlatch;
+
+        if (is_coil) {
+            if (self.selected_index < self.output_names.len and self.output_names[self.selected_index].len > 0) {
+                return self.output_names[self.selected_index][0];
+            }
+            return if (self.selected_index < 2) 'Y' + self.selected_index else '?';
+        } else {
+            if (self.selected_index < self.input_names.len and self.input_names[self.selected_index].len > 0) {
+                return self.input_names[self.selected_index][0];
+            }
+            return if (self.selected_index < 26) 'A' + self.selected_index else '?';
         }
     }
 };
@@ -319,5 +409,178 @@ pub const StatusWidget = struct {
         if (self.message.len > 0) {
             buf.setString(area.x, area.y, self.message, Style.empty);
         }
+    }
+};
+
+/// Victory overlay shown when a level is solved
+pub const VictoryOverlay = struct {
+    level: usize,
+    has_next: bool,
+
+    pub fn render(self: VictoryOverlay, area: Rect, buf: *Buffer) void {
+        // Center a box on screen
+        const box_width: u16 = 32;
+        const box_height: u16 = 7;
+
+        if (area.width < box_width or area.height < box_height) return;
+
+        const box_x = area.x + (area.width - box_width) / 2;
+        const box_y = area.y + (area.height - box_height) / 2;
+        const box = Rect{ .x = box_x, .y = box_y, .width = box_width, .height = box_height };
+
+        // Draw background
+        for (0..box_height) |dy| {
+            for (0..box_width) |dx| {
+                buf.setString(
+                    box_x + @as(u16, @intCast(dx)),
+                    box_y + @as(u16, @intCast(dy)),
+                    " ",
+                    Colors.overlay_bg,
+                );
+            }
+        }
+
+        // Draw border
+        const block = zithril.Block{
+            .title = "SOLVED!",
+            .border = .rounded,
+            .border_style = Colors.overlay_border,
+        };
+        block.render(box, buf);
+
+        const inner = block.inner(box);
+
+        // Victory message
+        var msg_buf: [32]u8 = undefined;
+        const msg = std.fmt.bufPrint(&msg_buf, "Level {d} Complete!", .{self.level}) catch "Complete!";
+        const msg_x = inner.x + (inner.width -| @as(u16, @intCast(msg.len))) / 2;
+        buf.setString(msg_x, inner.y + 1, msg, Colors.pass.bold());
+
+        // Next level hint
+        const hint = if (self.has_next) "Press N for next level" else "All levels complete!";
+        const hint_x = inner.x + (inner.width -| @as(u16, @intCast(hint.len))) / 2;
+        buf.setString(hint_x, inner.y + 3, hint, Colors.hint);
+    }
+};
+
+/// Help overlay showing controls
+pub const HelpOverlay = struct {
+    pub fn render(self: HelpOverlay, area: Rect, buf: *Buffer) void {
+        _ = self;
+
+        const box_width: u16 = 44;
+        const box_height: u16 = 16;
+
+        if (area.width < box_width or area.height < box_height) return;
+
+        const box_x = area.x + (area.width - box_width) / 2;
+        const box_y = area.y + (area.height - box_height) / 2;
+        const box = Rect{ .x = box_x, .y = box_y, .width = box_width, .height = box_height };
+
+        // Draw background
+        for (0..box_height) |dy| {
+            for (0..box_width) |dx| {
+                buf.setString(
+                    box_x + @as(u16, @intCast(dx)),
+                    box_y + @as(u16, @intCast(dy)),
+                    " ",
+                    Colors.overlay_bg,
+                );
+            }
+        }
+
+        // Draw border
+        const block = zithril.Block{
+            .title = "Help",
+            .border = .rounded,
+            .border_style = Colors.overlay_border,
+        };
+        block.render(box, buf);
+
+        const inner = block.inner(box);
+        var y: u16 = 0;
+
+        const lines = [_][]const u8{
+            "CONTROLS",
+            "--------",
+            "Arrows    Move cursor",
+            "Space     Place/remove component",
+            "Tab       Cycle component type",
+            "0-9       Set input/output index",
+            "Enter     Run simulation",
+            "R         Reset level",
+            "P/N       Previous/Next level",
+            "L         Level select menu",
+            "Q         Quit",
+            "",
+            "Press any key to close",
+        };
+
+        for (lines) |line| {
+            if (y >= inner.height) break;
+            const style = if (y == 0) Colors.header else Colors.hint;
+            buf.setString(inner.x + 1, inner.y + y, line, style);
+            y += 1;
+        }
+    }
+};
+
+/// Level selection overlay
+pub const LevelSelectOverlay = struct {
+    current_level: usize,
+    total_levels: usize,
+
+    pub fn render(self: LevelSelectOverlay, area: Rect, buf: *Buffer) void {
+        const box_width: u16 = 36;
+        const box_height: u16 = @as(u16, @intCast(self.total_levels)) + 5;
+
+        if (area.width < box_width or area.height < box_height) return;
+
+        const box_x = area.x + (area.width - box_width) / 2;
+        const box_y = area.y + (area.height - box_height) / 2;
+        const box = Rect{ .x = box_x, .y = box_y, .width = box_width, .height = box_height };
+
+        // Draw background
+        for (0..box_height) |dy| {
+            for (0..box_width) |dx| {
+                buf.setString(
+                    box_x + @as(u16, @intCast(dx)),
+                    box_y + @as(u16, @intCast(dy)),
+                    " ",
+                    Colors.overlay_bg,
+                );
+            }
+        }
+
+        // Draw border
+        const block = zithril.Block{
+            .title = "Select Level",
+            .border = .rounded,
+            .border_style = Colors.overlay_border,
+        };
+        block.render(box, buf);
+
+        const inner = block.inner(box);
+
+        // List levels
+        for (0..self.total_levels) |i| {
+            if (i >= inner.height) break;
+
+            const levels_mod = @import("levels.zig");
+            const level = levels_mod.get(i);
+            const is_current = i == self.current_level;
+
+            var line_buf: [32]u8 = undefined;
+            const key: u8 = if (i < 9) '1' + @as(u8, @intCast(i)) else '0';
+            const line = std.fmt.bufPrint(&line_buf, "{c}. {s}", .{ key, level.name }) catch "?";
+
+            const style = if (is_current) Colors.highlight else Style.init().fg(.white);
+            buf.setString(inner.x + 1, inner.y + @as(u16, @intCast(i)), line, style);
+        }
+
+        // Hint at bottom
+        const hint = "Press 1-9/0 or Esc to close";
+        const hint_y = inner.y + inner.height - 1;
+        buf.setString(inner.x + 1, hint_y, hint, Colors.hint);
     }
 };
