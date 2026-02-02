@@ -105,4 +105,35 @@ pub fn build(b: *std.Build) void {
 
     const run_examples_step = b.step("run-examples", "Run all examples");
     run_examples_step.dependOn(prev_step);
+
+    // Demos - larger applications in their own directories
+    const demos = [_]struct { name: []const u8, desc: []const u8 }{
+        .{ .name = "rung", .desc = "Ladder logic puzzle game" },
+    };
+
+    for (demos) |demo| {
+        const demo_exe = b.addExecutable(.{
+            .name = demo.name,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(b.fmt("demos/{s}/main.zig", .{demo.name})),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "zithril", .module = mod },
+                    .{ .name = "rich_zig", .module = rich_zig.module("rich_zig") },
+                },
+            }),
+        });
+
+        b.installArtifact(demo_exe);
+
+        const demo_run = b.addRunArtifact(demo_exe);
+        demo_run.step.dependOn(b.getInstallStep());
+
+        const demo_step = b.step(
+            b.fmt("run-{s}", .{demo.name}),
+            b.fmt("Run {s}", .{demo.desc}),
+        );
+        demo_step.dependOn(&demo_run.step);
+    }
 }
