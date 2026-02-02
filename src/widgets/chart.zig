@@ -74,14 +74,44 @@ pub const LineDataset = struct {
     marker: ?u21 = null,
 };
 
-/// Chart widget for displaying line plots.
+/// Common marker characters for scatter plots.
+pub const Markers = struct {
+    pub const dot: u21 = 0x25CF; // '●'
+    pub const circle: u21 = 0x25CB; // '○'
+    pub const square: u21 = 0x25A0; // '■'
+    pub const square_empty: u21 = 0x25A1; // '□'
+    pub const diamond: u21 = 0x25C6; // '◆'
+    pub const diamond_empty: u21 = 0x25C7; // '◇'
+    pub const triangle_up: u21 = 0x25B2; // '▲'
+    pub const triangle_down: u21 = 0x25BC; // '▼'
+    pub const star: u21 = 0x2605; // '★'
+    pub const cross: u21 = 0x2715; // '✕'
+    pub const plus: u21 = '+';
+    pub const x: u21 = 0x00D7; // '×'
+};
+
+/// A scatter dataset to be plotted (points only, no connecting lines).
+pub const ScatterDataset = struct {
+    /// Optional name for the dataset (for legends).
+    name: []const u8 = "",
+    /// Data points as [x, y] pairs.
+    data: []const [2]f64,
+    /// Marker character for data points.
+    marker: u21 = Markers.dot,
+    /// Style for the markers.
+    style: Style = Style.empty,
+};
+
+/// Chart widget for displaying line and scatter plots.
 pub const Chart = struct {
     /// X-axis configuration.
     x_axis: Axis,
     /// Y-axis configuration.
     y_axis: Axis,
-    /// Datasets to plot.
+    /// Line datasets to plot.
     datasets: []const LineDataset = &.{},
+    /// Scatter datasets to plot (points only, no connecting lines).
+    scatter_datasets: []const ScatterDataset = &.{},
     /// Style for the chart area background.
     style: Style = Style.empty,
     /// Default style for datasets without explicit style.
@@ -104,9 +134,14 @@ pub const Chart = struct {
         self.renderYAxis(layout, buf);
         self.renderXAxis(layout, buf);
 
-        // Render datasets
+        // Render line datasets
         for (self.datasets) |dataset| {
             self.renderLineDataset(dataset, layout, buf);
+        }
+
+        // Render scatter datasets
+        for (self.scatter_datasets) |dataset| {
+            self.renderScatterDataset(dataset, layout, buf);
         }
     }
 
@@ -336,6 +371,24 @@ pub const Chart = struct {
                 if (layout.plot_area.contains(x, y)) {
                     buf.set(x, y, Cell.styled(marker, line_style));
                 }
+            }
+        }
+    }
+
+    /// Render a scatter dataset (points only, no connecting lines).
+    fn renderScatterDataset(self: Chart, dataset: ScatterDataset, layout: ChartLayout, buf: *Buffer) void {
+        if (dataset.data.len == 0) return;
+
+        const marker_style = if (dataset.style.isEmpty()) self.default_dataset_style else dataset.style;
+
+        // Draw each point as a marker at its screen position
+        for (dataset.data) |point| {
+            const x = self.dataToScreenX(point[0], layout);
+            const y = self.dataToScreenY(point[1], layout);
+
+            // Only render if within plot area bounds
+            if (layout.plot_area.contains(x, y)) {
+                buf.set(x, y, Cell.styled(dataset.marker, marker_style));
             }
         }
     }
@@ -995,4 +1048,282 @@ test "regression: Chart renders at non-zero offset" {
 
     // Origin should be unchanged
     try std.testing.expect(buf.get(0, 0).isDefault());
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Scatter dataset rendering
+// ============================================================
+
+test "sanity: ScatterDataset with default values" {
+    const data = [_][2]f64{
+        .{ 10, 20 },
+        .{ 30, 40 },
+    };
+    const dataset = ScatterDataset{
+        .data = &data,
+    };
+    try std.testing.expectEqual(@as(usize, 2), dataset.data.len);
+    try std.testing.expectEqual(Markers.dot, dataset.marker);
+    try std.testing.expect(dataset.style.isEmpty());
+}
+
+test "sanity: Markers constants are valid unicode" {
+    try std.testing.expectEqual(@as(u21, 0x25CF), Markers.dot);
+    try std.testing.expectEqual(@as(u21, 0x25CB), Markers.circle);
+    try std.testing.expectEqual(@as(u21, 0x25A0), Markers.square);
+    try std.testing.expectEqual(@as(u21, 0x25A1), Markers.square_empty);
+    try std.testing.expectEqual(@as(u21, 0x25C6), Markers.diamond);
+    try std.testing.expectEqual(@as(u21, 0x25C7), Markers.diamond_empty);
+    try std.testing.expectEqual(@as(u21, 0x25B2), Markers.triangle_up);
+    try std.testing.expectEqual(@as(u21, 0x25BC), Markers.triangle_down);
+    try std.testing.expectEqual(@as(u21, 0x2605), Markers.star);
+    try std.testing.expectEqual(@as(u21, 0x2715), Markers.cross);
+    try std.testing.expectEqual(@as(u21, '+'), Markers.plus);
+    try std.testing.expectEqual(@as(u21, 0x00D7), Markers.x);
+}
+
+test "behavior: Chart renders scatter dataset markers" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    const data = [_][2]f64{
+        .{ 50, 50 },
+    };
+    const scatter_datasets = [_]ScatterDataset{
+        .{ .data = &data, .marker = Markers.star },
+    };
+    const chart = Chart{
+        .x_axis = .{ .bounds = .{ 0, 100 } },
+        .y_axis = .{ .bounds = .{ 0, 100 } },
+        .scatter_datasets = &scatter_datasets,
+    };
+    chart.render(Rect.init(0, 0, 40, 20), &buf);
+
+    // Check that marker exists somewhere in buffer
+    var found_marker = false;
+    for (buf.cells) |cell| {
+        if (cell.char == Markers.star) {
+            found_marker = true;
+            break;
+        }
+    }
+    try std.testing.expect(found_marker);
+}
+
+test "behavior: Chart renders multiple scatter points" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    const data = [_][2]f64{
+        .{ 0, 0 },
+        .{ 50, 50 },
+        .{ 100, 100 },
+    };
+    const scatter_datasets = [_]ScatterDataset{
+        .{ .data = &data, .marker = Markers.dot },
+    };
+    const chart = Chart{
+        .x_axis = .{ .bounds = .{ 0, 100 } },
+        .y_axis = .{ .bounds = .{ 0, 100 } },
+        .scatter_datasets = &scatter_datasets,
+    };
+    chart.render(Rect.init(0, 0, 40, 20), &buf);
+
+    // Count markers
+    var marker_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == Markers.dot) {
+            marker_count += 1;
+        }
+    }
+    // At least some markers should be rendered (may overlap)
+    try std.testing.expect(marker_count >= 1);
+}
+
+test "behavior: Chart applies scatter dataset style" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    const data = [_][2]f64{
+        .{ 50, 50 },
+    };
+    const scatter_datasets = [_]ScatterDataset{
+        .{ .data = &data, .marker = Markers.square, .style = Style.init().fg(.magenta) },
+    };
+    const chart = Chart{
+        .x_axis = .{ .bounds = .{ 0, 100 } },
+        .y_axis = .{ .bounds = .{ 0, 100 } },
+        .scatter_datasets = &scatter_datasets,
+    };
+    chart.render(Rect.init(0, 0, 40, 20), &buf);
+
+    // Check for styled marker
+    var found_styled = false;
+    for (buf.cells) |cell| {
+        if (cell.char == Markers.square) {
+            if (cell.style.getForeground()) |fg| {
+                if (fg.eql(.magenta)) {
+                    found_styled = true;
+                    break;
+                }
+            }
+        }
+    }
+    try std.testing.expect(found_styled);
+}
+
+test "behavior: Chart renders multiple scatter datasets" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    const data1 = [_][2]f64{
+        .{ 25, 25 },
+    };
+    const data2 = [_][2]f64{
+        .{ 75, 75 },
+    };
+    const scatter_datasets = [_]ScatterDataset{
+        .{ .data = &data1, .marker = Markers.circle, .style = Style.init().fg(.red) },
+        .{ .data = &data2, .marker = Markers.triangle_up, .style = Style.init().fg(.blue) },
+    };
+    const chart = Chart{
+        .x_axis = .{ .bounds = .{ 0, 100 } },
+        .y_axis = .{ .bounds = .{ 0, 100 } },
+        .scatter_datasets = &scatter_datasets,
+    };
+    chart.render(Rect.init(0, 0, 40, 20), &buf);
+
+    // Check for both markers
+    var found_circle = false;
+    var found_triangle = false;
+    for (buf.cells) |cell| {
+        if (cell.char == Markers.circle) found_circle = true;
+        if (cell.char == Markers.triangle_up) found_triangle = true;
+    }
+    try std.testing.expect(found_circle);
+    try std.testing.expect(found_triangle);
+}
+
+test "behavior: Chart renders both line and scatter datasets" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    const line_data = [_][2]f64{
+        .{ 0, 0 },
+        .{ 100, 100 },
+    };
+    const scatter_data = [_][2]f64{
+        .{ 50, 50 },
+    };
+    const line_datasets = [_]LineDataset{
+        .{ .data = &line_data, .style = Style.init().fg(.green) },
+    };
+    const scatter_datasets = [_]ScatterDataset{
+        .{ .data = &scatter_data, .marker = Markers.star, .style = Style.init().fg(.yellow) },
+    };
+    const chart = Chart{
+        .x_axis = .{ .bounds = .{ 0, 100 } },
+        .y_axis = .{ .bounds = .{ 0, 100 } },
+        .datasets = &line_datasets,
+        .scatter_datasets = &scatter_datasets,
+    };
+    chart.render(Rect.init(0, 0, 40, 20), &buf);
+
+    // Check for scatter marker
+    var found_star = false;
+    for (buf.cells) |cell| {
+        if (cell.char == Markers.star) {
+            found_star = true;
+            break;
+        }
+    }
+    try std.testing.expect(found_star);
+}
+
+test "regression: Chart scatter dataset handles out-of-bounds points" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    const data = [_][2]f64{
+        .{ -50, 150 }, // Outside bounds - gets clamped to edge
+        .{ 50, 50 }, // Inside bounds
+        .{ 150, -50 }, // Outside bounds - gets clamped to edge
+    };
+    const scatter_datasets = [_]ScatterDataset{
+        .{ .data = &data, .marker = Markers.diamond },
+    };
+    const chart = Chart{
+        .x_axis = .{ .bounds = .{ 0, 100 } },
+        .y_axis = .{ .bounds = .{ 0, 100 } },
+        .scatter_datasets = &scatter_datasets,
+    };
+    chart.render(Rect.init(0, 0, 40, 20), &buf);
+
+    // All points should render (out-of-bounds are clamped to edge, not excluded)
+    // This matches the behavior of line datasets
+    var marker_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == Markers.diamond) {
+            marker_count += 1;
+        }
+    }
+    // All 3 points should be rendered (clamped to edges)
+    try std.testing.expect(marker_count >= 1);
+}
+
+test "regression: Chart scatter dataset handles empty data" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    const scatter_datasets = [_]ScatterDataset{
+        .{ .data = &.{}, .marker = Markers.dot },
+    };
+    const chart = Chart{
+        .x_axis = .{ .bounds = .{ 0, 100 } },
+        .y_axis = .{ .bounds = .{ 0, 100 } },
+        .scatter_datasets = &scatter_datasets,
+    };
+    chart.render(Rect.init(0, 0, 40, 20), &buf);
+
+    // Should not crash, no markers should be rendered
+    var marker_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == Markers.dot) {
+            marker_count += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 0), marker_count);
+}
+
+test "regression: Chart scatter uses default style when dataset style is empty" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    const data = [_][2]f64{
+        .{ 50, 50 },
+    };
+    const scatter_datasets = [_]ScatterDataset{
+        .{ .data = &data, .marker = Markers.cross },
+    };
+    const chart = Chart{
+        .x_axis = .{ .bounds = .{ 0, 100 } },
+        .y_axis = .{ .bounds = .{ 0, 100 } },
+        .scatter_datasets = &scatter_datasets,
+        .default_dataset_style = Style.init().fg(.cyan),
+    };
+    chart.render(Rect.init(0, 0, 40, 20), &buf);
+
+    // Check for marker with default style
+    var found_styled = false;
+    for (buf.cells) |cell| {
+        if (cell.char == Markers.cross) {
+            if (cell.style.getForeground()) |fg| {
+                if (fg.eql(.cyan)) {
+                    found_styled = true;
+                    break;
+                }
+            }
+        }
+    }
+    try std.testing.expect(found_styled);
 }

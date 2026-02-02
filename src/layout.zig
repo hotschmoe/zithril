@@ -2,6 +2,10 @@
 // Constraint-based layout system inspired by ratatui
 
 const std = @import("std");
+const spacing_mod = @import("spacing.zig");
+
+pub const Margin = spacing_mod.Margin;
+pub const Spacing = spacing_mod.Spacing;
 
 /// Direction for layout: how children are arranged.
 pub const Direction = enum {
@@ -323,6 +327,29 @@ pub fn layout(
     return layoutWithFlex(area, direction, constraints, .legacy);
 }
 
+/// Options for layout configuration.
+pub const LayoutOptions = struct {
+    /// Margin applied to the area before layout calculation.
+    margin: Margin = .{},
+    /// Spacing (gap) between layout elements.
+    spacing: Spacing = Spacing.none,
+    /// How excess space is distributed.
+    flex: Flex = .start,
+};
+
+/// Split an area according to constraints with layout options.
+/// Applies margin to the area first, then calculates layout with spacing between elements.
+pub fn layoutWithOptions(
+    area: Rect,
+    direction: Direction,
+    constraints: []const Constraint,
+    options: LayoutOptions,
+) BoundedRects {
+    // Apply margin first
+    const inner_area = options.margin.apply(area);
+    return layoutWithFlexAndSpacing(inner_area, direction, constraints, options.flex, options.spacing.value);
+}
+
 /// Split an area according to constraints with explicit flex alignment.
 /// See layout() for constraint resolution details. The flex parameter
 /// controls how excess space is distributed.
@@ -332,7 +359,18 @@ pub fn layoutWithFlex(
     constraints: []const Constraint,
     flex: Flex,
 ) BoundedRects {
-    const total_space: u16 = switch (direction) {
+    return layoutWithFlexAndSpacing(area, direction, constraints, flex, 0);
+}
+
+/// Internal: Split an area with flex alignment and inter-element spacing.
+fn layoutWithFlexAndSpacing(
+    area: Rect,
+    direction: Direction,
+    constraints: []const Constraint,
+    flex: Flex,
+    element_spacing: u16,
+) BoundedRects {
+    const raw_total_space: u16 = switch (direction) {
         .horizontal => area.width,
         .vertical => area.height,
     };
@@ -345,6 +383,16 @@ pub fn layoutWithFlex(
 
     var sizes: [max_constraints]u16 = [_]u16{0} ** max_constraints;
     const count = @min(constraints.len, max_constraints);
+
+    // Calculate total spacing between elements (N-1 gaps for N elements)
+    const gap_count: u32 = if (count > 1) count - 1 else 0;
+    const total_spacing: u32 = gap_count * @as(u32, element_spacing);
+
+    // Effective space available for constraints (after reserving space for gaps)
+    const total_space: u16 = if (total_spacing >= raw_total_space)
+        0
+    else
+        raw_total_space -| @as(u16, @intCast(total_spacing));
 
     var allocated: u32 = 0;
     var flex_total: u32 = 0;
@@ -443,10 +491,10 @@ pub fn layoutWithFlex(
         total_space -| @as(u16, @intCast(total_allocated));
 
     // Calculate starting position and gap based on Flex mode
-    const spacing = calculateFlexSpacing(flex, excess, count);
+    const flex_spacing = calculateFlexSpacing(flex, excess, count);
 
     // Phase 5: Build result rects with proper positioning
-    var pos: u16 = spacing.start_offset;
+    var pos: u16 = flex_spacing.start_offset;
     for (sizes[0..count], 0..count) |size, i| {
         const rect: Rect = switch (direction) {
             .horizontal => .{
@@ -467,9 +515,12 @@ pub fn layoutWithFlex(
 
         // Add gap after this item (not after the last one)
         if (i + 1 < count) {
-            pos +|= spacing.gap;
+            // Add element spacing first (user-specified gap between elements)
+            pos +|= element_spacing;
+            // Then add flex-calculated gap
+            pos +|= flex_spacing.gap;
             // Handle fractional remainder distribution (left-to-right)
-            if (i < spacing.remainder) {
+            if (i < flex_spacing.remainder) {
                 pos +|= 1;
             }
         }
@@ -956,4 +1007,155 @@ test "regression: Flex handles fractional gap remainder" {
     try std.testing.expectEqual(@as(u16, 0), result.get(0).x);
     try std.testing.expectEqual(@as(u16, 45), result.get(1).x);
     try std.testing.expectEqual(@as(u16, 90), result.get(2).x);
+}
+
+// ============================================================
+// LAYOUT OPTIONS TESTS
+// ============================================================
+
+test "sanity: LayoutOptions default values" {
+    const opts = LayoutOptions{};
+    try std.testing.expect(opts.margin.isZero());
+    try std.testing.expectEqual(@as(u16, 0), opts.spacing.value);
+    try std.testing.expectEqual(Flex.start, opts.flex);
+}
+
+test "behavior: layoutWithOptions applies margin" {
+    const area = Rect.init(0, 0, 100, 50);
+    const result = layoutWithOptions(area, .horizontal, &.{
+        Constraint.flexible(1),
+    }, .{
+        .margin = Margin.all(5),
+    });
+
+    // With margin 5 on all sides, effective area is (5, 5, 90, 40)
+    try std.testing.expectEqual(@as(usize, 1), result.len);
+    try std.testing.expectEqual(@as(u16, 5), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 5), result.get(0).y);
+    try std.testing.expectEqual(@as(u16, 90), result.get(0).width);
+    try std.testing.expectEqual(@as(u16, 40), result.get(0).height);
+}
+
+test "behavior: layoutWithOptions applies spacing between elements" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithOptions(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(20),
+        Constraint.len(20),
+    }, .{
+        .spacing = Spacing.init(10),
+    });
+
+    // 3 elements with 10px spacing between = 20 total spacing
+    // Effective space = 100 - 20 = 80, but we want exact sizes
+    // Positions: 0, 20+10=30, 50+10=60
+    try std.testing.expectEqual(@as(usize, 3), result.len);
+    try std.testing.expectEqual(@as(u16, 0), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 30), result.get(1).x);
+    try std.testing.expectEqual(@as(u16, 60), result.get(2).x);
+}
+
+test "behavior: layoutWithOptions applies flex alignment" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithOptions(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(20),
+    }, .{
+        .flex = .center,
+    });
+
+    // Total items = 40, excess = 60, centered: offset = 30
+    try std.testing.expectEqual(@as(usize, 2), result.len);
+    try std.testing.expectEqual(@as(u16, 30), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 50), result.get(1).x);
+}
+
+test "behavior: layoutWithOptions combines margin, spacing, and flex" {
+    const area = Rect.init(0, 0, 120, 60);
+    const result = layoutWithOptions(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(20),
+    }, .{
+        .margin = Margin.all(10),
+        .spacing = Spacing.init(5),
+        .flex = .start,
+    });
+
+    // Margin 10: effective area is (10, 10, 100, 40)
+    // Spacing 5: 1 gap of 5 between 2 elements
+    // Available space = 100, need 20+20+5=45, excess = 55
+    // Flex.start: items at start
+    // Positions: 10, 10+20+5=35
+    try std.testing.expectEqual(@as(usize, 2), result.len);
+    try std.testing.expectEqual(@as(u16, 10), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 35), result.get(1).x);
+    try std.testing.expectEqual(@as(u16, 10), result.get(0).y);
+    try std.testing.expectEqual(@as(u16, 40), result.get(0).height);
+}
+
+test "behavior: layoutWithOptions vertical direction" {
+    const area = Rect.init(0, 0, 50, 100);
+    const result = layoutWithOptions(area, .vertical, &.{
+        Constraint.len(20),
+        Constraint.len(20),
+    }, .{
+        .margin = Margin.vertical(5),
+        .spacing = Spacing.init(10),
+    });
+
+    // Margin top/bottom 5: effective area is (0, 5, 50, 90)
+    // Spacing 10: 1 gap of 10 between 2 elements
+    // Positions: 5, 5+20+10=35
+    try std.testing.expectEqual(@as(usize, 2), result.len);
+    try std.testing.expectEqual(@as(u16, 5), result.get(0).y);
+    try std.testing.expectEqual(@as(u16, 35), result.get(1).y);
+}
+
+test "regression: layoutWithOptions with zero margin and spacing is same as layout" {
+    const area = Rect.init(0, 0, 100, 50);
+    const result1 = layout(area, .horizontal, &.{
+        Constraint.len(30),
+        Constraint.flexible(1),
+    });
+    const result2 = layoutWithOptions(area, .horizontal, &.{
+        Constraint.len(30),
+        Constraint.flexible(1),
+    }, .{});
+
+    try std.testing.expectEqual(result1.len, result2.len);
+    try std.testing.expectEqual(result1.get(0).x, result2.get(0).x);
+    try std.testing.expectEqual(result1.get(0).width, result2.get(0).width);
+}
+
+test "regression: layoutWithOptions handles single element with spacing" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithOptions(area, .horizontal, &.{
+        Constraint.flexible(1),
+    }, .{
+        .spacing = Spacing.init(10),
+    });
+
+    // Single element, no gaps needed
+    try std.testing.expectEqual(@as(usize, 1), result.len);
+    try std.testing.expectEqual(@as(u16, 0), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 100), result.get(0).width);
+}
+
+test "regression: layoutWithOptions spacing reduces flex space" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithOptions(area, .horizontal, &.{
+        Constraint.flexible(1),
+        Constraint.flexible(1),
+    }, .{
+        .spacing = Spacing.init(20),
+    });
+
+    // 2 flex elements with 20 spacing between = 20 total spacing
+    // Available space = 100 - 20 = 80
+    // Each flex gets 40
+    try std.testing.expectEqual(@as(usize, 2), result.len);
+    try std.testing.expectEqual(@as(u16, 40), result.get(0).width);
+    try std.testing.expectEqual(@as(u16, 40), result.get(1).width);
+    // Second element at 40 + 20 = 60
+    try std.testing.expectEqual(@as(u16, 60), result.get(1).x);
 }

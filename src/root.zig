@@ -17,6 +17,12 @@ pub const geometry = @import("geometry.zig");
 pub const Rect = geometry.Rect;
 pub const Position = geometry.Position;
 
+// Spacing types
+pub const spacing_mod = @import("spacing.zig");
+pub const Padding = spacing_mod.Padding;
+pub const Margin = spacing_mod.Margin;
+pub const Spacing = spacing_mod.Spacing;
+
 // Style types (wrapper around rich_zig)
 pub const style_mod = @import("style.zig");
 pub const Style = style_mod.Style;
@@ -33,7 +39,11 @@ pub const ControlType = style_mod.ControlType;
 pub const layout_mod = @import("layout.zig");
 pub const Constraint = layout_mod.Constraint;
 pub const Direction = layout_mod.Direction;
+pub const Flex = layout_mod.Flex;
+pub const LayoutOptions = layout_mod.LayoutOptions;
 pub const layout = layout_mod.layout;
+pub const layoutWithFlex = layout_mod.layoutWithFlex;
+pub const layoutWithOptions = layout_mod.layoutWithOptions;
 pub const BoundedRects = layout_mod.BoundedRects;
 
 // Event types
@@ -171,6 +181,32 @@ test "geometry re-export" {
 
     const pos = Position.init(10, 20);
     try std.testing.expectEqual(@as(u16, 10), pos.x);
+}
+
+test "spacing re-export" {
+    // Test Padding
+    const p = Padding.all(5);
+    try std.testing.expectEqual(@as(u16, 5), p.top);
+    try std.testing.expectEqual(@as(u16, 5), p.right);
+
+    const p2 = Padding.symmetric(10, 5);
+    try std.testing.expectEqual(@as(u16, 5), p2.top);
+    try std.testing.expectEqual(@as(u16, 10), p2.left);
+
+    // Test Margin
+    const m = Margin.all(3);
+    try std.testing.expectEqual(@as(u16, 3), m.top);
+
+    // Test Spacing
+    const s = Spacing.init(8);
+    try std.testing.expectEqual(@as(u16, 8), s.value);
+    try std.testing.expectEqual(@as(u16, 0), Spacing.none.value);
+
+    // Test apply
+    const rect = Rect.init(0, 0, 100, 50);
+    const inner_rect = p.apply(rect);
+    try std.testing.expectEqual(@as(u16, 5), inner_rect.x);
+    try std.testing.expectEqual(@as(u16, 90), inner_rect.width);
 }
 
 test "layout re-export" {

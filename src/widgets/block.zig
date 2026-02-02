@@ -4,12 +4,14 @@
 const std = @import("std");
 const buffer_mod = @import("../buffer.zig");
 const geometry = @import("../geometry.zig");
+const spacing_mod = @import("../spacing.zig");
 const style_mod = @import("../style.zig");
 const text_mod = @import("text.zig");
 
 pub const Buffer = buffer_mod.Buffer;
 pub const Cell = buffer_mod.Cell;
 pub const Rect = geometry.Rect;
+pub const Padding = spacing_mod.Padding;
 pub const Style = style_mod.Style;
 pub const Alignment = text_mod.Alignment;
 
@@ -95,6 +97,9 @@ pub const Block = struct {
 
     /// Background style applied to the interior of the block
     style: Style = Style.empty,
+
+    /// Interior padding (space between border and content)
+    padding: Padding = .{},
 
     /// Render the block into the buffer at the given area.
     /// Draws the border and title, fills interior with background style.
@@ -188,13 +193,17 @@ pub const Block = struct {
         buf.setString(title_x, area.y, title[0..title_len], self.border_style);
     }
 
-    /// Get the interior area (inside the border).
-    /// Returns a Rect with margin 1 if there's a border, otherwise the full area.
+    /// Get the interior area (inside the border and padding).
+    /// Returns a Rect accounting for border (1 cell if present) and padding values.
     pub fn inner(self: Block, area: Rect) Rect {
-        if (self.border == .none) {
-            return area;
+        var inner_area = if (self.border == .none) area else area.inner(1);
+
+        // Apply padding to the inner area
+        if (!self.padding.isZero()) {
+            inner_area = self.padding.apply(inner_area);
         }
-        return area.inner(1);
+
+        return inner_area;
     }
 };
 
@@ -495,4 +504,82 @@ test "regression: BorderType.chars returns correct chars for all types" {
 
     const thick = BorderType.thick.chars();
     try std.testing.expectEqual(@as(u21, 0x250F), thick.top_left);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Padding
+// ============================================================
+
+test "behavior: Block.inner with padding and no border" {
+    const block = Block{
+        .border = .none,
+        .padding = Padding.all(2),
+    };
+    const area = Rect.init(0, 0, 20, 10);
+    const interior = block.inner(area);
+
+    try std.testing.expectEqual(@as(u16, 2), interior.x);
+    try std.testing.expectEqual(@as(u16, 2), interior.y);
+    try std.testing.expectEqual(@as(u16, 16), interior.width);
+    try std.testing.expectEqual(@as(u16, 6), interior.height);
+}
+
+test "behavior: Block.inner with padding and border" {
+    const block = Block{
+        .border = .plain,
+        .padding = Padding.all(2),
+    };
+    const area = Rect.init(0, 0, 20, 10);
+    const interior = block.inner(area);
+
+    // Border shrinks by 1 on each side, then padding by 2 on each side
+    try std.testing.expectEqual(@as(u16, 3), interior.x); // 1 (border) + 2 (padding)
+    try std.testing.expectEqual(@as(u16, 3), interior.y);
+    try std.testing.expectEqual(@as(u16, 14), interior.width); // 20 - 2 (border) - 4 (padding)
+    try std.testing.expectEqual(@as(u16, 4), interior.height); // 10 - 2 (border) - 4 (padding)
+}
+
+test "behavior: Block.inner with asymmetric padding" {
+    const block = Block{
+        .border = .none,
+        .padding = Padding{ .top = 1, .right = 2, .bottom = 3, .left = 4 },
+    };
+    const area = Rect.init(0, 0, 20, 10);
+    const interior = block.inner(area);
+
+    try std.testing.expectEqual(@as(u16, 4), interior.x);
+    try std.testing.expectEqual(@as(u16, 1), interior.y);
+    try std.testing.expectEqual(@as(u16, 14), interior.width); // 20 - 4 - 2
+    try std.testing.expectEqual(@as(u16, 6), interior.height); // 10 - 1 - 3
+}
+
+test "behavior: Block.inner with zero padding is same as without padding" {
+    const with_padding = Block{
+        .border = .plain,
+        .padding = Padding{},
+    };
+    const without_padding = Block{
+        .border = .plain,
+    };
+    const area = Rect.init(0, 0, 20, 10);
+
+    const inner1 = with_padding.inner(area);
+    const inner2 = without_padding.inner(area);
+
+    try std.testing.expectEqual(inner2.x, inner1.x);
+    try std.testing.expectEqual(inner2.y, inner1.y);
+    try std.testing.expectEqual(inner2.width, inner1.width);
+    try std.testing.expectEqual(inner2.height, inner1.height);
+}
+
+test "regression: Block.inner with large padding returns zero-size" {
+    const block = Block{
+        .border = .plain,
+        .padding = Padding.all(50),
+    };
+    const area = Rect.init(0, 0, 20, 10);
+    const interior = block.inner(area);
+
+    try std.testing.expectEqual(@as(u16, 0), interior.width);
+    try std.testing.expectEqual(@as(u16, 0), interior.height);
 }

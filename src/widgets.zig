@@ -56,6 +56,8 @@ pub const chart = @import("widgets/chart.zig");
 pub const Chart = chart.Chart;
 pub const Axis = chart.Axis;
 pub const LineDataset = chart.LineDataset;
+pub const ScatterDataset = chart.ScatterDataset;
+pub const Markers = chart.Markers;
 pub const ChartLabel = chart.Label;
 
 test "widgets module" {
