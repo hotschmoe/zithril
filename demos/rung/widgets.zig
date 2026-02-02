@@ -66,6 +66,37 @@ const Colors = struct {
     const highlight = Style.init().fg(.yellow).bold();
 };
 
+/// Draw a centered overlay box with background and border. Returns the inner rect, or null if area is too small.
+fn drawOverlayBox(buf: *Buffer, area: Rect, box_width: u16, box_height: u16, title: []const u8) ?Rect {
+    if (area.width < box_width or area.height < box_height) return null;
+
+    const box_x = area.x + (area.width - box_width) / 2;
+    const box_y = area.y + (area.height - box_height) / 2;
+    const box = Rect{ .x = box_x, .y = box_y, .width = box_width, .height = box_height };
+
+    // Draw background
+    for (0..box_height) |dy| {
+        for (0..box_width) |dx| {
+            buf.setString(
+                box_x + @as(u16, @intCast(dx)),
+                box_y + @as(u16, @intCast(dy)),
+                " ",
+                Colors.overlay_bg,
+            );
+        }
+    }
+
+    // Draw border
+    const block = zithril.Block{
+        .title = title,
+        .border = .rounded,
+        .border_style = Colors.overlay_border,
+    };
+    block.render(box, buf);
+
+    return block.inner(box);
+}
+
 /// Header widget showing level info and mode
 pub const HeaderWidget = struct {
     level: usize,
@@ -187,19 +218,7 @@ pub const DiagramWidget = struct {
                 }
                 break :blk &str_buf;
             },
-            .coil => |idx| blk: {
-                str_buf[0] = '(';
-                str_buf[1] = self.getOutputLabel(idx);
-                str_buf[2] = ')';
-                break :blk &str_buf;
-            },
-            .coil_latch => |idx| blk: {
-                str_buf[0] = '(';
-                str_buf[1] = self.getOutputLabel(idx);
-                str_buf[2] = ')';
-                break :blk &str_buf;
-            },
-            .coil_unlatch => |idx| blk: {
+            .coil, .coil_latch, .coil_unlatch => |idx| blk: {
                 str_buf[0] = '(';
                 str_buf[1] = self.getOutputLabel(idx);
                 str_buf[2] = ')';
@@ -418,37 +437,7 @@ pub const VictoryOverlay = struct {
     has_next: bool,
 
     pub fn render(self: VictoryOverlay, area: Rect, buf: *Buffer) void {
-        // Center a box on screen
-        const box_width: u16 = 32;
-        const box_height: u16 = 7;
-
-        if (area.width < box_width or area.height < box_height) return;
-
-        const box_x = area.x + (area.width - box_width) / 2;
-        const box_y = area.y + (area.height - box_height) / 2;
-        const box = Rect{ .x = box_x, .y = box_y, .width = box_width, .height = box_height };
-
-        // Draw background
-        for (0..box_height) |dy| {
-            for (0..box_width) |dx| {
-                buf.setString(
-                    box_x + @as(u16, @intCast(dx)),
-                    box_y + @as(u16, @intCast(dy)),
-                    " ",
-                    Colors.overlay_bg,
-                );
-            }
-        }
-
-        // Draw border
-        const block = zithril.Block{
-            .title = "SOLVED!",
-            .border = .rounded,
-            .border_style = Colors.overlay_border,
-        };
-        block.render(box, buf);
-
-        const inner = block.inner(box);
+        const inner = drawOverlayBox(buf, area, 32, 7, "SOLVED!") orelse return;
 
         // Victory message
         var msg_buf: [32]u8 = undefined;
@@ -465,40 +454,8 @@ pub const VictoryOverlay = struct {
 
 /// Help overlay showing controls
 pub const HelpOverlay = struct {
-    pub fn render(self: HelpOverlay, area: Rect, buf: *Buffer) void {
-        _ = self;
-
-        const box_width: u16 = 44;
-        const box_height: u16 = 16;
-
-        if (area.width < box_width or area.height < box_height) return;
-
-        const box_x = area.x + (area.width - box_width) / 2;
-        const box_y = area.y + (area.height - box_height) / 2;
-        const box = Rect{ .x = box_x, .y = box_y, .width = box_width, .height = box_height };
-
-        // Draw background
-        for (0..box_height) |dy| {
-            for (0..box_width) |dx| {
-                buf.setString(
-                    box_x + @as(u16, @intCast(dx)),
-                    box_y + @as(u16, @intCast(dy)),
-                    " ",
-                    Colors.overlay_bg,
-                );
-            }
-        }
-
-        // Draw border
-        const block = zithril.Block{
-            .title = "Help",
-            .border = .rounded,
-            .border_style = Colors.overlay_border,
-        };
-        block.render(box, buf);
-
-        const inner = block.inner(box);
-        var y: u16 = 0;
+    pub fn render(_: HelpOverlay, area: Rect, buf: *Buffer) void {
+        const inner = drawOverlayBox(buf, area, 44, 16, "Help") orelse return;
 
         const lines = [_][]const u8{
             "CONTROLS",
@@ -516,11 +473,10 @@ pub const HelpOverlay = struct {
             "Press any key to close",
         };
 
-        for (lines) |line| {
+        for (lines, 0..) |line, y| {
             if (y >= inner.height) break;
             const style = if (y == 0) Colors.header else Colors.hint;
-            buf.setString(inner.x + 1, inner.y + y, line, style);
-            y += 1;
+            buf.setString(inner.x + 1, inner.y + @as(u16, @intCast(y)), line, style);
         }
     }
 };
@@ -531,43 +487,14 @@ pub const LevelSelectOverlay = struct {
     total_levels: usize,
 
     pub fn render(self: LevelSelectOverlay, area: Rect, buf: *Buffer) void {
-        const box_width: u16 = 36;
         const box_height: u16 = @as(u16, @intCast(self.total_levels)) + 5;
-
-        if (area.width < box_width or area.height < box_height) return;
-
-        const box_x = area.x + (area.width - box_width) / 2;
-        const box_y = area.y + (area.height - box_height) / 2;
-        const box = Rect{ .x = box_x, .y = box_y, .width = box_width, .height = box_height };
-
-        // Draw background
-        for (0..box_height) |dy| {
-            for (0..box_width) |dx| {
-                buf.setString(
-                    box_x + @as(u16, @intCast(dx)),
-                    box_y + @as(u16, @intCast(dy)),
-                    " ",
-                    Colors.overlay_bg,
-                );
-            }
-        }
-
-        // Draw border
-        const block = zithril.Block{
-            .title = "Select Level",
-            .border = .rounded,
-            .border_style = Colors.overlay_border,
-        };
-        block.render(box, buf);
-
-        const inner = block.inner(box);
+        const inner = drawOverlayBox(buf, area, 36, box_height, "Select Level") orelse return;
 
         // List levels
         for (0..self.total_levels) |i| {
             if (i >= inner.height) break;
 
-            const levels_mod = @import("levels.zig");
-            const level = levels_mod.get(i);
+            const level = levels.get(i);
             const is_current = i == self.current_level;
 
             var line_buf: [32]u8 = undefined;
@@ -579,8 +506,8 @@ pub const LevelSelectOverlay = struct {
         }
 
         // Hint at bottom
-        const hint = "Press 1-9/0 or Esc to close";
+        const hint_str = "Press 1-9/0 or Esc to close";
         const hint_y = inner.y + inner.height - 1;
-        buf.setString(inner.x + 1, hint_y, hint, Colors.hint);
+        buf.setString(inner.x + 1, hint_y, hint_str, Colors.hint);
     }
 };
