@@ -133,24 +133,24 @@ pub const BarChart = struct {
                 // Draw full block cells
                 while (cells_drawn < full_cells and cells_drawn < bar_area_height) : (cells_drawn += 1) {
                     const y = bar_base_y -| cells_drawn;
-                    self.renderBarCell(buf, x_pos, y, self.bar_width, VERTICAL_BAR_CHARS[8], bar_style);
+                    renderBarCell(buf, x_pos, y, self.bar_width, VERTICAL_BAR_CHARS[8], bar_style);
                 }
 
                 // Draw partial top cell if needed
                 if (remaining_eighths > 0 and cells_drawn < bar_area_height) {
                     const y = bar_base_y -| cells_drawn;
-                    self.renderBarCell(buf, x_pos, y, self.bar_width, VERTICAL_BAR_CHARS[remaining_eighths], bar_style);
+                    renderBarCell(buf, x_pos, y, self.bar_width, VERTICAL_BAR_CHARS[remaining_eighths], bar_style);
                 }
 
                 // Render value above bar if enabled
                 if (self.show_values) {
-                    self.renderValue(buf, x_pos, area.y, bar.value, self.bar_width, bar.value_style);
+                    renderValue(buf, x_pos, area.y, bar.value, self.bar_width, bar.value_style);
                 }
 
                 // Render bar label at bottom
                 if (bar.label.len > 0) {
                     const label_y = area.y +| area.height -| 1;
-                    self.renderLabel(buf, x_pos, label_y, bar.label, self.bar_width, self.label_style);
+                    renderLabel(buf, x_pos, label_y, bar.label, self.bar_width, self.label_style);
                 }
 
                 x_pos +|= self.bar_width;
@@ -166,7 +166,7 @@ pub const BarChart = struct {
                 // Group label goes in a second label row if we have space
                 const label_y = area.y +| area.height -| 1;
                 const group_start = x_pos -| self.groupWidth(group);
-                self.renderLabel(buf, group_start, label_y, group.label, self.groupWidth(group), self.label_style);
+                renderLabel(buf, group_start, label_y, group.label, self.groupWidth(group), self.label_style);
             }
 
             // Add gap between groups (not after last group)
@@ -192,7 +192,7 @@ pub const BarChart = struct {
         for (self.groups, 0..) |group, group_idx| {
             // Render group label if present
             if (group.label.len > 0 and y_pos < area.y +| area.height) {
-                self.renderLabel(buf, area.x, y_pos, group.label, max_label_width, self.label_style.bold());
+                renderLabel(buf, area.x, y_pos, group.label, max_label_width, self.label_style.bold());
                 y_pos +|= 1;
             }
 
@@ -203,7 +203,7 @@ pub const BarChart = struct {
                 const bar_style = if (bar.style.isEmpty()) self.default_bar_style else bar.style;
 
                 // Render label
-                self.renderLabel(buf, area.x, y_pos, bar.label, max_label_width, self.label_style);
+                renderLabel(buf, area.x, y_pos, bar.label, max_label_width, self.label_style);
 
                 // Calculate bar width based on value
                 const bar_start_x = area.x +| max_label_width +| 1;
@@ -228,7 +228,7 @@ pub const BarChart = struct {
                 // Render value at end of bar
                 if (self.show_values) {
                     const value_x = bar_start_x +| bar_area_width +| 1;
-                    self.renderValue(buf, value_x, y_pos, bar.value, value_width, bar.value_style);
+                    renderValue(buf, value_x, y_pos, bar.value, value_width, bar.value_style);
                 }
 
                 y_pos +|= 1;
@@ -248,49 +248,6 @@ pub const BarChart = struct {
             if (group_idx + 1 < self.groups.len) {
                 y_pos +|= self.group_gap;
             }
-        }
-    }
-
-    /// Render a single bar cell (possibly multiple columns wide).
-    fn renderBarCell(self: BarChart, buf: *Buffer, x: u16, y: u16, width: u16, char: u21, style: Style) void {
-        _ = self;
-        var i: u16 = 0;
-        while (i < width) : (i += 1) {
-            buf.set(x +| i, y, Cell.styled(char, style));
-        }
-    }
-
-    /// Render a label, truncated or padded to fit width.
-    fn renderLabel(self: BarChart, buf: *Buffer, x: u16, y: u16, label: []const u8, width: u16, style: Style) void {
-        _ = self;
-        if (label.len == 0 or width == 0) return;
-
-        var iter = std.unicode.Utf8View.initUnchecked(label).iterator();
-        var col: u16 = 0;
-
-        while (iter.nextCodepoint()) |codepoint| {
-            if (col >= width) break;
-            buf.set(x +| col, y, Cell.styled(codepoint, style));
-            col += 1;
-        }
-    }
-
-    /// Render a numeric value.
-    fn renderValue(self: BarChart, buf: *Buffer, x: u16, y: u16, value: f64, width: u16, style: Style) void {
-        _ = self;
-        if (width == 0) return;
-
-        var format_buf: [16]u8 = undefined;
-        const value_str = if (value == @trunc(value))
-            std.fmt.bufPrint(&format_buf, "{d:.0}", .{value}) catch return
-        else
-            std.fmt.bufPrint(&format_buf, "{d:.1}", .{value}) catch return;
-
-        var col: u16 = 0;
-        for (value_str) |c| {
-            if (col >= width) break;
-            buf.set(x +| col, y, Cell.styled(c, style));
-            col += 1;
         }
     }
 
@@ -325,16 +282,47 @@ pub const BarChart = struct {
         }
         return max_width;
     }
-
-    /// Create a bar chart from simple value/label pairs.
-    pub fn fromPairs(labels: []const []const u8, values: []const f64) BarChart {
-        _ = labels;
-        _ = values;
-        // This would require allocation to create Bar structs,
-        // so we'll leave it as a pattern for the user to follow
-        return BarChart{};
-    }
 };
+
+/// Render a single bar cell (possibly multiple columns wide).
+fn renderBarCell(buf: *Buffer, x: u16, y: u16, width: u16, char: u21, style: Style) void {
+    var i: u16 = 0;
+    while (i < width) : (i += 1) {
+        buf.set(x +| i, y, Cell.styled(char, style));
+    }
+}
+
+/// Render a label, truncated or padded to fit width.
+fn renderLabel(buf: *Buffer, x: u16, y: u16, label: []const u8, width: u16, style: Style) void {
+    if (label.len == 0 or width == 0) return;
+
+    var iter = std.unicode.Utf8View.initUnchecked(label).iterator();
+    var col: u16 = 0;
+
+    while (iter.nextCodepoint()) |codepoint| {
+        if (col >= width) break;
+        buf.set(x +| col, y, Cell.styled(codepoint, style));
+        col += 1;
+    }
+}
+
+/// Render a numeric value.
+fn renderValue(buf: *Buffer, x: u16, y: u16, value: f64, width: u16, style: Style) void {
+    if (width == 0) return;
+
+    var format_buf: [16]u8 = undefined;
+    const value_str = if (value == @trunc(value))
+        std.fmt.bufPrint(&format_buf, "{d:.0}", .{value}) catch return
+    else
+        std.fmt.bufPrint(&format_buf, "{d:.1}", .{value}) catch return;
+
+    var col: u16 = 0;
+    for (value_str) |c| {
+        if (col >= width) break;
+        buf.set(x +| col, y, Cell.styled(c, style));
+        col += 1;
+    }
+}
 
 // ============================================================
 // SANITY TESTS - Basic BarChart functionality
