@@ -308,14 +308,10 @@ pub const Menu = struct {
         // Draw shortcut if present (right-aligned before submenu indicator)
         if (item.shortcut) |shortcut| {
             const shortcut_len: u16 = @intCast(shortcut.len);
-            var shortcut_x: u16 = undefined;
-            if (has_submenu_indicator) {
-                // Position before submenu indicator
-                shortcut_x = area.x +| shortcut_col -| shortcut_len -| self.shortcut_gap;
-            } else {
-                // Right-aligned with padding
-                shortcut_x = area.right() -| self.padding_right -| shortcut_len;
-            }
+            const shortcut_x = if (has_submenu_indicator)
+                area.x +| shortcut_col -| shortcut_len -| self.shortcut_gap
+            else
+                area.right() -| self.padding_right -| shortcut_len;
             if (shortcut_x >= area.x and shortcut_x < area.right()) {
                 buf.setString(shortcut_x, y, shortcut, row_style);
             }
@@ -771,19 +767,18 @@ test "behavior: Menu renders submenu indicator" {
 
     menu.render(Rect.init(0, 0, 20, 4), &buf, state);
 
-    // Find submenu indicator
+    // Verify item rendered correctly
+    try std.testing.expectEqual(@as(u21, 'P'), buf.get(2, 1).char);
+
+    // Find submenu indicator (U+25B6) somewhere in the row
     var found_indicator = false;
-    var x: u16 = 10;
-    while (x < 20) : (x += 1) {
-        const cell = buf.get(x, 1);
-        // Check for first byte of the indicator
-        if (cell.char == 0xe2 or cell.char == 0x25b6 or cell.char == '>') {
+    for (2..19) |x| {
+        if (buf.get(@intCast(x), 1).char == 0x25B6) {
             found_indicator = true;
             break;
         }
     }
-    // Just check that the item rendered without crash
-    try std.testing.expectEqual(@as(u21, 'P'), buf.get(2, 1).char);
+    try std.testing.expect(found_indicator);
 }
 
 test "behavior: Menu renders disabled item" {
