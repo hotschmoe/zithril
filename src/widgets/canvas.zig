@@ -96,9 +96,12 @@ pub const Canvas = struct {
         const x_ratio = (x - self.x_bounds[0]) / x_range;
         const y_ratio = (y - self.y_bounds[0]) / y_range;
 
+        const w: f64 = @floatFromInt(area.width -| 1);
+        const h: f64 = @floatFromInt(area.height -| 1);
+
         return .{
-            .x = area.x +| @as(u16, @intFromFloat(x_ratio * @as(f64, @floatFromInt(area.width -| 1)))),
-            .y = area.y +| area.height -| 1 -| @as(u16, @intFromFloat(y_ratio * @as(f64, @floatFromInt(area.height -| 1)))),
+            .x = area.x +| @as(u16, @intFromFloat(x_ratio * w)),
+            .y = area.y +| area.height -| 1 -| @as(u16, @intFromFloat(y_ratio * h)),
         };
     }
 };

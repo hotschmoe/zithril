@@ -16,6 +16,9 @@ pub const Color = style_mod.Color;
 // Painter - Drawing context for shapes
 // ============================================================
 
+/// Screen coordinate pair returned by coordinate transformation.
+pub const ScreenPoint = struct { x: i32, y: i32 };
+
 /// Painter provides drawing operations for shapes on a Canvas.
 /// Transforms virtual coordinates to screen coordinates and handles pixel operations.
 pub const Painter = struct {
@@ -68,24 +71,22 @@ pub const Painter = struct {
     }
 
     /// Transform virtual coordinates to screen coordinates.
-    /// Returns null if the point is outside the canvas bounds.
-    pub fn virtualToScreen(self: Painter, x: f64, y: f64) ?struct { x: i32, y: i32 } {
+    /// Returns null if bounds have zero range.
+    pub fn virtualToScreen(self: Painter, x: f64, y: f64) ?ScreenPoint {
         const x_range = self.x_bounds[1] - self.x_bounds[0];
         const y_range = self.y_bounds[1] - self.y_bounds[0];
 
         if (x_range == 0 or y_range == 0) return null;
 
-        // Calculate ratios (can be outside 0-1 for out-of-bounds points)
+        const w: f64 = @floatFromInt(self.area.width -| 1);
+        const h: f64 = @floatFromInt(self.area.height -| 1);
         const x_ratio = (x - self.x_bounds[0]) / x_range;
         const y_ratio = (y - self.y_bounds[0]) / y_range;
 
-        // Convert to screen coordinates
-        // X increases left to right
-        const screen_x: i32 = @as(i32, self.area.x) + @as(i32, @intFromFloat(x_ratio * @as(f64, @floatFromInt(self.area.width -| 1))));
-        // Y is inverted: virtual Y increases upward, screen Y increases downward
-        const screen_y: i32 = @as(i32, self.area.y) + @as(i32, self.area.height -| 1) - @as(i32, @intFromFloat(y_ratio * @as(f64, @floatFromInt(self.area.height -| 1))));
-
-        return .{ .x = screen_x, .y = screen_y };
+        return .{
+            .x = @as(i32, self.area.x) + @as(i32, @intFromFloat(x_ratio * w)),
+            .y = @as(i32, self.area.y) + @as(i32, self.area.height -| 1) - @as(i32, @intFromFloat(y_ratio * h)),
+        };
     }
 
     /// Get the screen-space width of the drawing area.
@@ -239,12 +240,9 @@ pub const Line = struct {
 
     /// Draw the line using Bresenham's algorithm with Cohen-Sutherland clipping.
     fn draw(self: *const Line, painter: *Painter) void {
-        // Transform endpoints to screen coordinates
-        const p1 = painter.virtualToScreen(self.x1, self.y1);
-        const p2 = painter.virtualToScreen(self.x2, self.y2);
-
-        // If both endpoints are null, line is completely outside
-        if (p1 == null and p2 == null) return;
+        // Transform endpoints to screen coordinates (allows out-of-bounds for clipping)
+        const p1 = painter.virtualToScreen(self.x1, self.y1) orelse return;
+        const p2 = painter.virtualToScreen(self.x2, self.y2) orelse return;
 
         // Get screen bounds for clipping
         const x_min: i32 = @intCast(painter.area.x);
@@ -252,33 +250,10 @@ pub const Line = struct {
         const x_max: i32 = @as(i32, @intCast(painter.area.x)) + @as(i32, @intCast(painter.area.width)) - 1;
         const y_max: i32 = @as(i32, @intCast(painter.area.y)) + @as(i32, @intCast(painter.area.height)) - 1;
 
-        var x0: i32 = if (p1) |pt| pt.x else 0;
-        var y0: i32 = if (p1) |pt| pt.y else 0;
-        var x1: i32 = if (p2) |pt| pt.x else 0;
-        var y1: i32 = if (p2) |pt| pt.y else 0;
-
-        // Use raw screen coordinate calculation for clipping
-        if (p1 == null) {
-            // Calculate screen position even if outside bounds
-            const x_range = painter.x_bounds[1] - painter.x_bounds[0];
-            const y_range = painter.y_bounds[1] - painter.y_bounds[0];
-            if (x_range != 0 and y_range != 0) {
-                const x_ratio = (self.x1 - painter.x_bounds[0]) / x_range;
-                const y_ratio = (self.y1 - painter.y_bounds[0]) / y_range;
-                x0 = @as(i32, @intCast(painter.area.x)) + @as(i32, @intFromFloat(x_ratio * @as(f64, @floatFromInt(painter.area.width -| 1))));
-                y0 = @as(i32, @intCast(painter.area.y)) + @as(i32, @intCast(painter.area.height -| 1)) - @as(i32, @intFromFloat(y_ratio * @as(f64, @floatFromInt(painter.area.height -| 1))));
-            }
-        }
-        if (p2 == null) {
-            const x_range = painter.x_bounds[1] - painter.x_bounds[0];
-            const y_range = painter.y_bounds[1] - painter.y_bounds[0];
-            if (x_range != 0 and y_range != 0) {
-                const x_ratio = (self.x2 - painter.x_bounds[0]) / x_range;
-                const y_ratio = (self.y2 - painter.y_bounds[0]) / y_range;
-                x1 = @as(i32, @intCast(painter.area.x)) + @as(i32, @intFromFloat(x_ratio * @as(f64, @floatFromInt(painter.area.width -| 1))));
-                y1 = @as(i32, @intCast(painter.area.y)) + @as(i32, @intCast(painter.area.height -| 1)) - @as(i32, @intFromFloat(y_ratio * @as(f64, @floatFromInt(painter.area.height -| 1))));
-            }
-        }
+        var x0: i32 = p1.x;
+        var y0: i32 = p1.y;
+        var x1: i32 = p2.x;
+        var y1: i32 = p2.y;
 
         // Cohen-Sutherland line clipping
         if (clipLine(&x0, &y0, &x1, &y1, x_min, y_min, x_max, y_max)) {
