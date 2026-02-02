@@ -60,6 +60,10 @@ pub const ScatterDataset = chart.ScatterDataset;
 pub const Markers = chart.Markers;
 pub const ChartLabel = chart.Label;
 
+pub const line_gauge = @import("widgets/line_gauge.zig");
+pub const LineGauge = line_gauge.LineGauge;
+pub const LineSet = line_gauge.LineSet;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -75,4 +79,5 @@ test "widgets module" {
     _ = sparkline;
     _ = bar_chart;
     _ = chart;
+    _ = line_gauge;
 }
