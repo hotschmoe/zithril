@@ -923,6 +923,518 @@ test "regression: Painter handles zero-range bounds" {
     try std.testing.expect(result == null);
 }
 
+// ============================================================
+// Rectangle Shape - Outline or filled rectangle
+// ============================================================
+
+/// Rectangle shape for drawing rectangles on a Canvas.
+/// Supports both outline and filled modes.
+pub const Rectangle = struct {
+    /// Left X coordinate in virtual space.
+    x: f64,
+    /// Bottom Y coordinate in virtual space.
+    y: f64,
+    /// Width in virtual coordinate units.
+    width: f64,
+    /// Height in virtual coordinate units.
+    height: f64,
+    /// Color of the rectangle.
+    color: Color = .white,
+    /// If true, fill the rectangle; otherwise draw outline only.
+    fill: bool = false,
+
+    /// Create a Shape interface for this Rectangle.
+    pub fn shape(self: *const Rectangle) Shape {
+        return Shape.init(self, draw);
+    }
+
+    /// Draw the rectangle.
+    fn draw(self: *const Rectangle, painter: *Painter) void {
+        if (self.fill) {
+            self.drawFilled(painter);
+        } else {
+            self.drawOutline(painter);
+        }
+    }
+
+    /// Draw filled rectangle by iterating over interior points.
+    fn drawFilled(self: *const Rectangle, painter: *Painter) void {
+        // Transform corners to screen coordinates
+        const bottom_left = painter.virtualToScreen(self.x, self.y) orelse return;
+        const top_right = painter.virtualToScreen(self.x + self.width, self.y + self.height) orelse return;
+
+        // In screen coordinates, y increases downward, so top_right.y < bottom_left.y
+        const min_x = bottom_left.x;
+        const max_x = top_right.x;
+        const min_y = top_right.y;
+        const max_y = bottom_left.y;
+
+        // Fill all interior pixels
+        var py = min_y;
+        while (py <= max_y) : (py += 1) {
+            var px = min_x;
+            while (px <= max_x) : (px += 1) {
+                painter.setPixel(px, py, self.color);
+            }
+        }
+    }
+
+    /// Draw rectangle outline using 4 lines.
+    fn drawOutline(self: *const Rectangle, painter: *Painter) void {
+        const x1 = self.x;
+        const y1 = self.y;
+        const x2 = self.x + self.width;
+        const y2 = self.y + self.height;
+
+        // Draw 4 edges using the Line shape's drawing logic
+        // Bottom edge: (x1, y1) to (x2, y1)
+        drawLineSegment(painter, x1, y1, x2, y1, self.color);
+        // Top edge: (x1, y2) to (x2, y2)
+        drawLineSegment(painter, x1, y2, x2, y2, self.color);
+        // Left edge: (x1, y1) to (x1, y2)
+        drawLineSegment(painter, x1, y1, x1, y2, self.color);
+        // Right edge: (x2, y1) to (x2, y2)
+        drawLineSegment(painter, x2, y1, x2, y2, self.color);
+    }
+};
+
+/// Helper to draw a line segment (used by Rectangle).
+fn drawLineSegment(painter: *Painter, x1: f64, y1: f64, x2: f64, y2: f64, color: Color) void {
+    // Transform endpoints to screen coordinates
+    const p1 = painter.virtualToScreen(x1, y1) orelse return;
+    const p2 = painter.virtualToScreen(x2, y2) orelse return;
+
+    // Get screen bounds for clipping
+    const x_min: i32 = @intCast(painter.area.x);
+    const y_min: i32 = @intCast(painter.area.y);
+    const x_max: i32 = @as(i32, @intCast(painter.area.x)) + @as(i32, @intCast(painter.area.width)) - 1;
+    const y_max: i32 = @as(i32, @intCast(painter.area.y)) + @as(i32, @intCast(painter.area.height)) - 1;
+
+    var sx0: i32 = p1.x;
+    var sy0: i32 = p1.y;
+    var sx1: i32 = p2.x;
+    var sy1: i32 = p2.y;
+
+    // Cohen-Sutherland line clipping
+    if (clipLine(&sx0, &sy0, &sx1, &sy1, x_min, y_min, x_max, y_max)) {
+        bresenhamLine(painter, sx0, sy0, sx1, sy1, color);
+    }
+}
+
+// ============================================================
+// Points Shape - Scatter plot data
+// ============================================================
+
+/// Points shape for rendering scatter plot data on a Canvas.
+/// Efficiently draws multiple isolated points.
+pub const Points = struct {
+    /// Array of coordinate pairs [[x, y], [x, y], ...].
+    coords: []const [2]f64,
+    /// Color of all points.
+    color: Color = .white,
+
+    /// Create a Shape interface for this Points.
+    pub fn shape(self: *const Points) Shape {
+        return Shape.init(self, draw);
+    }
+
+    /// Draw all points.
+    fn draw(self: *const Points, painter: *Painter) void {
+        for (self.coords) |coord| {
+            painter.paint(coord[0], coord[1], self.color);
+        }
+    }
+};
+
+// ============================================================
+// SANITY TESTS - Rectangle and Points
+// ============================================================
+
+test "sanity: Rectangle with default values" {
+    const rect = Rectangle{
+        .x = 10,
+        .y = 20,
+        .width = 30,
+        .height = 40,
+    };
+    try std.testing.expectEqual(@as(f64, 10), rect.x);
+    try std.testing.expectEqual(@as(f64, 20), rect.y);
+    try std.testing.expectEqual(@as(f64, 30), rect.width);
+    try std.testing.expectEqual(@as(f64, 40), rect.height);
+    try std.testing.expect(rect.color.eql(.white));
+    try std.testing.expect(!rect.fill);
+}
+
+test "sanity: Rectangle.shape returns Shape interface" {
+    const rect = Rectangle{
+        .x = 5,
+        .y = 5,
+        .width = 10,
+        .height = 10,
+        .color = .green,
+        .fill = true,
+    };
+    const s = rect.shape();
+    try std.testing.expect(s.ptr == @as(*const anyopaque, &rect));
+}
+
+test "sanity: Points with default color" {
+    const coords = [_][2]f64{ .{ 10, 20 }, .{ 30, 40 } };
+    const points = Points{
+        .coords = &coords,
+    };
+    try std.testing.expectEqual(@as(usize, 2), points.coords.len);
+    try std.testing.expect(points.color.eql(.white));
+}
+
+test "sanity: Points.shape returns Shape interface" {
+    const coords = [_][2]f64{ .{ 1, 2 }, .{ 3, 4 }, .{ 5, 6 } };
+    const points = Points{
+        .coords = &coords,
+        .color = .cyan,
+    };
+    const s = points.shape();
+    try std.testing.expect(s.ptr == @as(*const anyopaque, &points));
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Rectangle rendering
+// ============================================================
+
+test "behavior: Rectangle outline renders 4 edges" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const rect = Rectangle{
+        .x = 20,
+        .y = 20,
+        .width = 60,
+        .height = 60,
+        .color = .red,
+        .fill = false,
+    };
+
+    rect.draw(&painter);
+
+    // Should have drawn pixels for the outline
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    try std.testing.expect(pixel_count > 4); // At least 4 corner points
+}
+
+test "behavior: Rectangle filled renders interior" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const rect = Rectangle{
+        .x = 25,
+        .y = 25,
+        .width = 50,
+        .height = 50,
+        .color = .blue,
+        .fill = true,
+    };
+
+    rect.draw(&painter);
+
+    // Filled rectangle should have many more pixels than outline
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    // For a 50x50 virtual rect on 40x20 screen, should fill a significant area
+    try std.testing.expect(pixel_count > 20);
+}
+
+test "behavior: Rectangle clips at canvas bounds" {
+    var buf = try Buffer.init(std.testing.allocator, 20, 10);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(5, 2, 10, 6),
+        .default,
+    );
+
+    // Rectangle extending beyond visible area
+    const rect = Rectangle{
+        .x = -20,
+        .y = -20,
+        .width = 140,
+        .height = 140,
+        .color = .yellow,
+        .fill = true,
+    };
+
+    rect.draw(&painter);
+
+    // Should draw pixels only within the clip area
+    var pixel_count: usize = 0;
+    var all_in_bounds = true;
+    for (0..buf.height) |y| {
+        for (0..buf.width) |x| {
+            const cell = buf.get(@intCast(x), @intCast(y));
+            if (cell.char == 0x2022) {
+                pixel_count += 1;
+                if (x < 5 or x >= 15 or y < 2 or y >= 8) {
+                    all_in_bounds = false;
+                }
+            }
+        }
+    }
+    try std.testing.expect(pixel_count > 0);
+    try std.testing.expect(all_in_bounds);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Points rendering
+// ============================================================
+
+test "behavior: Points renders all coordinates" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const coords = [_][2]f64{
+        .{ 10, 10 },
+        .{ 50, 50 },
+        .{ 90, 90 },
+    };
+    const points = Points{
+        .coords = &coords,
+        .color = .green,
+    };
+
+    points.draw(&painter);
+
+    // Should have exactly 3 points drawn
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 3), pixel_count);
+}
+
+test "behavior: Points skips out-of-bounds coordinates" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const coords = [_][2]f64{
+        .{ 50, 50 }, // In bounds
+        .{ 150, 50 }, // Out of bounds (x too high)
+        .{ 50, 150 }, // Out of bounds (y too high)
+        .{ -50, 50 }, // Out of bounds (x negative)
+    };
+    const points = Points{
+        .coords = &coords,
+        .color = .magenta,
+    };
+
+    points.draw(&painter);
+
+    // Only 1 point should be drawn (the in-bounds one)
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 1), pixel_count);
+}
+
+test "behavior: Points with empty coords draws nothing" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const coords = [_][2]f64{};
+    const points = Points{
+        .coords = &coords,
+        .color = .red,
+    };
+
+    points.draw(&painter);
+
+    // No pixels should be drawn
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 0), pixel_count);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Shape interface with new shapes
+// ============================================================
+
+test "behavior: Shape interface works with Rectangle and Points" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const rect = Rectangle{
+        .x = 10,
+        .y = 10,
+        .width = 20,
+        .height = 20,
+        .color = .red,
+    };
+
+    const coords = [_][2]f64{ .{ 70, 70 }, .{ 80, 80 } };
+    const points = Points{
+        .coords = &coords,
+        .color = .blue,
+    };
+
+    // Create heterogeneous shape collection
+    const shapes = [_]Shape{
+        rect.shape(),
+        points.shape(),
+    };
+
+    for (&shapes) |s| {
+        s.draw(&painter);
+    }
+
+    // Both shapes should have drawn pixels
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    try std.testing.expect(pixel_count > 2);
+}
+
+// ============================================================
+// REGRESSION TESTS - Rectangle and Points edge cases
+// ============================================================
+
+test "regression: Rectangle with zero dimensions" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const rect = Rectangle{
+        .x = 50,
+        .y = 50,
+        .width = 0,
+        .height = 0,
+        .color = .white,
+    };
+
+    // Should not crash
+    rect.draw(&painter);
+
+    // May draw a single point at the corner
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    // Zero-dimension rectangle draws at least the corner point
+    try std.testing.expect(pixel_count >= 1);
+}
+
+test "regression: Rectangle completely outside bounds" {
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const rect = Rectangle{
+        .x = 200,
+        .y = 200,
+        .width = 50,
+        .height = 50,
+        .color = .red,
+        .fill = true,
+    };
+
+    // Should not crash
+    rect.draw(&painter);
+
+    // No pixels should be drawn
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 0), pixel_count);
+}
+
 test "regression: Circle outside canvas bounds" {
     var buf = try Buffer.init(std.testing.allocator, 40, 20);
     defer buf.deinit();
