@@ -177,7 +177,7 @@ pub const Calendar = struct {
                     // Current month's day
                     const current_day: u8 = @intCast(day);
                     const is_today = self.isToday(current_day);
-                    const is_selected = self.selected_day != null and self.selected_day.? == current_day;
+                    const is_selected = self.selected_day == current_day;
                     self.renderDay(col_x, y +| row, current_day, false, is_today, is_selected, buf);
                 }
 
@@ -237,12 +237,8 @@ pub const Calendar = struct {
         return false;
     }
 
-    /// Calculate week number (simplified ISO week approximation).
-    fn weekNumber(self: Calendar, day: i16, first_dow: u8, days_in_month: u8) u8 {
-        _ = self;
-        _ = first_dow;
-        _ = days_in_month;
-        // Simple calculation: week of month (1-6)
+    /// Calculate week of month (1-6) for a given day.
+    fn weekNumber(_: Calendar, day: i16, _: u8, _: u8) u8 {
         if (day < 1) return 0;
         const d: u8 = @intCast(@min(day, 31));
         return (d - 1) / 7 + 1;
