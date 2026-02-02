@@ -13,16 +13,13 @@ This document captures missing features and improvement ideas discovered while b
 
 These issues prevent levels from being completable or fundamentally break the game logic.
 
-#### 1. Input Index Selection
+#### 1. Input Index Selection [DONE]
 
 **Problem**: All contacts/coils placed get hardcoded index 0. Players cannot specify which input (A, B, C) a contact references.
 
 **Impact**: Levels requiring multiple inputs (AND, OR, XOR) cannot be solved correctly.
 
-**Solution**: Add index cycling when placing contacts/coils. Options:
-- Number keys 0-9 to set index before placing
-- Shift+Tab to cycle index on selected component
-- Display index label on each contact (A, B, etc.)
+**Solution**: Number keys 0-9 set the selected index. The palette shows current index and label.
 
 #### 2. Parallel Branch Support
 
@@ -35,16 +32,13 @@ These issues prevent levels from being completable or fundamentally break the ga
 - Handle junction cells (T-splits, joins)
 - Evaluate all branches and OR their results at junction points
 
-#### 3. Level Selection Menu
+#### 3. Level Selection Menu [DONE]
 
 **Problem**: Must play levels sequentially. No way to jump to a specific level or replay completed levels.
 
 **Impact**: Testing/debugging specific levels requires playing through all prior levels.
 
-**Solution**: Add a level select screen:
-- Grid of level numbers (1-10)
-- Show locked/unlocked/completed status
-- Allow jumping to any unlocked level
+**Solution**: Press L to open level select overlay. Press 1-9/0 to jump to any level. Also added P/N for previous/next level navigation.
 
 ---
 
@@ -63,38 +57,29 @@ These improve playability but don't block core gameplay.
 - Ctrl+Z to undo, Ctrl+Shift+Z or Ctrl+Y to redo
 - Clear stack on level change
 
-#### 5. Input Labels on Contacts
+#### 5. Input Labels on Contacts [DONE]
 
 **Problem**: Placed contacts show `[ ]` but not which input they reference.
 
 **Impact**: Complex diagrams become confusing; hard to verify wiring.
 
-**Solution**: Render input label inside contact brackets:
-- `[A]` for input A (normally open)
-- `[/B]` for input B (normally closed)
-- `(Y)` for output Y coil
+**Solution**: Labels now render inside brackets: `[A]`, `[B]`, `(Y)`, etc. Uses first character of level's input/output names.
 
-#### 6. Victory/Completion Screen
+#### 6. Victory/Completion Screen [DONE]
 
 **Problem**: Solving a level just changes status to "SOLVED". No celebration or clear transition.
 
 **Impact**: Anticlimactic; unclear if the game recognized the solution.
 
-**Solution**: Show a victory overlay:
-- "Level X Complete!" message
-- Stats (attempts, time if tracked)
-- "Press N for next level" or "Press Enter to continue"
+**Solution**: Victory overlay now appears when solved, showing "Level X Complete!" with prompt for next level.
 
-#### 7. Help Overlay
+#### 7. Help Overlay [DONE]
 
 **Problem**: Controls are documented in README but not discoverable in-game.
 
 **Impact**: New players must read external docs to learn controls.
 
-**Solution**: Toggle help overlay with `?` key:
-- Show keybindings
-- Show component reference (NO, NC, coil meanings)
-- Semi-transparent overlay that doesn't exit the game
+**Solution**: Press ? to toggle help overlay showing all keybindings. Any key dismisses it.
 
 ---
 
@@ -345,21 +330,21 @@ frame.toast("Level complete!", .{
 
 ## Priority Matrix
 
-| Item | Effort | Impact | Priority |
-|------|--------|--------|----------|
-| Input index selection | Medium | Critical | P0 |
-| Parallel branch simulation | High | Critical | P0 |
-| Level selection menu | Medium | High | P1 |
-| Undo/redo | Medium | High | P1 |
-| Input labels on contacts | Low | Medium | P2 |
-| Victory screen | Low | Medium | P2 |
-| Help overlay | Low | Medium | P2 |
-| Modal dialog (framework) | Medium | High | P1 |
-| Grid navigation helper (framework) | Low | Medium | P2 |
-| Animated power flow | High | Low | P3 |
-| Save/load progress | Medium | Medium | P3 |
-| Custom level editor | High | Low | P4 |
-| Sound effects | High | Low | P4 |
+| Item | Effort | Impact | Priority | Status |
+|------|--------|--------|----------|--------|
+| Input index selection | Medium | Critical | P0 | DONE |
+| Parallel branch simulation | High | Critical | P0 | TODO |
+| Level selection menu | Medium | High | P1 | DONE |
+| Undo/redo | Medium | High | P1 | TODO |
+| Input labels on contacts | Low | Medium | P2 | DONE |
+| Victory screen | Low | Medium | P2 | DONE |
+| Help overlay | Low | Medium | P2 | DONE |
+| Modal dialog (framework) | Medium | High | P1 | TODO |
+| Grid navigation helper (framework) | Low | Medium | P2 | TODO |
+| Animated power flow | High | Low | P3 | TODO |
+| Save/load progress | Medium | Medium | P3 | TODO |
+| Custom level editor | High | Low | P4 | TODO |
+| Sound effects | High | Low | P4 | TODO |
 
 ---
 
