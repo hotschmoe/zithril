@@ -81,6 +81,12 @@ pub const TreeState = tree.TreeState;
 pub const TreeSymbols = tree.TreeSymbols;
 pub const MutableTreeItem = tree.MutableTreeItem;
 
+pub const menu = @import("widgets/menu.zig");
+pub const Menu = menu.Menu;
+pub const MenuItem = menu.MenuItem;
+pub const MenuState = menu.MenuState;
+pub const MenuSymbols = menu.MenuSymbols;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -99,4 +105,5 @@ test "widgets module" {
     _ = line_gauge;
     _ = canvas;
     _ = tree;
+    _ = menu;
 }
