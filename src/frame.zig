@@ -11,6 +11,7 @@ pub const Rect = geometry.Rect;
 pub const Direction = layout_mod.Direction;
 pub const Constraint = layout_mod.Constraint;
 pub const BoundedRects = layout_mod.BoundedRects;
+pub const Flex = layout_mod.Flex;
 
 /// Frame is passed to the view function and provides layout and rendering methods.
 /// Generic over max_widgets to allow comptime-sized layout cache.
@@ -64,7 +65,29 @@ pub fn Frame(comptime max_widgets: usize) type {
             direction: Direction,
             constraints: []const Constraint,
         ) BoundedRects {
-            const result = layout_mod.layout(area, direction, constraints);
+            return self.layoutWithFlex(area, direction, constraints, .legacy);
+        }
+
+        /// Split an area according to constraints with explicit flex alignment.
+        /// The flex parameter controls how excess space is distributed when
+        /// constraints don't fill the available area.
+        ///
+        /// Flex modes:
+        /// - .start: Content at start, excess at end (default)
+        /// - .end_: Content at end, excess at start
+        /// - .center: Content centered, excess split on sides
+        /// - .space_between: Space between items, none at edges
+        /// - .space_around: Equal space around each item
+        /// - .space_evenly: Equal gaps everywhere including edges
+        /// - .legacy: Excess absorbed by flex constraints
+        pub fn layoutWithFlex(
+            self: *Self,
+            area: Rect,
+            direction: Direction,
+            constraints: []const Constraint,
+            flex: Flex,
+        ) BoundedRects {
+            const result = layout_mod.layoutWithFlex(area, direction, constraints, flex);
 
             if (self.layout_cache_len < max_widgets) {
                 self.layout_cache[self.layout_cache_len] = result;
@@ -252,4 +275,34 @@ test "regression: Frame layout with empty constraints" {
     const result = frame.layout(frame.size(), .horizontal, &.{});
 
     try std.testing.expectEqual(@as(usize, 0), result.len);
+}
+
+// ============================================================
+// FLEX ALIGNMENT TESTS
+// ============================================================
+
+test "behavior: Frame.layoutWithFlex centers items" {
+    var buf = try Buffer.init(std.testing.allocator, 100, 10);
+    defer buf.deinit();
+
+    var frame = Frame(16).init(&buf);
+    const result = frame.layoutWithFlex(frame.size(), .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(30),
+    }, .center);
+
+    // Total items = 50, excess = 50, start offset = 25
+    try std.testing.expectEqual(@as(u16, 25), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 45), result.get(1).x);
+}
+
+test "behavior: Frame.layoutWithFlex caches results" {
+    var buf = try Buffer.init(std.testing.allocator, 100, 50);
+    defer buf.deinit();
+
+    var frame = Frame(16).init(&buf);
+
+    _ = frame.layoutWithFlex(frame.size(), .horizontal, &.{Constraint.len(20)}, .center);
+
+    try std.testing.expectEqual(@as(usize, 1), frame.layout_cache_len);
 }

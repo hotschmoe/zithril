@@ -9,6 +9,28 @@ pub const Direction = enum {
     vertical,
 };
 
+/// Flex alignment mode controls how excess space is distributed in layouts.
+/// When constraints don't fill the available area, Flex determines where the
+/// remaining space goes.
+pub const Flex = enum {
+    /// Content at start, all excess space at end (default).
+    start,
+    /// Content at end, all excess space at start.
+    end_,
+    /// Content centered, excess space split evenly on sides.
+    center,
+    /// Space distributed between items, none at edges.
+    space_between,
+    /// Equal space around each item (half-space at edges).
+    space_around,
+    /// Equal gaps everywhere including edges.
+    space_evenly,
+    /// Legacy: excess space goes to last flex element.
+    /// This is the pre-Flex behavior where remaining space is absorbed
+    /// by flex-weighted constraints.
+    legacy,
+};
+
 /// Constraints describe how space should be allocated among layout children.
 ///
 /// The constraint solver allocates space in this order:
@@ -289,11 +311,26 @@ fn shrinkByTag(
 /// - Flex items shrink to zero before fixed items shrink
 /// - No negative sizes (saturating arithmetic)
 ///
+/// The flex parameter controls how excess space is distributed when constraints
+/// don't fill the available area. See Flex enum for available modes.
+///
 /// Returns a bounded array of Rects matching the constraint count.
 pub fn layout(
     area: Rect,
     direction: Direction,
     constraints: []const Constraint,
+) BoundedRects {
+    return layoutWithFlex(area, direction, constraints, .legacy);
+}
+
+/// Split an area according to constraints with explicit flex alignment.
+/// See layout() for constraint resolution details. The flex parameter
+/// controls how excess space is distributed.
+pub fn layoutWithFlex(
+    area: Rect,
+    direction: Direction,
+    constraints: []const Constraint,
+    flex: Flex,
 ) BoundedRects {
     const total_space: u16 = switch (direction) {
         .horizontal => area.width,
@@ -392,11 +429,25 @@ pub fn layout(
             to_shrink = shrinkByTag(constraints[0..count], &sizes, to_shrink, target_tag);
             if (to_shrink == 0) break;
         }
+        // Recalculate total after shrinking
+        total_allocated = 0;
+        for (sizes[0..count]) |s| {
+            total_allocated += s;
+        }
     }
 
-    // Phase 4: Build result rects
-    var pos: u16 = 0;
-    for (sizes[0..count]) |size| {
+    // Phase 4: Calculate excess space and apply Flex alignment
+    const excess: u16 = if (total_allocated >= total_space)
+        0
+    else
+        total_space -| @as(u16, @intCast(total_allocated));
+
+    // Calculate starting position and gap based on Flex mode
+    const spacing = calculateFlexSpacing(flex, excess, count);
+
+    // Phase 5: Build result rects with proper positioning
+    var pos: u16 = spacing.start_offset;
+    for (sizes[0..count], 0..count) |size, i| {
         const rect: Rect = switch (direction) {
             .horizontal => .{
                 .x = area.x +| pos,
@@ -413,9 +464,94 @@ pub fn layout(
         };
         result.appendAssumeCapacity(rect);
         pos +|= size;
+
+        // Add gap after this item (not after the last one)
+        if (i + 1 < count) {
+            pos +|= spacing.gap;
+            // Handle fractional remainder distribution (left-to-right)
+            if (i < spacing.remainder) {
+                pos +|= 1;
+            }
+        }
     }
 
     return result;
+}
+
+/// Spacing parameters calculated from Flex mode.
+const FlexSpacing = struct {
+    start_offset: u16,
+    gap: u16,
+    remainder: usize,
+};
+
+/// Calculate spacing parameters based on Flex mode, excess space, and item count.
+fn calculateFlexSpacing(flex: Flex, excess: u16, count: usize) FlexSpacing {
+    if (excess == 0 or count == 0) {
+        return .{ .start_offset = 0, .gap = 0, .remainder = 0 };
+    }
+
+    return switch (flex) {
+        .start, .legacy => .{
+            .start_offset = 0,
+            .gap = 0,
+            .remainder = 0,
+        },
+        .end_ => .{
+            .start_offset = excess,
+            .gap = 0,
+            .remainder = 0,
+        },
+        .center => .{
+            .start_offset = excess / 2,
+            .gap = 0,
+            .remainder = 0,
+        },
+        .space_between => blk: {
+            if (count <= 1) {
+                // Single item: center it
+                break :blk .{
+                    .start_offset = excess / 2,
+                    .gap = 0,
+                    .remainder = 0,
+                };
+            }
+            const gaps = count - 1;
+            const gap_size: u16 = @intCast(excess / gaps);
+            const remainder = excess % @as(u16, @intCast(gaps));
+            break :blk .{
+                .start_offset = 0,
+                .gap = gap_size,
+                .remainder = remainder,
+            };
+        },
+        .space_around => blk: {
+            // Space around: each item gets equal space around it
+            // Edge gaps are half of inner gaps
+            // Total gaps = N items * 2 half-gaps = N full gaps worth
+            const total_gaps = count;
+            const gap_size: u16 = @intCast(excess / total_gaps);
+            const remainder = excess % @as(u16, @intCast(total_gaps));
+            // Start offset is half a gap
+            break :blk .{
+                .start_offset = gap_size / 2,
+                .gap = gap_size,
+                .remainder = remainder,
+            };
+        },
+        .space_evenly => blk: {
+            // Space evenly: equal gaps everywhere including edges
+            // Total gaps = N + 1 (before first, between each, after last)
+            const total_gaps = count + 1;
+            const gap_size: u16 = @intCast(excess / total_gaps);
+            const remainder = excess % @as(u16, @intCast(total_gaps));
+            break :blk .{
+                .start_offset = gap_size,
+                .gap = gap_size,
+                .remainder = remainder,
+            };
+        },
+    };
 }
 
 /// Maximum number of constraints supported in a single layout call.
@@ -674,4 +810,150 @@ test "regression: layout all fixed with overflow distributes reduction" {
         total += r.width;
     }
     try std.testing.expectEqual(@as(u32, 50), total);
+}
+
+// ============================================================
+// FLEX ALIGNMENT TESTS
+// ============================================================
+
+test "sanity: Flex enum has all modes" {
+    const modes = [_]Flex{ .start, .end_, .center, .space_between, .space_around, .space_evenly, .legacy };
+    try std.testing.expectEqual(@as(usize, 7), modes.len);
+}
+
+test "behavior: Flex.start places items at start with excess at end" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(30),
+    }, .start);
+    try std.testing.expectEqual(@as(u16, 0), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 20), result.get(1).x);
+}
+
+test "behavior: Flex.end_ places items at end with excess at start" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(30),
+    }, .end_);
+    // Total items = 50, excess = 50
+    // First item should start at 50
+    try std.testing.expectEqual(@as(u16, 50), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 70), result.get(1).x);
+}
+
+test "behavior: Flex.center centers items" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(30),
+    }, .center);
+    // Total items = 50, excess = 50, start offset = 25
+    try std.testing.expectEqual(@as(u16, 25), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 45), result.get(1).x);
+}
+
+test "behavior: Flex.space_between distributes gaps between items" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(20),
+        Constraint.len(20),
+    }, .space_between);
+    // Total items = 60, excess = 40, 2 gaps = 20 each
+    try std.testing.expectEqual(@as(u16, 0), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 40), result.get(1).x);
+    try std.testing.expectEqual(@as(u16, 80), result.get(2).x);
+}
+
+test "behavior: Flex.space_between with single item centers it" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(20),
+    }, .space_between);
+    // Single item: center it (excess = 80, start = 40)
+    try std.testing.expectEqual(@as(u16, 40), result.get(0).x);
+}
+
+test "behavior: Flex.space_around distributes space around items" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(20),
+    }, .space_around);
+    // Total items = 40, excess = 60
+    // 2 items = 2 gaps worth of space total
+    // Gap = 60/2 = 30, edge offset = 15
+    try std.testing.expectEqual(@as(u16, 15), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 65), result.get(1).x);
+}
+
+test "behavior: Flex.space_evenly distributes equal gaps everywhere" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(20),
+    }, .space_evenly);
+    // Total items = 40, excess = 60
+    // 3 gaps (before, between, after) = 60/3 = 20 each
+    try std.testing.expectEqual(@as(u16, 20), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 60), result.get(1).x);
+}
+
+test "behavior: Flex.legacy behaves like default layout" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result_legacy = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(30),
+    }, .legacy);
+    const result_default = layout(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.len(30),
+    });
+    try std.testing.expectEqual(result_default.get(0).x, result_legacy.get(0).x);
+    try std.testing.expectEqual(result_default.get(1).x, result_legacy.get(1).x);
+}
+
+test "behavior: Flex works with vertical direction" {
+    const area = Rect.init(0, 0, 10, 100);
+    const result = layoutWithFlex(area, .vertical, &.{
+        Constraint.len(20),
+        Constraint.len(30),
+    }, .center);
+    // Total items = 50, excess = 50, start offset = 25
+    try std.testing.expectEqual(@as(u16, 25), result.get(0).y);
+    try std.testing.expectEqual(@as(u16, 45), result.get(1).y);
+}
+
+test "regression: Flex with no excess space behaves normally" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(50),
+        Constraint.len(50),
+    }, .center);
+    // No excess, so items are placed consecutively
+    try std.testing.expectEqual(@as(u16, 0), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 50), result.get(1).x);
+}
+
+test "regression: Flex with empty constraints returns empty" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{}, .center);
+    try std.testing.expectEqual(@as(usize, 0), result.len);
+}
+
+test "regression: Flex handles fractional gap remainder" {
+    const area = Rect.init(0, 0, 100, 10);
+    const result = layoutWithFlex(area, .horizontal, &.{
+        Constraint.len(10),
+        Constraint.len(10),
+        Constraint.len(10),
+    }, .space_between);
+    // Total items = 30, excess = 70, 2 gaps
+    // 70 / 2 = 35 per gap
+    // First at 0, second at 10+35=45, third at 55+35=90
+    try std.testing.expectEqual(@as(u16, 0), result.get(0).x);
+    try std.testing.expectEqual(@as(u16, 45), result.get(1).x);
+    try std.testing.expectEqual(@as(u16, 90), result.get(2).x);
 }

@@ -46,6 +46,12 @@ pub const sparkline = @import("widgets/sparkline.zig");
 pub const Sparkline = sparkline.Sparkline;
 pub const SparklineDirection = sparkline.Direction;
 
+pub const bar_chart = @import("widgets/bar_chart.zig");
+pub const BarChart = bar_chart.BarChart;
+pub const Bar = bar_chart.Bar;
+pub const BarGroup = bar_chart.BarGroup;
+pub const BarChartOrientation = bar_chart.Orientation;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -59,4 +65,5 @@ test "widgets module" {
     _ = scroll_view;
     _ = text_input;
     _ = sparkline;
+    _ = bar_chart;
 }
