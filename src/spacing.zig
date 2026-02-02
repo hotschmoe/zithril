@@ -13,72 +13,56 @@ pub const Padding = struct {
     bottom: u16 = 0,
     left: u16 = 0,
 
-    /// Create padding with equal value on all sides.
     pub fn all(value: u16) Padding {
         return .{ .top = value, .right = value, .bottom = value, .left = value };
     }
 
-    /// Create padding with horizontal (left/right) and vertical (top/bottom) values.
     pub fn symmetric(h: u16, v: u16) Padding {
         return .{ .top = v, .right = h, .bottom = v, .left = h };
     }
 
-    /// Create padding with horizontal only (left and right).
     pub fn horizontal(value: u16) Padding {
         return .{ .left = value, .right = value };
     }
 
-    /// Create padding with vertical only (top and bottom).
     pub fn vertical(value: u16) Padding {
         return .{ .top = value, .bottom = value };
     }
 
-    /// Create padding with left only.
     pub fn leftOnly(value: u16) Padding {
         return .{ .left = value };
     }
 
-    /// Create padding with right only.
     pub fn rightOnly(value: u16) Padding {
         return .{ .right = value };
     }
 
-    /// Create padding with top only.
     pub fn topOnly(value: u16) Padding {
         return .{ .top = value };
     }
 
-    /// Create padding with bottom only.
     pub fn bottomOnly(value: u16) Padding {
         return .{ .bottom = value };
     }
 
-    /// Apply padding to shrink a Rect inward.
-    /// Uses saturating arithmetic to prevent underflow.
     pub fn apply(self: Padding, rect: Rect) Rect {
         const new_x = rect.x +| self.left;
         const new_y = rect.y +| self.top;
-
-        const h_padding = @as(u32, self.left) + @as(u32, self.right);
-        const v_padding = @as(u32, self.top) + @as(u32, self.bottom);
-
-        const new_w: u16 = if (h_padding >= rect.width) 0 else rect.width -| @as(u16, @intCast(h_padding));
-        const new_h: u16 = if (v_padding >= rect.height) 0 else rect.height -| @as(u16, @intCast(v_padding));
-
+        const h_total = @as(u32, self.left) + @as(u32, self.right);
+        const v_total = @as(u32, self.top) + @as(u32, self.bottom);
+        const new_w: u16 = if (h_total >= rect.width) 0 else rect.width -| @as(u16, @intCast(h_total));
+        const new_h: u16 = if (v_total >= rect.height) 0 else rect.height -| @as(u16, @intCast(v_total));
         return Rect.init(new_x, new_y, new_w, new_h);
     }
 
-    /// Returns true if all padding values are zero.
     pub fn isZero(self: Padding) bool {
         return self.top == 0 and self.right == 0 and self.bottom == 0 and self.left == 0;
     }
 
-    /// Total horizontal padding (left + right).
     pub fn totalHorizontal(self: Padding) u16 {
         return self.left +| self.right;
     }
 
-    /// Total vertical padding (top + bottom).
     pub fn totalVertical(self: Padding) u16 {
         return self.top +| self.bottom;
     }
@@ -92,72 +76,56 @@ pub const Margin = struct {
     bottom: u16 = 0,
     left: u16 = 0,
 
-    /// Create margin with equal value on all sides.
     pub fn all(value: u16) Margin {
         return .{ .top = value, .right = value, .bottom = value, .left = value };
     }
 
-    /// Create margin with horizontal (left/right) and vertical (top/bottom) values.
     pub fn symmetric(h: u16, v: u16) Margin {
         return .{ .top = v, .right = h, .bottom = v, .left = h };
     }
 
-    /// Create margin with horizontal only (left and right).
     pub fn horizontal(value: u16) Margin {
         return .{ .left = value, .right = value };
     }
 
-    /// Create margin with vertical only (top and bottom).
     pub fn vertical(value: u16) Margin {
         return .{ .top = value, .bottom = value };
     }
 
-    /// Create margin with left only.
     pub fn leftOnly(value: u16) Margin {
         return .{ .left = value };
     }
 
-    /// Create margin with right only.
     pub fn rightOnly(value: u16) Margin {
         return .{ .right = value };
     }
 
-    /// Create margin with top only.
     pub fn topOnly(value: u16) Margin {
         return .{ .top = value };
     }
 
-    /// Create margin with bottom only.
     pub fn bottomOnly(value: u16) Margin {
         return .{ .bottom = value };
     }
 
-    /// Apply margin to shrink a Rect inward.
-    /// Uses saturating arithmetic to prevent underflow.
     pub fn apply(self: Margin, rect: Rect) Rect {
         const new_x = rect.x +| self.left;
         const new_y = rect.y +| self.top;
-
-        const h_margin = @as(u32, self.left) + @as(u32, self.right);
-        const v_margin = @as(u32, self.top) + @as(u32, self.bottom);
-
-        const new_w: u16 = if (h_margin >= rect.width) 0 else rect.width -| @as(u16, @intCast(h_margin));
-        const new_h: u16 = if (v_margin >= rect.height) 0 else rect.height -| @as(u16, @intCast(v_margin));
-
+        const h_total = @as(u32, self.left) + @as(u32, self.right);
+        const v_total = @as(u32, self.top) + @as(u32, self.bottom);
+        const new_w: u16 = if (h_total >= rect.width) 0 else rect.width -| @as(u16, @intCast(h_total));
+        const new_h: u16 = if (v_total >= rect.height) 0 else rect.height -| @as(u16, @intCast(v_total));
         return Rect.init(new_x, new_y, new_w, new_h);
     }
 
-    /// Returns true if all margin values are zero.
     pub fn isZero(self: Margin) bool {
         return self.top == 0 and self.right == 0 and self.bottom == 0 and self.left == 0;
     }
 
-    /// Total horizontal margin (left + right).
     pub fn totalHorizontal(self: Margin) u16 {
         return self.left +| self.right;
     }
 
-    /// Total vertical margin (top + bottom).
     pub fn totalVertical(self: Margin) u16 {
         return self.top +| self.bottom;
     }

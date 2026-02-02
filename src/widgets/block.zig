@@ -196,14 +196,8 @@ pub const Block = struct {
     /// Get the interior area (inside the border and padding).
     /// Returns a Rect accounting for border (1 cell if present) and padding values.
     pub fn inner(self: Block, area: Rect) Rect {
-        var inner_area = if (self.border == .none) area else area.inner(1);
-
-        // Apply padding to the inner area
-        if (!self.padding.isZero()) {
-            inner_area = self.padding.apply(inner_area);
-        }
-
-        return inner_area;
+        const after_border = if (self.border == .none) area else area.inner(1);
+        return self.padding.apply(after_border);
     }
 };
 
