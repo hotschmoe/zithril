@@ -87,6 +87,12 @@ pub const MenuItem = menu.MenuItem;
 pub const MenuState = menu.MenuState;
 pub const MenuSymbols = menu.MenuSymbols;
 
+pub const calendar = @import("widgets/calendar.zig");
+pub const Calendar = calendar.Calendar;
+pub const daysInMonth = calendar.daysInMonth;
+pub const isLeapYear = calendar.isLeapYear;
+pub const dayOfWeek = calendar.dayOfWeek;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -106,4 +112,5 @@ test "widgets module" {
     _ = canvas;
     _ = tree;
     _ = menu;
+    _ = calendar;
 }

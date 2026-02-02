@@ -130,6 +130,28 @@ pub const Style = struct {
         return self.strikethrough();
     }
 
+    /// Enable hidden/invisible text (ANSI SGR 8).
+    /// Hidden text takes up space but is not visible.
+    /// Terminal support varies; some terminals render as visible or blank.
+    pub fn hidden(self: Style) Style {
+        return .{ .inner = self.inner.conceal() };
+    }
+
+    /// Disable hidden/invisible text.
+    pub fn notHidden(self: Style) Style {
+        return .{ .inner = self.inner.notConceal() };
+    }
+
+    /// Enable hidden/invisible text (alias for hidden).
+    pub fn conceal(self: Style) Style {
+        return self.hidden();
+    }
+
+    /// Disable hidden/invisible text (alias for notHidden).
+    pub fn notConceal(self: Style) Style {
+        return self.notHidden();
+    }
+
     /// Merge another style on top of this one.
     /// Non-default values in `other` override values in `self`.
     pub fn patch(self: Style, other: Style) Style {
@@ -274,7 +296,8 @@ test "behavior: Style all attributes" {
         .dim()
         .blink()
         .reverse()
-        .strikethrough();
+        .strikethrough()
+        .hidden();
 
     try std.testing.expect(style.hasAttribute(.bold));
     try std.testing.expect(style.hasAttribute(.italic));
@@ -283,6 +306,45 @@ test "behavior: Style all attributes" {
     try std.testing.expect(style.hasAttribute(.blink));
     try std.testing.expect(style.hasAttribute(.reverse));
     try std.testing.expect(style.hasAttribute(.strike));
+    try std.testing.expect(style.hasAttribute(.conceal));
+}
+
+test "behavior: Style.hidden enables conceal attribute" {
+    const style = Style.init().hidden();
+    try std.testing.expect(style.hasAttribute(.conceal));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notHidden disables conceal attribute" {
+    const style = Style.init().hidden().notHidden();
+    try std.testing.expect(!style.hasAttribute(.conceal));
+}
+
+test "behavior: Style.hidden and Style.conceal are equivalent" {
+    const hidden_style = Style.init().hidden();
+    const conceal_style = Style.init().conceal();
+    try std.testing.expect(hidden_style.eql(conceal_style));
+}
+
+test "behavior: Style.patch merges hidden attribute" {
+    const base = Style.init().bold();
+    const overlay = Style.init().hidden();
+
+    const merged = base.patch(overlay);
+    try std.testing.expect(merged.hasAttribute(.bold));
+    try std.testing.expect(merged.hasAttribute(.conceal));
+}
+
+test "behavior: Style.hidden renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().hidden();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    const written = stream.getWritten();
+    // SGR 8 is the conceal/hidden code
+    try std.testing.expectEqualStrings("\x1b[8m", written);
 }
 
 test "behavior: Style disable attributes" {
