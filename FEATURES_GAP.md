@@ -285,43 +285,43 @@ ratatui has a large ecosystem of third-party widgets. These would need to be imp
 
 | Feature | Bead ID | Description |
 |---------|---------|-------------|
-| Sparkline widget | `bd-t6g` | Compact data visualization, low effort |
-| Percentage constraint | `bd-2k2` | Convenience for common layouts |
-| Flex alignment modes | `bd-186` | Start, Center, End, SpaceBetween, SpaceAround, SpaceEvenly |
+| Sparkline widget | `bd-2ke` | Compact data visualization, low effort |
+| Percentage constraint | `bd-d42` | Convenience for common layouts |
+| Flex alignment modes | `bd-mlx` | Start, Center, End, SpaceBetween, SpaceAround, SpaceEvenly |
 
 ### P1 - High Impact, Higher Effort
 
 | Feature | Bead ID | Description |
 |---------|---------|-------------|
-| BarChart widget | `bd-s5a` | Data visualization for dashboards |
-| Chart widget | `bd-ha1` | Line graphs with axes (epic) |
-| - Axis rendering | `bd-1r6` | X/Y axes, ticks, labels, auto-scaling |
-| - Line dataset | `bd-1z8` | Connect data points with lines |
-| - Scatter dataset | `bd-x9f` | Individual point markers |
-| Padding/Margin types | `bd-21s` | Layout convenience structs |
+| BarChart widget | `bd-2zv` | Data visualization for dashboards |
+| Chart widget | `bd-24d` | Line graphs with axes (epic) |
+| - Axis rendering | `bd-128` | X/Y axes, ticks, labels, auto-scaling |
+| - Line dataset | `bd-1qm` | Connect data points with lines |
+| - Scatter dataset | `bd-ad4` | Individual point markers |
+| Padding/Margin types | `bd-ms6` | Layout convenience structs |
 
 ### P2 - Medium Impact
 
 | Feature | Bead ID | Description |
 |---------|---------|-------------|
-| LineGauge widget | `bd-4xj` | Thin progress variant |
-| Canvas widget | `bd-gk7` | Arbitrary drawing (epic) |
-| - Circle shape | `bd-3vb` | Bresenham circle algorithm |
-| - Line shape | `bd-d3w` | Bresenham line algorithm |
-| - Rectangle shape | `bd-fa6` | Fill or outline mode |
-| - Points shape | `bd-w67` | Scatter plot points |
-| - Shape trait | `bd-22u` | Custom shape extensibility |
-| Tree widget | `bd-3a7` | Hierarchical data display |
-| Menu widget | `bd-xap` | Nested navigation |
+| LineGauge widget | `bd-2it` | Thin progress variant |
+| Canvas widget | `bd-2us` | Arbitrary drawing (epic) |
+| - Circle shape | `bd-2os` | Bresenham circle algorithm |
+| - Line shape | `bd-2nk` | Bresenham line algorithm |
+| - Rectangle shape | `bd-1zo` | Fill or outline mode |
+| - Points shape | `bd-1jl` | Scatter plot points |
+| - Shape trait | `bd-lsj` | Custom shape extensibility |
+| Tree widget | `bd-197` | Hierarchical data display |
+| Menu widget | `bd-oaf` | Nested navigation |
 
 ### P3 - Low Priority
 
 | Feature | Bead ID | Description |
 |---------|---------|-------------|
-| Calendar widget | `bd-1fh` | Monthly calendar display |
-| Hidden text attribute | `bd-1ip` | Invisible text rendering |
-| BigText widget | `bd-hfv` | Decorative large text |
-| CodeEditor widget | `bd-3in` | Syntax highlighting (P4 backlog) |
+| Calendar widget | `bd-5s1` | Monthly calendar display |
+| Hidden text attribute | `bd-207` | Invisible text rendering |
+| BigText widget | `bd-tbm` | Decorative large text |
+| CodeEditor widget | `bd-446` | Syntax highlighting (P4 backlog) |
 
 ---
 
@@ -348,28 +348,28 @@ The core architecture is solid. Focus on data visualization widgets for the high
 
 | Priority | Bead ID | Type | Title |
 |----------|---------|------|-------|
-| P0 | `bd-t6g` | feature | Sparkline widget |
-| P0 | `bd-2k2` | feature | Percentage layout constraint |
-| P0 | `bd-186` | feature | Flex alignment modes for layout |
-| P1 | `bd-s5a` | feature | BarChart widget |
-| P1 | `bd-ha1` | feature | Chart widget (line graphs) |
-| P1 | `bd-1r6` | task | Chart: Axis rendering |
-| P1 | `bd-1z8` | task | Chart: Line dataset |
-| P1 | `bd-x9f` | task | Chart: Scatter dataset |
-| P1 | `bd-21s` | feature | Padding and Margin types |
-| P2 | `bd-4xj` | feature | LineGauge widget |
-| P2 | `bd-gk7` | epic | Canvas widget |
-| P2 | `bd-3vb` | task | Canvas: Circle shape |
-| P2 | `bd-d3w` | task | Canvas: Line shape |
-| P2 | `bd-fa6` | task | Canvas: Rectangle shape |
-| P2 | `bd-w67` | task | Canvas: Points shape |
-| P2 | `bd-22u` | task | Canvas: Shape trait |
-| P2 | `bd-3a7` | feature | Tree widget |
-| P2 | `bd-xap` | feature | Menu widget |
-| P3 | `bd-1fh` | feature | Calendar widget |
-| P3 | `bd-1ip` | feature | Hidden text attribute |
-| P3 | `bd-hfv` | feature | BigText widget |
-| P4 | `bd-3in` | feature | CodeEditor widget |
+| P0 | `bd-2ke` | feature | Sparkline widget |
+| P0 | `bd-d42` | feature | Percentage layout constraint |
+| P0 | `bd-mlx` | feature | Flex alignment modes for layout |
+| P1 | `bd-2zv` | feature | BarChart widget |
+| P1 | `bd-24d` | epic | Chart widget |
+| P1 | `bd-128` | task | Chart: Axis rendering |
+| P1 | `bd-1qm` | task | Chart: Line dataset rendering |
+| P1 | `bd-ad4` | task | Chart: Scatter dataset rendering |
+| P1 | `bd-ms6` | feature | Padding and Margin types |
+| P2 | `bd-2it` | feature | LineGauge widget |
+| P2 | `bd-2us` | epic | Canvas widget |
+| P2 | `bd-2os` | task | Canvas: Circle shape |
+| P2 | `bd-2nk` | task | Canvas: Line shape |
+| P2 | `bd-1zo` | task | Canvas: Rectangle shape |
+| P2 | `bd-1jl` | task | Canvas: Points shape |
+| P2 | `bd-lsj` | task | Canvas: Shape trait interface |
+| P2 | `bd-197` | feature | Tree widget |
+| P2 | `bd-oaf` | feature | Menu widget |
+| P3 | `bd-5s1` | feature | Calendar widget |
+| P3 | `bd-207` | feature | Hidden text attribute |
+| P3 | `bd-tbm` | feature | BigText widget |
+| P4 | `bd-446` | feature | CodeEditor widget |
 
 ---
 
