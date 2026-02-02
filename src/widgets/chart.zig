@@ -18,9 +18,7 @@ const CORNER: u21 = 0x2514; // '└'
 const TICK_Y: u21 = 0x2524; // '┤'
 const TICK_X: u21 = 0x2534; // '┴'
 
-// Line-drawing characters for datasets
-const LINE_HORIZONTAL: u21 = 0x2500; // '─'
-const LINE_VERTICAL: u21 = 0x2502; // '│'
+// Line-drawing characters for datasets (reuse axis chars where applicable)
 const LINE_DIAG_UP: u21 = '/';
 const LINE_DIAG_DOWN: u21 = '\\';
 const LINE_CROSS: u21 = 0x2573; // '╳'
@@ -327,7 +325,7 @@ pub const Chart = struct {
             const x2 = self.dataToScreenX(p2[0], layout);
             const y2 = self.dataToScreenY(p2[1], layout);
 
-            self.drawLine(x1, y1, x2, y2, layout.plot_area, line_style, buf);
+            drawLine(x1, y1, x2, y2, layout.plot_area, line_style, buf);
         }
 
         // Draw markers if specified
@@ -337,51 +335,6 @@ pub const Chart = struct {
                 const y = self.dataToScreenY(point[1], layout);
                 if (layout.plot_area.contains(x, y)) {
                     buf.set(x, y, Cell.styled(marker, line_style));
-                }
-            }
-        }
-    }
-
-    /// Draw a line between two screen coordinates.
-    fn drawLine(self: Chart, x1: u16, y1: u16, x2: u16, y2: u16, plot_area: Rect, line_style: Style, buf: *Buffer) void {
-        _ = self;
-
-        // Use Bresenham's line algorithm
-        const dx: i32 = @as(i32, x2) - @as(i32, x1);
-        const dy: i32 = @as(i32, y2) - @as(i32, y1);
-        const abs_dx = if (dx < 0) -dx else dx;
-        const abs_dy = if (dy < 0) -dy else dy;
-
-        // Determine character based on slope
-        const char: u21 = if (abs_dx == 0)
-            LINE_VERTICAL
-        else if (abs_dy == 0)
-            LINE_HORIZONTAL
-        else if ((dx > 0) == (dy < 0))
-            LINE_DIAG_UP // Y inverted: screen Y increases downward
-        else
-            LINE_DIAG_DOWN;
-
-        // Use step-based algorithm for better coverage
-        const steps = @max(abs_dx, abs_dy);
-        if (steps == 0) {
-            if (plot_area.contains(x1, y1)) {
-                buf.set(x1, y1, Cell.styled(char, line_style));
-            }
-            return;
-        }
-
-        var step: i32 = 0;
-        while (step <= steps) : (step += 1) {
-            const t: f64 = @as(f64, @floatFromInt(step)) / @as(f64, @floatFromInt(steps));
-            const x = @as(i32, x1) + @as(i32, @intFromFloat(t * @as(f64, @floatFromInt(dx))));
-            const y = @as(i32, y1) + @as(i32, @intFromFloat(t * @as(f64, @floatFromInt(dy))));
-
-            if (x >= 0 and y >= 0) {
-                const ux: u16 = @intCast(x);
-                const uy: u16 = @intCast(y);
-                if (plot_area.contains(ux, uy)) {
-                    buf.set(ux, uy, Cell.styled(char, line_style));
                 }
             }
         }
@@ -478,6 +431,47 @@ fn formatValueWidth(value: f64) u16 {
     var buf: [16]u8 = undefined;
     const text = formatValue(value, &buf);
     return @intCast(@min(text.len, std.math.maxInt(u16)));
+}
+
+/// Draw a line between two screen coordinates.
+fn drawLine(x1: u16, y1: u16, x2: u16, y2: u16, plot_area: Rect, line_style: Style, buf: *Buffer) void {
+    const dx: i32 = @as(i32, x2) - @as(i32, x1);
+    const dy: i32 = @as(i32, y2) - @as(i32, y1);
+    const abs_dx = @abs(dx);
+    const abs_dy = @abs(dy);
+
+    // Determine character based on slope
+    const char: u21 = if (abs_dx == 0)
+        VERTICAL
+    else if (abs_dy == 0)
+        HORIZONTAL
+    else if ((dx > 0) == (dy < 0))
+        LINE_DIAG_UP // Y inverted: screen Y increases downward
+    else
+        LINE_DIAG_DOWN;
+
+    const steps = @max(abs_dx, abs_dy);
+    if (steps == 0) {
+        if (plot_area.contains(x1, y1)) {
+            buf.set(x1, y1, Cell.styled(char, line_style));
+        }
+        return;
+    }
+
+    var step: i32 = 0;
+    while (step <= steps) : (step += 1) {
+        const t: f64 = @as(f64, @floatFromInt(step)) / @as(f64, @floatFromInt(steps));
+        const x = @as(i32, x1) + @as(i32, @intFromFloat(t * @as(f64, @floatFromInt(dx))));
+        const y = @as(i32, y1) + @as(i32, @intFromFloat(t * @as(f64, @floatFromInt(dy))));
+
+        if (x >= 0 and y >= 0) {
+            const ux: u16 = @intCast(x);
+            const uy: u16 = @intCast(y);
+            if (plot_area.contains(ux, uy)) {
+                buf.set(ux, uy, Cell.styled(char, line_style));
+            }
+        }
+    }
 }
 
 // ============================================================
@@ -689,7 +683,7 @@ test "behavior: Chart renders line dataset" {
     // Check that line characters exist
     var found_line = false;
     for (buf.cells) |cell| {
-        if (cell.char == LINE_HORIZONTAL or cell.char == LINE_VERTICAL or
+        if (cell.char == HORIZONTAL or cell.char == VERTICAL or
             cell.char == LINE_DIAG_UP or cell.char == LINE_DIAG_DOWN)
         {
             found_line = true;
