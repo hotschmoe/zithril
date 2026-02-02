@@ -18,6 +18,34 @@ const Rect = zithril.Rect;
 const Style = zithril.Style;
 const Color = zithril.Color;
 
+/// Simple buffer writer for building strings without allocation.
+const BufWriter = struct {
+    buf: []u8,
+    pos: usize = 0,
+
+    fn init(buf: []u8) BufWriter {
+        return .{ .buf = buf };
+    }
+
+    fn write(self: *BufWriter, str: []const u8) void {
+        if (self.pos + str.len < self.buf.len) {
+            @memcpy(self.buf[self.pos..][0..str.len], str);
+            self.pos += str.len;
+        }
+    }
+
+    fn writeChar(self: *BufWriter, c: u8) void {
+        if (self.pos < self.buf.len) {
+            self.buf[self.pos] = c;
+            self.pos += 1;
+        }
+    }
+
+    fn slice(self: *const BufWriter) []const u8 {
+        return self.buf[0..self.pos];
+    }
+};
+
 // Colors for the game
 const Colors = struct {
     const rail = Style.init().fg(.blue);
@@ -161,7 +189,6 @@ pub const TruthTableWidget = struct {
     results: []const bool,
 
     pub fn render(self: TruthTableWidget, area: Rect, buf: *Buffer) void {
-        // Draw border
         const block = zithril.Block{
             .title = "Truth Table",
             .border = .rounded,
@@ -174,52 +201,29 @@ pub const TruthTableWidget = struct {
 
         var y_offset: u16 = 0;
 
-        // Header row with input/output names
+        // Header row
         var header_buf: [64]u8 = undefined;
-        var header_pos: usize = 0;
+        var writer = BufWriter.init(&header_buf);
 
-        // Input names
         for (self.level.input_names) |name| {
-            if (header_pos + name.len + 1 < header_buf.len) {
-                @memcpy(header_buf[header_pos..][0..name.len], name);
-                header_pos += name.len;
-                header_buf[header_pos] = ' ';
-                header_pos += 1;
-            }
+            writer.write(name);
+            writer.writeChar(' ');
         }
-
-        // Separator
-        if (header_pos + 2 < header_buf.len) {
-            header_buf[header_pos] = '|';
-            header_pos += 1;
-            header_buf[header_pos] = ' ';
-            header_pos += 1;
-        }
-
-        // Output names
+        writer.write("| ");
         for (self.level.output_names) |name| {
-            if (header_pos + name.len + 1 < header_buf.len) {
-                @memcpy(header_buf[header_pos..][0..name.len], name);
-                header_pos += name.len;
-                header_buf[header_pos] = ' ';
-                header_pos += 1;
-            }
+            writer.write(name);
+            writer.writeChar(' ');
         }
+        writer.write("| ?");
 
-        // Result column
-        if (header_pos + 4 < header_buf.len) {
-            @memcpy(header_buf[header_pos..][0..3], "| ?");
-            header_pos += 3;
-        }
-
-        buf.setString(inner.x, inner.y + y_offset, header_buf[0..header_pos], Colors.header);
+        buf.setString(inner.x, inner.y + y_offset, writer.slice(), Colors.header);
         y_offset += 1;
 
         // Separator line
         if (y_offset < inner.height) {
             var sep_buf: [64]u8 = undefined;
             @memset(&sep_buf, '-');
-            const sep_len = @min(header_pos, inner.width);
+            const sep_len = @min(writer.pos, inner.width);
             buf.setString(inner.x, inner.y + y_offset, sep_buf[0..sep_len], Style.empty);
             y_offset += 1;
         }
@@ -229,61 +233,31 @@ pub const TruthTableWidget = struct {
             if (y_offset >= inner.height) break;
 
             var row_buf: [64]u8 = undefined;
-            var row_pos: usize = 0;
+            var row_writer = BufWriter.init(&row_buf);
 
-            // Input values
             for (self.level.input_names, 0..) |_, j| {
-                if (row_pos + 2 < row_buf.len) {
-                    row_buf[row_pos] = if (row.inputs[j]) '1' else '0';
-                    row_pos += 1;
-                    row_buf[row_pos] = ' ';
-                    row_pos += 1;
-                }
+                row_writer.writeChar(if (row.inputs[j]) '1' else '0');
+                row_writer.writeChar(' ');
             }
-
-            // Separator
-            if (row_pos + 2 < row_buf.len) {
-                row_buf[row_pos] = '|';
-                row_pos += 1;
-                row_buf[row_pos] = ' ';
-                row_pos += 1;
-            }
-
-            // Output values
+            row_writer.write("| ");
             for (self.level.output_names, 0..) |_, j| {
-                if (row_pos + 2 < row_buf.len) {
-                    row_buf[row_pos] = if (row.outputs[j]) '1' else '0';
-                    row_pos += 1;
-                    row_buf[row_pos] = ' ';
-                    row_pos += 1;
-                }
+                row_writer.writeChar(if (row.outputs[j]) '1' else '0');
+                row_writer.writeChar(' ');
             }
+            row_writer.write("| ");
 
-            // Result indicator
-            if (row_pos + 4 < row_buf.len) {
-                row_buf[row_pos] = '|';
-                row_pos += 1;
-                row_buf[row_pos] = ' ';
-                row_pos += 1;
-
-                if (i < self.results.len) {
-                    if (self.results[i]) {
-                        row_buf[row_pos] = 'P'; // Pass
-                    } else {
-                        row_buf[row_pos] = 'F'; // Fail
-                    }
-                } else {
-                    row_buf[row_pos] = '-';
-                }
-                row_pos += 1;
-            }
+            const result_char: u8 = if (i < self.results.len)
+                (if (self.results[i]) 'P' else 'F')
+            else
+                '-';
+            row_writer.writeChar(result_char);
 
             const row_style = if (i < self.results.len)
                 (if (self.results[i]) Colors.pass else Colors.fail)
             else
                 Style.empty;
 
-            buf.setString(inner.x, inner.y + y_offset, row_buf[0..row_pos], row_style);
+            buf.setString(inner.x, inner.y + y_offset, row_writer.slice(), row_style);
             y_offset += 1;
         }
     }

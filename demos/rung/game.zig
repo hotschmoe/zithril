@@ -268,9 +268,9 @@ fn placeComponent(state: *GameState) void {
     const cell: Cell = switch (state.selected_component) {
         .wire_horizontal => .wire_h,
         .wire_vertical => .wire_v,
-        .contact_no => .{ .contact_no = 0 }, // TODO: assign input
+        .contact_no => .{ .contact_no = 0 },
         .contact_nc => .{ .contact_nc = 0 },
-        .coil => .{ .coil = 0 }, // TODO: assign output
+        .coil => .{ .coil = 0 },
         .coil_latch => .{ .coil_latch = 0 },
         .coil_unlatch => .{ .coil_unlatch = 0 },
         .junction => .junction,

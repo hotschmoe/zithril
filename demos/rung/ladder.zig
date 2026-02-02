@@ -106,8 +106,9 @@ pub fn validate(diagram: *const Diagram) ValidationResult {
         for (1..diagram.width - 1) |x| {
             const cell = diagram.get(x, y);
             if (cell != .empty) has_content = true;
-            if (cell == .coil or cell == .coil_latch or cell == .coil_unlatch) {
-                has_coil = true;
+            switch (cell) {
+                .coil, .coil_latch, .coil_unlatch => has_coil = true,
+                else => {},
             }
         }
 
@@ -130,10 +131,7 @@ pub const ValidationResult = struct {
 
 // Tests
 test "simple wire conducts" {
-    const std_test = std.testing;
-
     // TODO: Add proper test when Diagram can be created in tests
-    _ = std_test;
 }
 
 test "NO contact logic" {

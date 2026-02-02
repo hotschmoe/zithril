@@ -52,73 +52,8 @@ pub const Level = struct {
     setup: *const fn (*Diagram) void,
 };
 
-// Level setup functions
-
-fn setupLevel1(diagram: *Diagram) void {
-    // Direct wire: just place rails
-    for (0..diagram.height) |y| {
-        diagram.set(0, y, .rail_left);
-        diagram.set(diagram.width - 1, y, .rail_right);
-    }
-}
-
-fn setupLevel2(diagram: *Diagram) void {
-    // NOT gate
-    setupLevel1(diagram);
-}
-
-fn setupLevel3(diagram: *Diagram) void {
-    // AND gate
-    setupLevel1(diagram);
-}
-
-fn setupLevel4(diagram: *Diagram) void {
-    // OR gate - needs multiple rungs
-    for (0..diagram.height) |y| {
-        diagram.set(0, y, .rail_left);
-        diagram.set(diagram.width - 1, y, .rail_right);
-    }
-}
-
-fn setupLevel5(diagram: *Diagram) void {
-    // NAND gate
-    setupLevel1(diagram);
-}
-
-fn setupLevel6(diagram: *Diagram) void {
-    // NOR gate
-    for (0..diagram.height) |y| {
-        diagram.set(0, y, .rail_left);
-        diagram.set(diagram.width - 1, y, .rail_right);
-    }
-}
-
-fn setupLevel7(diagram: *Diagram) void {
-    // XOR gate - complex
-    for (0..diagram.height) |y| {
-        diagram.set(0, y, .rail_left);
-        diagram.set(diagram.width - 1, y, .rail_right);
-    }
-}
-
-fn setupLevel8(diagram: *Diagram) void {
-    // Latching circuit
-    for (0..diagram.height) |y| {
-        diagram.set(0, y, .rail_left);
-        diagram.set(diagram.width - 1, y, .rail_right);
-    }
-}
-
-fn setupLevel9(diagram: *Diagram) void {
-    // Sequencing
-    for (0..diagram.height) |y| {
-        diagram.set(0, y, .rail_left);
-        diagram.set(diagram.width - 1, y, .rail_right);
-    }
-}
-
-fn setupLevel10(diagram: *Diagram) void {
-    // Motor control
+/// Standard level setup: place power rails on left and right edges.
+fn setupRails(diagram: *Diagram) void {
     for (0..diagram.height) |y| {
         diagram.set(0, y, .rail_left);
         diagram.set(diagram.width - 1, y, .rail_right);
@@ -141,7 +76,7 @@ const levels = [_]Level{
             TruthRow.init(&.{false}, &.{false}),
             TruthRow.init(&.{true}, &.{true}),
         },
-        .setup = setupLevel1,
+        .setup = setupRails,
     },
 
     // Level 2: NOT Gate
@@ -157,7 +92,7 @@ const levels = [_]Level{
             TruthRow.init(&.{false}, &.{true}),
             TruthRow.init(&.{true}, &.{false}),
         },
-        .setup = setupLevel2,
+        .setup = setupRails,
     },
 
     // Level 3: AND Gate
@@ -175,7 +110,7 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, false }, &.{false}),
             TruthRow.init(&.{ true, true }, &.{true}),
         },
-        .setup = setupLevel3,
+        .setup = setupRails,
     },
 
     // Level 4: OR Gate
@@ -193,7 +128,7 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, false }, &.{true}),
             TruthRow.init(&.{ true, true }, &.{true}),
         },
-        .setup = setupLevel4,
+        .setup = setupRails,
     },
 
     // Level 5: NAND Gate
@@ -211,7 +146,7 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, false }, &.{true}),
             TruthRow.init(&.{ true, true }, &.{false}),
         },
-        .setup = setupLevel5,
+        .setup = setupRails,
     },
 
     // Level 6: NOR Gate
@@ -229,7 +164,7 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, false }, &.{false}),
             TruthRow.init(&.{ true, true }, &.{false}),
         },
-        .setup = setupLevel6,
+        .setup = setupRails,
     },
 
     // Level 7: XOR Gate
@@ -247,7 +182,7 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, false }, &.{true}),
             TruthRow.init(&.{ true, true }, &.{false}),
         },
-        .setup = setupLevel7,
+        .setup = setupRails,
     },
 
     // Level 8: Latching Circuit
@@ -264,7 +199,7 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, false }, &.{true}),
             TruthRow.init(&.{ false, true }, &.{false}),
         },
-        .setup = setupLevel8,
+        .setup = setupRails,
     },
 
     // Level 9: Priority Circuit
@@ -282,7 +217,7 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, false }, &.{ true, false }),
             TruthRow.init(&.{ true, true }, &.{ true, false }), // A has priority
         },
-        .setup = setupLevel9,
+        .setup = setupRails,
     },
 
     // Level 10: Start/Stop Motor Control
@@ -300,7 +235,7 @@ const levels = [_]Level{
             TruthRow.init(&.{ false, true }, &.{false}),
             TruthRow.init(&.{ false, false }, &.{false}), // Initial state
         },
-        .setup = setupLevel10,
+        .setup = setupRails,
     },
 };
 
