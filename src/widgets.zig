@@ -64,6 +64,14 @@ pub const line_gauge = @import("widgets/line_gauge.zig");
 pub const LineGauge = line_gauge.LineGauge;
 pub const LineSet = line_gauge.LineSet;
 
+pub const canvas = @import("widgets/canvas.zig");
+pub const Canvas = canvas.Canvas;
+pub const CanvasMarker = canvas.Marker;
+pub const CanvasShape = canvas.Shape;
+pub const CanvasPainter = canvas.Painter;
+pub const CanvasCircle = canvas.Circle;
+pub const CanvasLine = canvas.Line;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -80,4 +88,5 @@ test "widgets module" {
     _ = bar_chart;
     _ = chart;
     _ = line_gauge;
+    _ = canvas;
 }
