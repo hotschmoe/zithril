@@ -71,6 +71,15 @@ pub const CanvasShape = canvas.Shape;
 pub const CanvasPainter = canvas.Painter;
 pub const CanvasCircle = canvas.Circle;
 pub const CanvasLine = canvas.Line;
+pub const CanvasRectangle = canvas.Rectangle;
+pub const CanvasPoints = canvas.Points;
+
+pub const tree = @import("widgets/tree.zig");
+pub const Tree = tree.Tree;
+pub const TreeItem = tree.TreeItem;
+pub const TreeState = tree.TreeState;
+pub const TreeSymbols = tree.TreeSymbols;
+pub const MutableTreeItem = tree.MutableTreeItem;
 
 test "widgets module" {
     _ = block;
@@ -89,4 +98,5 @@ test "widgets module" {
     _ = chart;
     _ = line_gauge;
     _ = canvas;
+    _ = tree;
 }

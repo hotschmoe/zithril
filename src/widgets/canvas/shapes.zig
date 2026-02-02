@@ -1466,3 +1466,116 @@ test "regression: Circle outside canvas bounds" {
     }
     try std.testing.expectEqual(@as(usize, 0), pixel_count);
 }
+
+// ============================================================
+// BEHAVIOR TESTS - User-defined custom shapes
+// ============================================================
+
+test "behavior: Shape interface allows user-defined custom shapes" {
+    // Example of a custom shape that users can define
+    const DataPlot = struct {
+        data: []const f64,
+        color: Color,
+
+        const Self = @This();
+
+        pub fn shape(self: *const Self) Shape {
+            return Shape.init(self, draw);
+        }
+
+        fn draw(self: *const Self, painter: *Painter) void {
+            for (self.data, 0..) |value, i| {
+                const x: f64 = @floatFromInt(i * 10);
+                painter.paint(x, value, self.color);
+            }
+        }
+    };
+
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    const data = [_]f64{ 10, 30, 50, 70, 90 };
+    const plot = DataPlot{
+        .data = &data,
+        .color = .green,
+    };
+
+    // Can use custom shape through the Shape interface
+    const s = plot.shape();
+    s.draw(&painter);
+
+    // Should have drawn 5 points
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 5), pixel_count);
+}
+
+test "behavior: Custom shapes work in heterogeneous collections" {
+    // Another custom shape example: cross/marker
+    const CrossMarker = struct {
+        x: f64,
+        y: f64,
+        size: f64,
+        color: Color,
+
+        const Self = @This();
+
+        pub fn shape(self: *const Self) Shape {
+            return Shape.init(self, draw);
+        }
+
+        fn draw(self: *const Self, painter: *Painter) void {
+            // Draw a small cross pattern
+            painter.paint(self.x, self.y, self.color);
+            painter.paint(self.x - self.size, self.y, self.color);
+            painter.paint(self.x + self.size, self.y, self.color);
+            painter.paint(self.x, self.y - self.size, self.color);
+            painter.paint(self.x, self.y + self.size, self.color);
+        }
+    };
+
+    var buf = try Buffer.init(std.testing.allocator, 40, 20);
+    defer buf.deinit();
+
+    var painter = Painter.init(
+        .{ 0, 100 },
+        .{ 0, 100 },
+        &buf,
+        Rect.init(0, 0, 40, 20),
+        .default,
+    );
+
+    // Mix built-in and custom shapes
+    const circle = Circle{ .x = 20, .y = 50, .radius = 5, .color = .red };
+    const marker = CrossMarker{ .x = 80, .y = 50, .size = 5, .color = .blue };
+
+    const shapes = [_]Shape{
+        circle.shape(),
+        marker.shape(),
+    };
+
+    for (&shapes) |s| {
+        s.draw(&painter);
+    }
+
+    // Both shapes should have drawn pixels
+    var pixel_count: usize = 0;
+    for (buf.cells) |cell| {
+        if (cell.char == 0x2022) {
+            pixel_count += 1;
+        }
+    }
+    try std.testing.expect(pixel_count > 5);
+}
