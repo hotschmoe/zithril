@@ -1,1 +1,4 @@
-issue_prefix: bd
+# Beads Project Configuration
+# issue_prefix: bd
+# default_priority: 2
+# default_type: task
