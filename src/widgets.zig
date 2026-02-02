@@ -93,6 +93,19 @@ pub const daysInMonth = calendar.daysInMonth;
 pub const isLeapYear = calendar.isLeapYear;
 pub const dayOfWeek = calendar.dayOfWeek;
 
+pub const big_text = @import("widgets/big_text.zig");
+pub const BigText = big_text.BigText;
+pub const PixelSize = big_text.PixelSize;
+
+pub const font8x8 = @import("widgets/font8x8.zig");
+pub const Font8x8 = font8x8.Font8x8;
+
+pub const code_editor = @import("widgets/code_editor.zig");
+pub const CodeEditor = code_editor.CodeEditor;
+pub const CodeEditorLanguage = code_editor.Language;
+pub const CodeEditorTheme = code_editor.Theme;
+pub const TokenType = code_editor.TokenType;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -113,4 +126,7 @@ test "widgets module" {
     _ = tree;
     _ = menu;
     _ = calendar;
+    _ = big_text;
+    _ = font8x8;
+    _ = code_editor;
 }
