@@ -52,6 +52,12 @@ pub const Bar = bar_chart.Bar;
 pub const BarGroup = bar_chart.BarGroup;
 pub const BarChartOrientation = bar_chart.Orientation;
 
+pub const chart = @import("widgets/chart.zig");
+pub const Chart = chart.Chart;
+pub const Axis = chart.Axis;
+pub const LineDataset = chart.LineDataset;
+pub const ChartLabel = chart.Label;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -66,4 +72,5 @@ test "widgets module" {
     _ = text_input;
     _ = sparkline;
     _ = bar_chart;
+    _ = chart;
 }
