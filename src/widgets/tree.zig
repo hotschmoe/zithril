@@ -49,24 +49,6 @@ pub fn TreeItem(comptime T: type) type {
     };
 }
 
-/// Flattened representation of a tree node for rendering.
-/// Used internally to convert the tree structure to a linear list.
-pub fn FlatNode(comptime T: type) type {
-    return struct {
-        /// Depth level (0 = root).
-        depth: u16,
-        /// Whether this node is expanded.
-        is_expanded: bool,
-        /// Whether this node has children.
-        has_children: bool,
-        /// User data.
-        data: T,
-        /// Path indices to this node in the tree structure.
-        /// Used to identify nodes for toggle operations.
-        path: []const usize,
-    };
-}
-
 /// Tree widget for displaying hierarchical data.
 /// Generic over the data type T.
 pub fn Tree(comptime T: type) type {
@@ -287,14 +269,6 @@ pub fn TreeState(comptime T: type) type {
             } else if (self.selected >= self.offset + viewport_height) {
                 self.offset = self.selected - viewport_height + 1;
             }
-        }
-
-        /// Get the currently selected node path in the tree.
-        /// Returns null if selection is out of bounds.
-        pub fn getSelectedPath(self: Self, tree: Tree(T)) ?[]const usize {
-            _ = tree;
-            _ = self;
-            return null;
         }
 
         /// Apply state to a tree for rendering.
