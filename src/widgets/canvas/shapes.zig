@@ -1,5 +1,5 @@
 // Canvas shapes module for zithril TUI framework
-// Provides Shape trait interface and built-in shapes (Circle, Line)
+// Provides Shape trait interface and built-in shapes (Circle, Line, Rectangle, Points)
 
 const std = @import("std");
 const buffer_mod = @import("../../buffer.zig");

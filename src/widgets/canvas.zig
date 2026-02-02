@@ -18,6 +18,8 @@ pub const Shape = shapes.Shape;
 pub const Painter = shapes.Painter;
 pub const Circle = shapes.Circle;
 pub const Line = shapes.Line;
+pub const Rectangle = shapes.Rectangle;
+pub const Points = shapes.Points;
 
 /// Marker styles for canvas rendering.
 pub const Marker = enum {
