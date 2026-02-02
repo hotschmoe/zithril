@@ -41,6 +41,11 @@ pub const Constraint = union(enum) {
     /// flex(1) and flex(2) = 33/67 split
     flex: u16,
 
+    /// Percentage of available space (0-100).
+    /// Values >100 are clamped to 100.
+    /// Example: percentage(50) means 50% of available space.
+    percentage: u8,
+
     pub const Ratio = struct {
         num: u16,
         den: u16,
@@ -71,6 +76,12 @@ pub const Constraint = union(enum) {
         return .{ .flex = n };
     }
 
+    /// Create a percentage constraint (0-100% of available space).
+    /// Values >100 are clamped to 100.
+    pub fn percent(n: u8) Constraint {
+        return .{ .percentage = @min(n, 100) };
+    }
+
     /// Apply this constraint to resolve a concrete size given available space.
     /// Returns the size this constraint requests, which may exceed available space.
     /// The caller is responsible for ensuring the total doesn't exceed available.
@@ -85,6 +96,11 @@ pub const Constraint = union(enum) {
                 break :blk @intCast(@min(result, available));
             },
             .flex => available,
+            .percentage => |p| blk: {
+                const clamped = @min(p, 100);
+                const result = (@as(u32, available) * clamped) / 100;
+                break :blk @intCast(@min(result, available));
+            },
         };
     }
 
@@ -96,6 +112,7 @@ pub const Constraint = union(enum) {
             .max => |n| other == .max and other.max == n,
             .ratio => |r| other == .ratio and other.ratio.num == r.num and other.ratio.den == r.den,
             .flex => |n| other == .flex and other.flex == n,
+            .percentage => |p| other == .percentage and other.percentage == p,
         };
     }
 };
@@ -133,6 +150,17 @@ test "sanity: Constraint.flexible creates correct constraint" {
     const c = Constraint.flexible(2);
     try std.testing.expect(c == .flex);
     try std.testing.expectEqual(@as(u16, 2), c.flex);
+}
+
+test "sanity: Constraint.percent creates correct constraint" {
+    const c = Constraint.percent(50);
+    try std.testing.expect(c == .percentage);
+    try std.testing.expectEqual(@as(u8, 50), c.percentage);
+}
+
+test "sanity: Constraint.percent clamps values above 100" {
+    const c = Constraint.percent(150);
+    try std.testing.expectEqual(@as(u8, 100), c.percentage);
 }
 
 test "sanity: Direction enum values" {
@@ -178,6 +206,23 @@ test "behavior: Constraint flex apply returns full available" {
     try std.testing.expectEqual(@as(u16, 0), c.apply(0));
 }
 
+test "behavior: Constraint percentage apply calculates percentage" {
+    const c25 = Constraint.percent(25);
+    try std.testing.expectEqual(@as(u16, 25), c25.apply(100));
+    try std.testing.expectEqual(@as(u16, 50), c25.apply(200));
+
+    const c50 = Constraint.percent(50);
+    try std.testing.expectEqual(@as(u16, 50), c50.apply(100));
+
+    const c100 = Constraint.percent(100);
+    try std.testing.expectEqual(@as(u16, 100), c100.apply(100));
+}
+
+test "behavior: Constraint percentage apply handles zero" {
+    const c = Constraint.percent(0);
+    try std.testing.expectEqual(@as(u16, 0), c.apply(100));
+}
+
 test "behavior: Constraint eql checks equality" {
     try std.testing.expect(Constraint.len(10).eql(Constraint.len(10)));
     try std.testing.expect(!Constraint.len(10).eql(Constraint.len(20)));
@@ -185,6 +230,10 @@ test "behavior: Constraint eql checks equality" {
 
     try std.testing.expect(Constraint.fractional(1, 3).eql(Constraint.fractional(1, 3)));
     try std.testing.expect(!Constraint.fractional(1, 3).eql(Constraint.fractional(2, 3)));
+
+    try std.testing.expect(Constraint.percent(50).eql(Constraint.percent(50)));
+    try std.testing.expect(!Constraint.percent(50).eql(Constraint.percent(75)));
+    try std.testing.expect(!Constraint.percent(50).eql(Constraint.fractional(50, 100)));
 }
 
 // ============================================================
@@ -288,6 +337,15 @@ pub fn layout(
                     allocated += size;
                 }
             },
+            .percentage => |p| {
+                const clamped = @min(p, 100);
+                const size: u16 = @intCast(@min(
+                    (@as(u32, total_space) * clamped) / 100,
+                    total_space,
+                ));
+                sizes[i] = size;
+                allocated += size;
+            },
             .flex => |weight| {
                 flex_total += weight;
             },
@@ -328,8 +386,8 @@ pub fn layout(
 
     if (total_allocated > total_space) {
         var to_shrink: u32 = total_allocated - total_space;
-        // Shrink in priority order: flex, max, ratio, length, min
-        const shrink_order = [_]std.meta.Tag(Constraint){ .flex, .max, .ratio, .length, .min };
+        // Shrink in priority order: flex, max, percentage, ratio, length, min
+        const shrink_order = [_]std.meta.Tag(Constraint){ .flex, .max, .percentage, .ratio, .length, .min };
         for (shrink_order) |target_tag| {
             to_shrink = shrinkByTag(constraints[0..count], &sizes, to_shrink, target_tag);
             if (to_shrink == 0) break;
@@ -468,6 +526,58 @@ test "behavior: layout respects ratio constraint" {
     });
     try std.testing.expectEqual(@as(u16, 25), result.get(0).width);
     try std.testing.expectEqual(@as(u16, 75), result.get(1).width);
+}
+
+test "behavior: layout respects percentage constraint" {
+    const area = Rect.init(0, 0, 100, 50);
+    const result = layout(area, .horizontal, &.{
+        Constraint.percent(25),
+        Constraint.flexible(1),
+    });
+    try std.testing.expectEqual(@as(u16, 25), result.get(0).width);
+    try std.testing.expectEqual(@as(u16, 75), result.get(1).width);
+}
+
+test "behavior: layout percentage 50/50 split" {
+    const area = Rect.init(0, 0, 100, 50);
+    const result = layout(area, .horizontal, &.{
+        Constraint.percent(50),
+        Constraint.percent(50),
+    });
+    try std.testing.expectEqual(@as(u16, 50), result.get(0).width);
+    try std.testing.expectEqual(@as(u16, 50), result.get(1).width);
+}
+
+test "behavior: layout percentage 0 yields no space" {
+    const area = Rect.init(0, 0, 100, 50);
+    const result = layout(area, .horizontal, &.{
+        Constraint.percent(0),
+        Constraint.flexible(1),
+    });
+    try std.testing.expectEqual(@as(u16, 0), result.get(0).width);
+    try std.testing.expectEqual(@as(u16, 100), result.get(1).width);
+}
+
+test "behavior: layout percentage 100 takes all space" {
+    const area = Rect.init(0, 0, 100, 50);
+    const result = layout(area, .horizontal, &.{
+        Constraint.percent(100),
+        Constraint.flexible(1),
+    });
+    try std.testing.expectEqual(@as(u16, 100), result.get(0).width);
+    try std.testing.expectEqual(@as(u16, 0), result.get(1).width);
+}
+
+test "behavior: layout percentage mixed with other constraints" {
+    const area = Rect.init(0, 0, 100, 50);
+    const result = layout(area, .horizontal, &.{
+        Constraint.len(20),
+        Constraint.percent(50),
+        Constraint.flexible(1),
+    });
+    try std.testing.expectEqual(@as(u16, 20), result.get(0).width);
+    try std.testing.expectEqual(@as(u16, 50), result.get(1).width);
+    try std.testing.expectEqual(@as(u16, 30), result.get(2).width);
 }
 
 test "behavior: layout vertical direction" {

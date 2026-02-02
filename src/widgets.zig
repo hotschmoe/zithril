@@ -42,6 +42,10 @@ pub const text_input = @import("widgets/text_input.zig");
 pub const TextInput = text_input.TextInput;
 pub const TextInputState = text_input.TextInputState;
 
+pub const sparkline = @import("widgets/sparkline.zig");
+pub const Sparkline = sparkline.Sparkline;
+pub const SparklineDirection = sparkline.Direction;
+
 test "widgets module" {
     _ = block;
     _ = text;
@@ -54,4 +58,5 @@ test "widgets module" {
     _ = clear;
     _ = scroll_view;
     _ = text_input;
+    _ = sparkline;
 }
