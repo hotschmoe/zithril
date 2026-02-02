@@ -85,55 +85,46 @@ pub const LineGauge = struct {
     pub fn render(self: LineGauge, area: Rect, buf: *Buffer) void {
         if (area.isEmpty()) return;
 
-        // Clamp ratio to valid range
         const clamped_ratio = std.math.clamp(self.ratio, 0.0, 1.0);
-
-        // Calculate filled width with sub-character precision
         const total_width_f = @as(f32, @floatFromInt(area.width));
         const filled_precise = total_width_f * clamped_ratio;
         const filled_whole: u16 = @intFromFloat(@floor(filled_precise));
         const fractional_part = filled_precise - @floor(filled_precise);
+        const area_end = area.x +| area.width;
 
         // Render filled portion
-        if (filled_whole > 0) {
-            const filled_char = self.line_set.filledChar();
-            var x = area.x;
-            const fill_end = area.x +| filled_whole;
-            while (x < fill_end and x < area.x +| area.width) : (x += 1) {
-                buf.set(x, area.y, Cell.styled(filled_char, self.gauge_style));
-            }
+        const filled_char = self.line_set.filledChar();
+        var x = area.x;
+        while (x < area.x +| filled_whole and x < area_end) : (x += 1) {
+            buf.set(x, area.y, Cell.styled(filled_char, self.gauge_style));
         }
 
-        // Render fractional cell (transition cell) if applicable
+        // Render transition cell (fractional for thick style, unfilled otherwise)
         const transition_x = area.x +| filled_whole;
-        if (transition_x < area.x +| area.width and self.line_set == .thick) {
-            const frac_index: usize = @intFromFloat(@round(fractional_part * 8.0));
-            const frac_char = FRACTIONAL_BLOCKS[@min(frac_index, 8)];
-            if (frac_char != ' ') {
-                buf.set(transition_x, area.y, Cell.styled(frac_char, self.gauge_style));
-            } else {
-                // No fractional part, render unfilled
-                const unfilled_char = self.line_set.unfilledChar();
-                buf.set(transition_x, area.y, Cell.styled(unfilled_char, self.style));
-            }
-        } else if (transition_x < area.x +| area.width) {
-            // For normal/thin line sets, just show unfilled character
-            const unfilled_char = self.line_set.unfilledChar();
-            buf.set(transition_x, area.y, Cell.styled(unfilled_char, self.style));
+        if (transition_x < area_end) {
+            const transition_char = self.transitionChar(fractional_part);
+            const transition_style = if (transition_char != self.line_set.unfilledChar())
+                self.gauge_style
+            else
+                self.style;
+            buf.set(transition_x, area.y, Cell.styled(transition_char, transition_style));
         }
 
         // Render unfilled portion
-        const unfilled_start = area.x +| filled_whole +| 1;
-        if (unfilled_start < area.x +| area.width) {
-            const unfilled_char = self.line_set.unfilledChar();
-            var x = unfilled_start;
-            while (x < area.x +| area.width) : (x += 1) {
-                buf.set(x, area.y, Cell.styled(unfilled_char, self.style));
-            }
+        const unfilled_char = self.line_set.unfilledChar();
+        x = transition_x +| 1;
+        while (x < area_end) : (x += 1) {
+            buf.set(x, area.y, Cell.styled(unfilled_char, self.style));
         }
 
-        // Render label
         self.renderLabel(area, filled_whole, clamped_ratio, buf);
+    }
+
+    /// Get the character for the transition cell based on fractional fill.
+    fn transitionChar(self: LineGauge, fractional_part: f32) u21 {
+        if (self.line_set != .thick) return self.line_set.unfilledChar();
+        const frac_index: usize = @intFromFloat(@round(fractional_part * 8.0));
+        return FRACTIONAL_BLOCKS[@min(frac_index, 8)];
     }
 
     /// Render the label over the gauge.
@@ -179,21 +170,9 @@ pub const LineGauge = struct {
 
     /// Get the label style for text overlapping the filled portion.
     fn labelStyleOnFilled(self: LineGauge) Style {
-        // Use gauge foreground as background, and style's background as foreground
-        var result = Style.init();
-
-        // Get gauge foreground for label background
-        if (self.gauge_style.getForeground()) |gfg| {
-            result = result.bg(gfg);
-        }
-
-        // Get style background (or default white) for label foreground
-        if (self.style.getBackground()) |sbg| {
-            result = result.fg(sbg);
-        } else {
-            result = result.fg(.white);
-        }
-
+        const fg_color = self.style.getBackground() orelse style_mod.Color.white;
+        var result = Style.init().fg(fg_color);
+        if (self.gauge_style.getForeground()) |gfg| result = result.bg(gfg);
         return result;
     }
 
