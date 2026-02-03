@@ -89,6 +89,9 @@ const LogLevel = enum {
     }
 };
 
+// Frame type alias for view functions
+const FrameType = zithril.Frame(zithril.App(State).DefaultMaxWidgets);
+
 // Application state
 const State = struct {
     focus: Focus = .agents,
@@ -179,7 +182,7 @@ fn handleUp(state: *State) void {
 }
 
 // Render the UI
-fn view(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets)) void {
+fn view(state: *State, frame: *FrameType) void {
     const area = frame.size();
 
     // Main layout: status bar at bottom
@@ -192,7 +195,7 @@ fn view(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidget
     renderStatusBar(state, frame, main_chunks.get(1));
 }
 
-fn renderMainContent(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect) void {
+fn renderMainContent(state: *State, frame: *FrameType, area: zithril.Rect) void {
     // Split into left (agents) and right (detail + logs)
     const h_chunks = zithril.layout(area, .horizontal, &.{
         zithril.Constraint.len(30),
@@ -203,7 +206,7 @@ fn renderMainContent(state: *State, frame: *zithril.Frame(zithril.App(State).Def
     renderRightPanel(state, frame, h_chunks.get(1));
 }
 
-fn renderAgentList(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect) void {
+fn renderAgentList(state: *State, frame: *FrameType, area: zithril.Rect) void {
     const is_focused = state.focus == .agents;
     const border_color: zithril.Color = if (is_focused) .cyan else .white;
 
@@ -237,7 +240,7 @@ fn renderAgentList(state: *State, frame: *zithril.Frame(zithril.App(State).Defau
     frame.render(list, inner);
 }
 
-fn renderRightPanel(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect) void {
+fn renderRightPanel(state: *State, frame: *FrameType, area: zithril.Rect) void {
     // Split into detail (top) and logs (bottom)
     const v_chunks = zithril.layout(area, .vertical, &.{
         zithril.Constraint.len(10),
@@ -248,7 +251,7 @@ fn renderRightPanel(state: *State, frame: *zithril.Frame(zithril.App(State).Defa
     renderLogPanel(state, frame, v_chunks.get(1));
 }
 
-fn renderAgentDetail(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect) void {
+fn renderAgentDetail(state: *State, frame: *FrameType, area: zithril.Rect) void {
     const block = zithril.Block{
         .title = "Agent Details",
         .border = .rounded,
@@ -314,7 +317,7 @@ fn renderAgentDetail(state: *State, frame: *zithril.Frame(zithril.App(State).Def
     }
 }
 
-fn renderLogPanel(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect) void {
+fn renderLogPanel(state: *State, frame: *FrameType, area: zithril.Rect) void {
     const is_focused = state.focus == .logs;
     const border_color: zithril.Color = if (is_focused) .cyan else .white;
 
@@ -376,7 +379,7 @@ fn renderLogPanel(state: *State, frame: *zithril.Frame(zithril.App(State).Defaul
     }
 }
 
-fn renderStatusBar(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect) void {
+fn renderStatusBar(state: *State, frame: *FrameType, area: zithril.Rect) void {
     _ = state;
 
     // Status bar background

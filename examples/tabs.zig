@@ -17,6 +17,9 @@ const Tab = enum(usize) {
     help = 3,
 };
 
+// Frame type alias for view functions
+const FrameType = zithril.Frame(zithril.App(State).DefaultMaxWidgets);
+
 // Application state: current tab selection
 const State = struct {
     current_tab: Tab = .overview,
@@ -75,7 +78,7 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
 }
 
 // Render the UI
-fn view(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets)) void {
+fn view(state: *State, frame: *FrameType) void {
     const area = frame.size();
 
     // Main outer block
@@ -118,7 +121,7 @@ fn view(state: *State, frame: *zithril.Frame(zithril.App(State).DefaultMaxWidget
     }
 }
 
-fn renderOverview(frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect, state: *State) void {
+fn renderOverview(frame: *FrameType, area: zithril.Rect, state: *State) void {
     const content_block = zithril.Block{
         .title = "Overview",
         .border = .plain,
@@ -143,7 +146,7 @@ fn renderOverview(frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), a
     frame.render(para, content_inner);
 }
 
-fn renderDetails(frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect, state: *State) void {
+fn renderDetails(frame: *FrameType, area: zithril.Rect, state: *State) void {
     const content_block = zithril.Block{
         .title = "Details",
         .border = .plain,
@@ -175,7 +178,7 @@ fn renderDetails(frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), ar
     frame.render(para, content_inner);
 }
 
-fn renderSettings(frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect, state: *State) void {
+fn renderSettings(frame: *FrameType, area: zithril.Rect, state: *State) void {
     _ = state;
     const content_block = zithril.Block{
         .title = "Settings",
@@ -203,7 +206,7 @@ fn renderSettings(frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), a
     frame.render(list, content_inner);
 }
 
-fn renderHelp(frame: *zithril.Frame(zithril.App(State).DefaultMaxWidgets), area: zithril.Rect) void {
+fn renderHelp(frame: *FrameType, area: zithril.Rect) void {
     const content_block = zithril.Block{
         .title = "Help",
         .border = .plain,
