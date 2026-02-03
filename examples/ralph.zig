@@ -428,11 +428,12 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    var state = State{
+        .agents = &sample_agents,
+        .logs = &sample_logs,
+    };
     var app = zithril.App(State).init(.{
-        .state = .{
-            .agents = &sample_agents,
-            .logs = &sample_logs,
-        },
+        .state = &state,
         .update = update,
         .view = view,
     });

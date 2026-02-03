@@ -238,8 +238,9 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    var state = State{};
     var app = zithril.App(State).init(.{
-        .state = .{},
+        .state = &state,
         .update = update,
         .view = view,
     });

@@ -16,7 +16,7 @@ pub fn main() !void {
     var state = try game.GameState.init(allocator);
     defer state.deinit();
 
-    var app = zithril.App(*game.GameState).init(.{
+    var app = zithril.App(game.GameState).init(.{
         .state = &state,
         .update = game.update,
         .view = game.view,

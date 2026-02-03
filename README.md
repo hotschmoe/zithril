@@ -40,12 +40,13 @@ const State = struct {
 };
 
 pub fn main() !void {
+    var state = State{};
     var app = zithril.App(State).init(.{
-        .state = .{},
+        .state = &state,
         .update = update,
         .view = view,
     });
-    try app.run();
+    try app.run(std.heap.page_allocator);
 }
 
 fn update(state: *State, event: zithril.Event) zithril.Action {
@@ -443,11 +444,12 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
 ## Configuration
 
 ```zig
+var state = State{};
 var app = zithril.App(State).init(.{
-    .state = initial_state,
+    .state = &state,
     .update = update,
     .view = view,
-    
+
     // Optional configuration
     .tick_rate_ms = 250,           // Tick event interval (0 = disabled)
     .mouse_capture = true,          // Enable mouse events

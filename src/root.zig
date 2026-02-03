@@ -476,8 +476,9 @@ test "app re-export" {
         fn view(_: *TestState, _: *Frame(App(TestState).DefaultMaxWidgets)) void {}
     };
 
+    var state = TestState{ .count = 10 };
     const app = App(TestState).init(.{
-        .state = .{ .count = 10 },
+        .state = &state,
         .update = S.update,
         .view = S.view,
     });

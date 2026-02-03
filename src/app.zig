@@ -39,8 +39,8 @@ pub fn App(comptime State: type) type {
         /// Default max widgets for frame layout cache.
         pub const DefaultMaxWidgets: usize = 64;
 
-        /// User-defined state instance.
-        state: State,
+        /// Pointer to user-owned state instance.
+        state: *State,
 
         /// Update function: receives state and event, returns an Action.
         /// Signature: fn(*State, Event) Action
@@ -69,8 +69,8 @@ pub fn App(comptime State: type) type {
 
         /// Configuration options for App initialization.
         pub const Config = struct {
-            /// Initial state instance.
-            state: State,
+            /// Pointer to user-owned state instance.
+            state: *State,
             /// Update function pointer.
             update: *const fn (*State, Event) Action,
             /// View function pointer.
@@ -112,13 +112,13 @@ pub fn App(comptime State: type) type {
         /// Call the update function with an event.
         /// Returns the action to be processed by the runtime.
         pub fn update(self: *Self, event: Event) Action {
-            return self.update_fn(&self.state, event);
+            return self.update_fn(self.state, event);
         }
 
         /// Call the view function with a frame.
         /// The view function should use frame.render() to draw widgets.
         pub fn view(self: *Self, frame: *Frame(DefaultMaxWidgets)) void {
-            self.view_fn(&self.state, frame);
+            self.view_fn(self.state, frame);
         }
 
         /// Error type for run operations.
@@ -401,8 +401,9 @@ const TestHelpers = struct {
 };
 
 test "sanity: App init with simple state" {
+    var state = TestHelpers.SimpleState{ .count = 42 };
     const app = App(TestHelpers.SimpleState).init(.{
-        .state = .{ .count = 42 },
+        .state = &state,
         .update = TestHelpers.simpleUpdate,
         .view = TestHelpers.simpleView,
     });
@@ -411,8 +412,9 @@ test "sanity: App init with simple state" {
 }
 
 test "sanity: App update modifies state" {
+    var state = TestHelpers.SimpleState{ .count = 0 };
     var app = App(TestHelpers.SimpleState).init(.{
-        .state = .{ .count = 0 },
+        .state = &state,
         .update = TestHelpers.simpleUpdate,
         .view = TestHelpers.simpleView,
     });
@@ -425,8 +427,9 @@ test "sanity: App update modifies state" {
 }
 
 test "sanity: App update returns quit action" {
+    var state = TestHelpers.EmptyState{};
     var app = App(TestHelpers.EmptyState).init(.{
-        .state = .{},
+        .state = &state,
         .update = TestHelpers.quitOnEscapeUpdate,
         .view = TestHelpers.emptyView,
     });
@@ -465,11 +468,12 @@ const NestedTestHelpers = struct {
 };
 
 test "behavior: App with nested state" {
+    var state = NestedTestHelpers.NestedState{
+        .inner = .{ .value = 100 },
+        .name = "test",
+    };
     var app = App(NestedTestHelpers.NestedState).init(.{
-        .state = .{
-            .inner = .{ .value = 100 },
-            .name = "test",
-        },
+        .state = &state,
         .update = NestedTestHelpers.nestedUpdate,
         .view = NestedTestHelpers.nestedView,
     });
@@ -498,8 +502,9 @@ const ViewTestHelpers = struct {
 };
 
 test "behavior: App view receives mutable frame" {
+    var state = ViewTestHelpers.RenderState{ .rendered = false };
     var app = App(ViewTestHelpers.RenderState).init(.{
-        .state = .{ .rendered = false },
+        .state = &state,
         .update = ViewTestHelpers.renderUpdate,
         .view = ViewTestHelpers.renderView,
     });
@@ -518,8 +523,9 @@ test "behavior: App view receives mutable frame" {
 // ============================================================
 
 test "regression: App with empty state struct" {
+    var state = TestHelpers.EmptyState{};
     const app = App(TestHelpers.EmptyState).init(.{
-        .state = .{},
+        .state = &state,
         .update = TestHelpers.emptyUpdate,
         .view = TestHelpers.emptyView,
     });
@@ -552,8 +558,9 @@ const EventTrackingHelpers = struct {
 };
 
 test "regression: App handles all event types in update" {
+    var state = EventTrackingHelpers.TrackingState{};
     var app = App(EventTrackingHelpers.TrackingState).init(.{
-        .state = .{},
+        .state = &state,
         .update = EventTrackingHelpers.trackingUpdate,
         .view = EventTrackingHelpers.trackingView,
     });
@@ -576,8 +583,9 @@ test "regression: App handles all event types in update" {
 // ============================================================
 
 test "config: App.Config has correct defaults" {
+    var state = TestHelpers.SimpleState{};
     const config = App(TestHelpers.SimpleState).Config{
-        .state = .{},
+        .state = &state,
         .update = TestHelpers.simpleUpdate,
         .view = TestHelpers.simpleView,
     };
@@ -589,8 +597,9 @@ test "config: App.Config has correct defaults" {
 }
 
 test "config: App stores configuration values" {
+    var state = TestHelpers.SimpleState{};
     const app = App(TestHelpers.SimpleState).init(.{
-        .state = .{},
+        .state = &state,
         .update = TestHelpers.simpleUpdate,
         .view = TestHelpers.simpleView,
         .tick_rate_ms = 100,
@@ -606,8 +615,9 @@ test "config: App stores configuration values" {
 }
 
 test "config: backendConfig translates App config to BackendConfig" {
+    var state = TestHelpers.SimpleState{};
     const app = App(TestHelpers.SimpleState).init(.{
-        .state = .{},
+        .state = &state,
         .update = TestHelpers.simpleUpdate,
         .view = TestHelpers.simpleView,
         .mouse_capture = true,
@@ -624,8 +634,9 @@ test "config: backendConfig translates App config to BackendConfig" {
 }
 
 test "config: backendConfig uses defaults correctly" {
+    var state = TestHelpers.SimpleState{};
     const app = App(TestHelpers.SimpleState).init(.{
-        .state = .{},
+        .state = &state,
         .update = TestHelpers.simpleUpdate,
         .view = TestHelpers.simpleView,
     });

@@ -202,8 +202,7 @@ pub const GameState = struct {
 };
 
 /// Handle input events
-pub fn update(state: **GameState, event: zithril.Event) zithril.Action {
-    const self = state.*;
+pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
             // Handle overlay-specific input first
@@ -351,11 +350,10 @@ fn placeComponent(state: *GameState) void {
 }
 
 /// Frame type alias for convenience
-pub const FrameType = zithril.Frame(zithril.App(*GameState).DefaultMaxWidgets);
+pub const FrameType = zithril.Frame(zithril.App(GameState).DefaultMaxWidgets);
 
 /// Render the game UI
-pub fn view(state: **GameState, frame: *FrameType) void {
-    const self = state.*;
+pub fn view(self: *GameState, frame: *FrameType) void {
     const area = frame.size();
     const level = self.currentLevel();
 

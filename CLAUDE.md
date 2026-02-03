@@ -247,12 +247,13 @@ const State = struct {
 };
 
 pub fn main() !void {
+    var state = State{};
     var app = zithril.App(State).init(.{
-        .state = .{},
+        .state = &state,
         .update = update,
         .view = view,
     });
-    try app.run();
+    try app.run(std.heap.page_allocator);
 }
 
 fn update(state: *State, event: zithril.Event) zithril.Action {

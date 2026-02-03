@@ -113,8 +113,9 @@ pub fn main() !void {
         "Kiwi",
     };
 
+    var state = State{ .items = &items, .selected = 0 };
     var app = zithril.App(State).init(.{
-        .state = .{ .items = &items, .selected = 0 },
+        .state = &state,
         .update = update,
         .view = view,
     });
