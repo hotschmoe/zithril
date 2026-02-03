@@ -1,6 +1,6 @@
 .{
     .name = .zithril,
-    .version = "0.7.1",
+    .version = "0.7.2",
     .fingerprint = 0xaf01d6c98876eadb, // Changing this has security and trust implications.
     .minimum_zig_version = "0.15.2",
     .dependencies = .{

@@ -491,28 +491,30 @@ const Tokenizer = struct {
 
 fn classifyZigIdentifier(text: []const u8) TokenType {
     const keywords = [_][]const u8{
-        "const",      "var",        "fn",        "pub",
-        "return",     "if",         "else",      "while",
-        "for",        "switch",     "break",     "continue",
-        "struct",     "enum",       "union",     "error",
-        "try",        "catch",      "defer",     "errdefer",
-        "comptime",   "inline",     "unreachable", "undefined",
-        "null",       "true",       "false",     "and",
-        "or",         "orelse",     "async",     "await",
-        "suspend",    "resume",     "test",      "extern",
-        "export",     "align",      "threadlocal", "nosuspend",
-        "noinline",   "callconv",   "volatile",  "anytype",
-        "anyframe",   "asm",        "linksection", "allowzero",
-        "packed",     "usingnamespace",
+        "const",    "var",            "fn",          "pub",
+        "return",   "if",             "else",        "while",
+        "for",      "switch",         "break",       "continue",
+        "struct",   "enum",           "union",       "error",
+        "try",      "catch",          "defer",       "errdefer",
+        "comptime", "inline",         "unreachable", "undefined",
+        "null",     "true",           "false",       "and",
+        "or",       "orelse",         "async",       "await",
+        "suspend",  "resume",         "test",        "extern",
+        "export",   "align",          "threadlocal", "nosuspend",
+        "noinline", "callconv",       "volatile",    "anytype",
+        "anyframe", "asm",            "linksection", "allowzero",
+        "packed",   "usingnamespace",
     };
 
     const types = [_][]const u8{
-        "void",  "bool",  "anyerror", "noreturn",
-        "type",  "anyopaque", "comptime_int", "comptime_float",
-        "u8",    "u16",   "u32",      "u64",   "u128",  "usize",
-        "i8",    "i16",   "i32",      "i64",   "i128",  "isize",
-        "f16",   "f32",   "f64",      "f80",   "f128",
-        "c_int", "c_uint", "c_long", "c_ulong",
+        "void",    "bool",      "anyerror",     "noreturn",
+        "type",    "anyopaque", "comptime_int", "comptime_float",
+        "u8",      "u16",       "u32",          "u64",
+        "u128",    "usize",     "i8",           "i16",
+        "i32",     "i64",       "i128",         "isize",
+        "f16",     "f32",       "f64",          "f80",
+        "f128",    "c_int",     "c_uint",       "c_long",
+        "c_ulong",
     };
 
     for (keywords) |kw| {
@@ -533,12 +535,12 @@ fn classifyZigIdentifier(text: []const u8) TokenType {
 
 fn classifyRustIdentifier(text: []const u8) TokenType {
     const keywords = [_][]const u8{
-        "fn",     "let",   "mut",    "const",  "pub",    "return",
-        "if",     "else",  "while",  "for",    "loop",   "match",
-        "struct", "enum",  "impl",   "trait",  "type",   "mod",
-        "use",    "self",  "Self",   "super",  "crate",  "where",
-        "async",  "await", "move",   "ref",    "static", "unsafe",
-        "true",   "false", "as",     "in",     "dyn",    "extern",
+        "fn",     "let",   "mut",   "const", "pub",    "return",
+        "if",     "else",  "while", "for",   "loop",   "match",
+        "struct", "enum",  "impl",  "trait", "type",   "mod",
+        "use",    "self",  "Self",  "super", "crate",  "where",
+        "async",  "await", "move",  "ref",   "static", "unsafe",
+        "true",   "false", "as",    "in",    "dyn",    "extern",
     };
 
     for (keywords) |kw| {
@@ -554,13 +556,13 @@ fn classifyRustIdentifier(text: []const u8) TokenType {
 
 fn classifyPythonIdentifier(text: []const u8) TokenType {
     const keywords = [_][]const u8{
-        "def",     "class",  "if",       "elif",    "else",
-        "for",     "while",  "return",   "yield",   "import",
-        "from",    "as",     "try",      "except",  "finally",
-        "raise",   "with",   "pass",     "break",   "continue",
-        "and",     "or",     "not",      "in",      "is",
-        "lambda",  "global", "nonlocal", "True",    "False",
-        "None",    "async",  "await",    "assert",  "del",
+        "def",    "class",  "if",       "elif",   "else",
+        "for",    "while",  "return",   "yield",  "import",
+        "from",   "as",     "try",      "except", "finally",
+        "raise",  "with",   "pass",     "break",  "continue",
+        "and",    "or",     "not",      "in",     "is",
+        "lambda", "global", "nonlocal", "True",   "False",
+        "None",   "async",  "await",    "assert", "del",
     };
 
     for (keywords) |kw| {
@@ -576,14 +578,14 @@ fn classifyPythonIdentifier(text: []const u8) TokenType {
 
 fn classifyJsIdentifier(text: []const u8) TokenType {
     const keywords = [_][]const u8{
-        "function", "const",    "let",     "var",     "return",
-        "if",       "else",     "for",     "while",   "do",
-        "switch",   "case",     "default", "break",   "continue",
-        "class",    "extends",  "new",     "this",    "super",
-        "import",   "export",   "from",    "async",   "await",
-        "try",      "catch",    "finally", "throw",   "typeof",
-        "instanceof", "in",     "of",      "true",    "false",
-        "null",     "undefined",
+        "function",   "const",     "let",     "var",   "return",
+        "if",         "else",      "for",     "while", "do",
+        "switch",     "case",      "default", "break", "continue",
+        "class",      "extends",   "new",     "this",  "super",
+        "import",     "export",    "from",    "async", "await",
+        "try",        "catch",     "finally", "throw", "typeof",
+        "instanceof", "in",        "of",      "true",  "false",
+        "null",       "undefined",
     };
 
     for (keywords) |kw| {
@@ -599,12 +601,12 @@ fn classifyJsIdentifier(text: []const u8) TokenType {
 
 fn classifyGoIdentifier(text: []const u8) TokenType {
     const keywords = [_][]const u8{
-        "func",      "var",      "const",    "type",     "struct",
-        "interface", "map",      "chan",     "package",  "import",
-        "return",    "if",       "else",     "for",      "range",
-        "switch",    "case",     "default",  "break",    "continue",
-        "go",        "select",   "defer",    "fallthrough",
-        "true",      "false",    "nil",
+        "func",      "var",    "const",   "type",        "struct",
+        "interface", "map",    "chan",    "package",     "import",
+        "return",    "if",     "else",    "for",         "range",
+        "switch",    "case",   "default", "break",       "continue",
+        "go",        "select", "defer",   "fallthrough", "true",
+        "false",     "nil",
     };
 
     for (keywords) |kw| {
@@ -620,13 +622,13 @@ fn classifyGoIdentifier(text: []const u8) TokenType {
 
 fn classifyCIdentifier(text: []const u8) TokenType {
     const keywords = [_][]const u8{
-        "auto",     "break",    "case",     "char",     "const",
-        "continue", "default",  "do",       "double",   "else",
-        "enum",     "extern",   "float",    "for",      "goto",
-        "if",       "inline",   "int",      "long",     "register",
-        "restrict", "return",   "short",    "signed",   "sizeof",
-        "static",   "struct",   "switch",   "typedef",  "union",
-        "unsigned", "void",     "volatile", "while",    "_Bool",
+        "auto",     "break",      "case",     "char",    "const",
+        "continue", "default",    "do",       "double",  "else",
+        "enum",     "extern",     "float",    "for",     "goto",
+        "if",       "inline",     "int",      "long",    "register",
+        "restrict", "return",     "short",    "signed",  "sizeof",
+        "static",   "struct",     "switch",   "typedef", "union",
+        "unsigned", "void",       "volatile", "while",   "_Bool",
         "_Complex", "_Imaginary", "NULL",
     };
 

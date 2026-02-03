@@ -495,9 +495,9 @@ test "behavior: Easing.ease_in_out symmetric" {
 
 test "behavior: Easing endpoints are always 0 and 1" {
     const easings = [_]Easing{
-        .linear,      .ease_in,    .ease_out,    .ease_in_out,
-        .quad_in,     .quad_out,   .quad_in_out, .cubic_in,
-        .cubic_out,   .cubic_in_out,
+        .linear,    .ease_in,      .ease_out,    .ease_in_out,
+        .quad_in,   .quad_out,     .quad_in_out, .cubic_in,
+        .cubic_out, .cubic_in_out,
     };
 
     for (easings) |e| {

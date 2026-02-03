@@ -14,7 +14,7 @@ pub const Style = style_mod.Style;
 /// Unicode block characters for bar heights (8 levels + empty).
 /// Index 0 = empty (space), index 8 = full block.
 const BAR_CHARS: [9]u21 = .{
-    ' ',    // 0/8 - empty
+    ' ', // 0/8 - empty
     0x2581, // 1/8 - lower one eighth block
     0x2582, // 2/8 - lower one quarter block
     0x2583, // 3/8 - lower three eighths block

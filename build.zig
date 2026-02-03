@@ -106,6 +106,23 @@ pub fn build(b: *std.Build) void {
     const run_examples_step = b.step("run-examples", "Run all examples");
     run_examples_step.dependOn(prev_step);
 
+    // Fuzz testing step (for CI/CD Option C)
+    const fuzz_step = b.step("fuzz", "Run fuzz tests");
+    const fuzz_exe = b.addExecutable(.{
+        .name = "fuzz",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/fuzz.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zithril", .module = mod },
+            },
+        }),
+    });
+    const fuzz_run = b.addRunArtifact(fuzz_exe);
+    fuzz_run.step.dependOn(b.getInstallStep());
+    fuzz_step.dependOn(&fuzz_run.step);
+
     // Demos - larger applications in their own directories
     const demos = [_]struct { name: []const u8, desc: []const u8 }{
         .{ .name = "rung", .desc = "Ladder logic puzzle game" },
