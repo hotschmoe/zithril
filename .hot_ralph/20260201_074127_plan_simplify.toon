@@ -1,0 +1,1048 @@
+type: system
+subtype: init
+cwd: /home/hotschmoe/zithril
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+tools[18]: Task,TaskOutput,Bash,Glob,Grep,ExitPlanMode,Read,Edit,Write,NotebookEdit,WebFetch,TodoWrite,WebSearch,TaskStop,AskUserQuestion,Skill,EnterPlanMode,ToolSearch
+mcp_servers[0]:
+model: claude-opus-4-5-20251101
+permissionMode: bypassPermissions
+slash_commands[10]: keybindings-help,bd-to-br-migration,compact,context,cost,init,pr-comments,release-notes,review,security-review
+apiKeySource: none
+claude_code_version: "2.1.29"
+output_style: default
+agents[9]: Bash,general-purpose,statusline-setup,Explore,Plan,"code-simplifier:code-simplifier",build-verifier,gemini-analyzer,coder-sonnet
+skills[2]: keybindings-help,bd-to-br-migration
+plugins[2]{name,path}:
+  code-simplifier,/home/hotschmoe/.claude/plugins/cache/claude-plugins-official/code-simplifier/1.0.0
+  rust-analyzer-lsp,/home/hotschmoe/.claude/plugins/cache/claude-plugins-official/rust-analyzer-lsp/1.0.0
+uuid: d50d7ccb-6c6c-4ddf-b216-eeef2fd97d2e
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01NfTYTHGmTzkb4t1x4183Mx
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,I'll review the recent code changes and simplify them if needed. Let me start by checking what was modified.
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 2
+    cache_creation_input_tokens: 5692
+    cache_read_input_tokens: 18004
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 5692
+    output_tokens: 3
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: da3041e6-746c-46a0-9f13-cc52642741d8
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01NfTYTHGmTzkb4t1x4183Mx
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01UsqcHCDRM6MnYr1sNSS8tZ
+      name: Bash
+      input:
+        command: git diff --name-only HEAD~3
+        description: List files changed in last 3 commits
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 2
+    cache_creation_input_tokens: 5692
+    cache_read_input_tokens: 18004
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 5692
+    output_tokens: 3
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "7817554b-c2c2-4dd0-9403-61fa5e37ed1d"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01UsqcHCDRM6MnYr1sNSS8tZ,tool_result,".beads/issues.jsonl\n.hot_ralph/20260201_072809_plan_mode.md\n.hot_ralph/20260201_073246_plan_simplify.md\n.hot_ralph/state.json\nbuild.zig.zon\nsrc/action.zig\nsrc/backend.zig\nsrc/cell.zig\nsrc/root.zig",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "14c9af37-f8ea-4a48-95c5-c2e712266da8"
+tool_use_result:
+  stdout: ".beads/issues.jsonl\n.hot_ralph/20260201_072809_plan_mode.md\n.hot_ralph/20260201_073246_plan_simplify.md\n.hot_ralph/state.json\nbuild.zig.zon\nsrc/action.zig\nsrc/backend.zig\nsrc/cell.zig\nsrc/root.zig"
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01NfTYTHGmTzkb4t1x4183Mx
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01EaFc2tfS5NPjAV37MeJFVS
+      name: Bash
+      input:
+        command: git diff HEAD~3 --stat
+        description: Show change statistics for recent commits
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 2
+    cache_creation_input_tokens: 5692
+    cache_read_input_tokens: 18004
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 5692
+    output_tokens: 3
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "441246ce-9369-4da5-b436-4f9829b23613"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01EaFc2tfS5NPjAV37MeJFVS,tool_result," .beads/issues.jsonl                         |    8 +-\n .hot_ralph/20260201_072809_plan_mode.md     | 1844 +++++++++++++++++++++++++++\n .hot_ralph/20260201_073246_plan_simplify.md |  559 ++++++++\n .hot_ralph/state.json                       |    4 +-\n build.zig.zon                               |    2 +-\n src/action.zig                              |  114 ++\n src/backend.zig                             |  271 ++++\n src/cell.zig                                |  224 ++++\n src/root.zig                                |   55 +\n 9 files changed, 3074 insertions(+), 7 deletions(-)",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: c93100d9-a0e9-45e3-a1a4-8682cd2856f4
+tool_use_result:
+  stdout: " .beads/issues.jsonl                         |    8 +-\n .hot_ralph/20260201_072809_plan_mode.md     | 1844 +++++++++++++++++++++++++++\n .hot_ralph/20260201_073246_plan_simplify.md |  559 ++++++++\n .hot_ralph/state.json                       |    4 +-\n build.zig.zon                               |    2 +-\n src/action.zig                              |  114 ++\n src/backend.zig                             |  271 ++++\n src/cell.zig                                |  224 ++++\n src/root.zig                                |   55 +\n 9 files changed, 3074 insertions(+), 7 deletions(-)"
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01U4hi4YSJu87aTLqbsH6TGr
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"Let me read the new source files to review the code changes:"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 522
+    cache_read_input_tokens: 23696
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 522
+    output_tokens: 3
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "2a51ab0b-7a75-48d0-98c9-bbffbadee581"
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01U4hi4YSJu87aTLqbsH6TGr
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01UXjEMsgfjKed68KwAepfY5
+      name: Read
+      input:
+        file_path: /home/hotschmoe/zithril/src/action.zig
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 522
+    cache_read_input_tokens: 23696
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 522
+    output_tokens: 3
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "5210dc61-4752-4c55-b00d-5fa502e62055"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content}:
+    toolu_01UXjEMsgfjKed68KwAepfY5,tool_result,"     1→// Action types for zithril TUI framework\n     2→// Actions are returned by the update function to control application flow.\n     3→\n     4→const std = @import(\"std\");\n     5→\n     6→/// Actions returned by the update function to control the application.\n     7→/// The main loop inspects these to determine what to do next.\n     8→pub const Action = union(enum) {\n     9→    /// Continue running, no special action needed.\n    10→    none: void,\n    11→\n    12→    /// Exit the application cleanly.\n    13→    quit: void,\n    14→\n    15→    /// Execute an async command (future feature).\n    16→    /// Commands are executed by the runtime and results come back as events.\n    17→    command: Command,\n    18→\n    19→    /// Convenience constant for the common case of \"do nothing\".\n    20→    pub const none_action: Action = .{ .none = {} };\n    21→\n    22→    /// Convenience constant for quitting.\n    23→    pub const quit_action: Action = .{ .quit = {} };\n    24→\n    25→    /// Check if this action will terminate the application.\n    26→    pub fn isQuit(self: Action) bool {\n    27→        return self == .quit;\n    28→    }\n    29→\n    30→    /// Check if this is a no-op action.\n    31→    pub fn isNone(self: Action) bool {\n    32→        return self == .none;\n    33→    }\n    34→\n    35→    /// Check if this is a command action.\n    36→    pub fn isCommand(self: Action) bool {\n    37→        return self == .command;\n    38→    }\n    39→};\n    40→\n    41→/// Command type for async operations (future feature).\n    42→/// Commands are returned from update, executed by the runtime,\n    43→/// and results come back as events.\n    44→pub const Command = union(enum) {\n    45→    /// No command (placeholder for future expansion).\n    46→    none: void,\n    47→\n    48→    /// Batch multiple commands together.\n    49→    batch: []const Command,\n    50→\n    51→    /// Custom command with user-defined ID and data.\n    52→    custom: struct {\n    53→        id: u32,\n    54→        data: ?*anyopaque,\n    55→    },\n    56→\n    57→    /// Create an empty command.\n    58→    pub fn empty() Command {\n    59→        return .{ .none = {} };\n    60→    }\n    61→};\n    62→\n    63→// ============================================================\n    64→// SANITY TESTS - Basic type construction\n    65→// ============================================================\n    66→\n    67→test \"sanity: Action.none construction\" {\n    68→    const action = Action{ .none = {} };\n    69→    try std.testing.expect(action == .none);\n    70→    try std.testing.expect(action.isNone());\n    71→    try std.testing.expect(!action.isQuit());\n    72→}\n    73→\n    74→test \"sanity: Action.quit construction\" {\n    75→    const action = Action{ .quit = {} };\n    76→    try std.testing.expect(action == .quit);\n    77→    try std.testing.expect(action.isQuit());\n    78→    try std.testing.expect(!action.isNone());\n    79→}\n    80→\n    81→test \"sanity: Action.command construction\" {\n    82→    const action = Action{ .command = Command.empty() };\n    83→    try std.testing.expect(action == .command);\n    84→    try std.testing.expect(action.isCommand());\n    85→    try std.testing.expect(!action.isQuit());\n    86→}\n    87→\n    88→test \"sanity: Action convenience constants\" {\n    89→    try std.testing.expect(Action.none_action.isNone());\n    90→    try std.testing.expect(Action.quit_action.isQuit());\n    91→}\n    92→\n    93→// ============================================================\n    94→// BEHAVIOR TESTS - Command types\n    95→// ============================================================\n    96→\n    97→test \"behavior: Command.empty creates none command\" {\n    98→    const cmd = Command.empty();\n    99→    try std.testing.expect(cmd == .none);\n   100→}\n   101→\n   102→test \"behavior: Command.custom construction\" {\n   103→    const cmd = Command{ .custom = .{ .id = 42, .data = null } };\n   104→    try std.testing.expect(cmd == .custom);\n   105→    try std.testing.expectEqual(@as(u32, 42), cmd.custom.id);\n   106→    try std.testing.expect(cmd.custom.data == null);\n   107→}\n   108→\n   109→test \"behavior: Action with custom command\" {\n   110→    const cmd = Command{ .custom = .{ .id = 123, .data = null } };\n   111→    const action = Action{ .command = cmd };\n   112→    try std.testing.expect(action.isCommand());\n   113→    try std.testing.expectEqual(@as(u32, 123), action.command.custom.id);\n   114→}\n   115→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: f331ecc9-8d77-4755-bb12-1ec81c141f35
+tool_use_result:
+  type: text
+  file:
+    filePath: /home/hotschmoe/zithril/src/action.zig
+    content: "// Action types for zithril TUI framework\n// Actions are returned by the update function to control application flow.\n\nconst std = @import(\"std\");\n\n/// Actions returned by the update function to control the application.\n/// The main loop inspects these to determine what to do next.\npub const Action = union(enum) {\n    /// Continue running, no special action needed.\n    none: void,\n\n    /// Exit the application cleanly.\n    quit: void,\n\n    /// Execute an async command (future feature).\n    /// Commands are executed by the runtime and results come back as events.\n    command: Command,\n\n    /// Convenience constant for the common case of \"do nothing\".\n    pub const none_action: Action = .{ .none = {} };\n\n    /// Convenience constant for quitting.\n    pub const quit_action: Action = .{ .quit = {} };\n\n    /// Check if this action will terminate the application.\n    pub fn isQuit(self: Action) bool {\n        return self == .quit;\n    }\n\n    /// Check if this is a no-op action.\n    pub fn isNone(self: Action) bool {\n        return self == .none;\n    }\n\n    /// Check if this is a command action.\n    pub fn isCommand(self: Action) bool {\n        return self == .command;\n    }\n};\n\n/// Command type for async operations (future feature).\n/// Commands are returned from update, executed by the runtime,\n/// and results come back as events.\npub const Command = union(enum) {\n    /// No command (placeholder for future expansion).\n    none: void,\n\n    /// Batch multiple commands together.\n    batch: []const Command,\n\n    /// Custom command with user-defined ID and data.\n    custom: struct {\n        id: u32,\n        data: ?*anyopaque,\n    },\n\n    /// Create an empty command.\n    pub fn empty() Command {\n        return .{ .none = {} };\n    }\n};\n\n// ============================================================\n// SANITY TESTS - Basic type construction\n// ============================================================\n\ntest \"sanity: Action.none construction\" {\n    const action = Action{ .none = {} };\n    try std.testing.expect(action == .none);\n    try std.testing.expect(action.isNone());\n    try std.testing.expect(!action.isQuit());\n}\n\ntest \"sanity: Action.quit construction\" {\n    const action = Action{ .quit = {} };\n    try std.testing.expect(action == .quit);\n    try std.testing.expect(action.isQuit());\n    try std.testing.expect(!action.isNone());\n}\n\ntest \"sanity: Action.command construction\" {\n    const action = Action{ .command = Command.empty() };\n    try std.testing.expect(action == .command);\n    try std.testing.expect(action.isCommand());\n    try std.testing.expect(!action.isQuit());\n}\n\ntest \"sanity: Action convenience constants\" {\n    try std.testing.expect(Action.none_action.isNone());\n    try std.testing.expect(Action.quit_action.isQuit());\n}\n\n// ============================================================\n// BEHAVIOR TESTS - Command types\n// ============================================================\n\ntest \"behavior: Command.empty creates none command\" {\n    const cmd = Command.empty();\n    try std.testing.expect(cmd == .none);\n}\n\ntest \"behavior: Command.custom construction\" {\n    const cmd = Command{ .custom = .{ .id = 42, .data = null } };\n    try std.testing.expect(cmd == .custom);\n    try std.testing.expectEqual(@as(u32, 42), cmd.custom.id);\n    try std.testing.expect(cmd.custom.data == null);\n}\n\ntest \"behavior: Action with custom command\" {\n    const cmd = Command{ .custom = .{ .id = 123, .data = null } };\n    const action = Action{ .command = cmd };\n    try std.testing.expect(action.isCommand());\n    try std.testing.expectEqual(@as(u32, 123), action.command.custom.id);\n}\n"
+    numLines: 115
+    startLine: 1
+    totalLines: 115
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01U4hi4YSJu87aTLqbsH6TGr
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01XCRKgpWuQ7qStW7NdBofBf
+      name: Read
+      input:
+        file_path: /home/hotschmoe/zithril/src/backend.zig
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 522
+    cache_read_input_tokens: 23696
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 522
+    output_tokens: 3
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: d595fcfe-6d1c-4870-948b-6a3442a3be27
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content}:
+    toolu_01XCRKgpWuQ7qStW7NdBofBf,tool_result,"     1→// Terminal backend for zithril TUI framework\n     2→// Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste\n     3→\n     4→const std = @import(\"std\");\n     5→const builtin = @import(\"builtin\");\n     6→const posix = std.posix;\n     7→\n     8→/// Configuration options for terminal initialization.\n     9→pub const BackendConfig = struct {\n    10→    /// Enter alternate screen buffer (preserves original terminal content).\n    11→    alternate_screen: bool = true,\n    12→    /// Hide cursor during TUI operation.\n    13→    hide_cursor: bool = true,\n    14→    /// Enable mouse event reporting.\n    15→    mouse_capture: bool = false,\n    16→    /// Enable bracketed paste mode (distinguish pasted text from typed).\n    17→    bracketed_paste: bool = false,\n    18→};\n    19→\n    20→/// Terminal backend state.\n    21→/// Manages raw mode, alternate screen, and other terminal features.\n    22→/// RAII pattern: deinit() restores terminal to original state.\n    23→pub const Backend = struct {\n    24→    /// File descriptor for terminal output (typically stdout).\n    25→    fd: posix.fd_t,\n    26→    /// Original terminal settings, saved for restoration.\n    27→    original_termios: ?posix.termios,\n    28→    /// Configuration used during initialization.\n    29→    config: BackendConfig,\n    30→    /// Whether the backend is currently active.\n    31→    active: bool,\n    32→\n    33→    /// Error type for backend operations.\n    34→    pub const Error = error{\n    35→        NotATty,\n    36→        TerminalQueryFailed,\n    37→        TerminalSetFailed,\n    38→        IoError,\n    39→    };\n    40→\n    41→    /// Initialize the terminal backend.\n    42→    /// Enables raw mode and optional features based on config.\n    43→    /// Returns error if stdout is not a TTY or terminal ops fail.\n    44→    pub fn init(config: BackendConfig) Error!Backend {\n    45→        const fd = posix.STDOUT_FILENO;\n    46→\n    47→        if (!posix.isatty(fd)) {\n    48→            return Error.NotATty;\n    49→        }\n    50→\n    51→        var self = Backend{\n    52→            .fd = fd,\n    53→            .original_termios = null,\n    54→            .config = config,\n    55→            .active = false,\n    56→        };\n    57→\n    58→        try self.enterRawMode();\n    59→        self.active = true;\n    60→\n    61→        if (config.alternate_screen) {\n    62→            self.writeEscape(ENTER_ALTERNATE_SCREEN);\n    63→        }\n    64→\n    65→        if (config.hide_cursor) {\n    66→            self.writeEscape(HIDE_CURSOR);\n    67→        }\n    68→\n    69→        if (config.mouse_capture) {\n    70→            self.enableMouse();\n    71→        }\n    72→\n    73→        if (config.bracketed_paste) {\n    74→            self.writeEscape(ENABLE_BRACKETED_PASTE);\n    75→        }\n    76→\n    77→        return self;\n    78→    }\n    79→\n    80→    /// Restore terminal to original state.\n    81→    /// Safe to call multiple times.\n    82→    pub fn deinit(self: *Backend) void {\n    83→        if (!self.active) return;\n    84→\n    85→        if (self.config.bracketed_paste) {\n    86→            self.writeEscape(DISABLE_BRACKETED_PASTE);\n    87→        }\n    88→\n    89→        if (self.config.mouse_capture) {\n    90→            self.disableMouse();\n    91→        }\n    92→\n    93→        if (self.config.hide_cursor) {\n    94→            self.writeEscape(SHOW_CURSOR);\n    95→        }\n    96→\n    97→        if (self.config.alternate_screen) {\n    98→            self.writeEscape(LEAVE_ALTERNATE_SCREEN);\n    99→        }\n   100→\n   101→        self.exitRawMode();\n   102→        self.active = false;\n   103→    }\n   104→\n   105→    /// Enter raw mode: disable line buffering, echo, and canonical mode.\n   106→    fn enterRawMode(self: *Backend) Error!void {\n   107→        const original = posix.tcgetattr(self.fd) catch {\n   108→            return Error.TerminalQueryFailed;\n   109→        };\n   110→        self.original_termios = original;\n   111→\n   112→        var raw = original;\n   113→\n   114→        // Input flags: disable break handling, CR-to-NL, parity, strip, flow control\n   115→        raw.iflag.BRKINT = false;\n   116→        raw.iflag.ICRNL = false;\n   117→        raw.iflag.INPCK = false;\n   118→        raw.iflag.ISTRIP = false;\n   119→        raw.iflag.IXON = false;\n   120→\n   121→        // Output flags: disable post-processing\n   122→        raw.oflag.OPOST = false;\n   123→\n   124→        // Control flags: set character size to 8 bits\n   125→        raw.cflag.CSIZE = .CS8;\n   126→\n   127→        // Local flags: disable echo, canonical mode, signals, extended input\n   128→        raw.lflag.ECHO = false;\n   129→        raw.lflag.ICANON = false;\n   130→        raw.lflag.ISIG = false;\n   131→        raw.lflag.IEXTEN = false;\n   132→\n   133→        // Set minimum chars for non-canonical read\n   134→        raw.cc[@intFromEnum(posix.V.MIN)] = 0;\n   135→        raw.cc[@intFromEnum(posix.V.TIME)] = 1;\n   136→\n   137→        posix.tcsetattr(self.fd, .FLUSH, raw) catch {\n   138→            return Error.TerminalSetFailed;\n   139→        };\n   140→    }\n   141→\n   142→    /// Exit raw mode: restore original terminal settings.\n   143→    fn exitRawMode(self: *Backend) void {\n   144→        if (self.original_termios) |original| {\n   145→            posix.tcsetattr(self.fd, .FLUSH, original) catch {};\n   146→        }\n   147→    }\n   148→\n   149→    /// Enable mouse reporting (SGR mode for better coordinate handling).\n   150→    fn enableMouse(self: *Backend) void {\n   151→        self.writeEscape(ENABLE_MOUSE_CAPTURE);\n   152→        self.writeEscape(ENABLE_MOUSE_SGR);\n   153→    }\n   154→\n   155→    /// Disable mouse reporting.\n   156→    fn disableMouse(self: *Backend) void {\n   157→        self.writeEscape(DISABLE_MOUSE_SGR);\n   158→        self.writeEscape(DISABLE_MOUSE_CAPTURE);\n   159→    }\n   160→\n   161→    /// Write an escape sequence to the terminal.\n   162→    fn writeEscape(self: *Backend, seq: []const u8) void {\n   163→        const file = std.fs.File{ .handle = self.fd };\n   164→        file.writeAll(seq) catch {};\n   165→    }\n   166→\n   167→    /// Flush output to terminal.\n   168→    pub fn flush(self: *Backend) void {\n   169→        const file = std.fs.File{ .handle = self.fd };\n   170→        file.sync() catch {};\n   171→    }\n   172→\n   173→    /// Write bytes to the terminal.\n   174→    pub fn write(self: *Backend, data: []const u8) Error!void {\n   175→        const file = std.fs.File{ .handle = self.fd };\n   176→        file.writeAll(data) catch {\n   177→            return Error.IoError;\n   178→        };\n   179→    }\n   180→\n   181→    /// Move cursor to home position (0, 0).\n   182→    pub fn cursorHome(self: *Backend) void {\n   183→        self.writeEscape(CURSOR_HOME);\n   184→    }\n   185→\n   186→    /// Move cursor to specific position (0-indexed).\n   187→    pub fn cursorTo(self: *Backend, x: u16, y: u16) void {\n   188→        var buf: [32]u8 = undefined;\n   189→        const seq = std.fmt.bufPrint(&buf, \"\\x1b[{d};{d}H\", .{ y + 1, x + 1 }) catch return;\n   190→        self.writeEscape(seq);\n   191→    }\n   192→\n   193→    /// Clear the entire screen.\n   194→    pub fn clearScreen(self: *Backend) void {\n   195→        self.writeEscape(CLEAR_SCREEN);\n   196→    }\n   197→\n   198→    /// Get terminal size (width, height).\n   199→    pub fn getSize(self: *Backend) struct { width: u16, height: u16 } {\n   200→        var ws: posix.winsize = undefined;\n   201→        const result = posix.system.ioctl(self.fd, posix.T.IOCGWINSZ, @intFromPtr(&ws));\n   202→        if (result == 0) {\n   203→            return .{ .width = ws.col, .height = ws.row };\n   204→        }\n   205→        return .{ .width = 80, .height = 24 };\n   206→    }\n   207→\n   208→    // ANSI escape sequences\n   209→    const ENTER_ALTERNATE_SCREEN = \"\\x1b[?1049h\";\n   210→    const LEAVE_ALTERNATE_SCREEN = \"\\x1b[?1049l\";\n   211→    const HIDE_CURSOR = \"\\x1b[?25l\";\n   212→    const SHOW_CURSOR = \"\\x1b[?25h\";\n   213→    const CLEAR_SCREEN = \"\\x1b[2J\";\n   214→    const CURSOR_HOME = \"\\x1b[H\";\n   215→\n   216→    const ENABLE_MOUSE_CAPTURE = \"\\x1b[?1000h\\x1b[?1002h\\x1b[?1003h\";\n   217→    const DISABLE_MOUSE_CAPTURE = \"\\x1b[?1003l\\x1b[?1002l\\x1b[?1000l\";\n   218→    const ENABLE_MOUSE_SGR = \"\\x1b[?1006h\";\n   219→    const DISABLE_MOUSE_SGR = \"\\x1b[?1006l\";\n   220→\n   221→    const ENABLE_BRACKETED_PASTE = \"\\x1b[?2004h\";\n   222→    const DISABLE_BRACKETED_PASTE = \"\\x1b[?2004l\";\n   223→};\n   224→\n   225→// ============================================================\n   226→// SANITY TESTS - Backend configuration\n   227→// ============================================================\n   228→\n   229→test \"sanity: BackendConfig defaults\" {\n   230→    const config = BackendConfig{};\n   231→    try std.testing.expect(config.alternate_screen);\n   232→    try std.testing.expect(config.hide_cursor);\n   233→    try std.testing.expect(!config.mouse_capture);\n   234→    try std.testing.expect(!config.bracketed_paste);\n   235→}\n   236→\n   237→test \"sanity: BackendConfig custom\" {\n   238→    const config = BackendConfig{\n   239→        .alternate_screen = false,\n   240→        .hide_cursor = false,\n   241→        .mouse_capture = true,\n   242→        .bracketed_paste = true,\n   243→    };\n   244→    try std.testing.expect(!config.alternate_screen);\n   245→    try std.testing.expect(!config.hide_cursor);\n   246→    try std.testing.expect(config.mouse_capture);\n   247→    try std.testing.expect(config.bracketed_paste);\n   248→}\n   249→\n   250→// ============================================================\n   251→// BEHAVIOR TESTS - Escape sequences\n   252→// ============================================================\n   253→\n   254→test \"behavior: escape sequences are correct format\" {\n   255→    try std.testing.expectEqualStrings(\"\\x1b[?1049h\", Backend.ENTER_ALTERNATE_SCREEN);\n   256→    try std.testing.expectEqualStrings(\"\\x1b[?1049l\", Backend.LEAVE_ALTERNATE_SCREEN);\n   257→    try std.testing.expectEqualStrings(\"\\x1b[?25l\", Backend.HIDE_CURSOR);\n   258→    try std.testing.expectEqualStrings(\"\\x1b[?25h\", Backend.SHOW_CURSOR);\n   259→    try std.testing.expectEqualStrings(\"\\x1b[2J\", Backend.CLEAR_SCREEN);\n   260→    try std.testing.expectEqualStrings(\"\\x1b[H\", Backend.CURSOR_HOME);\n   261→}\n   262→\n   263→test \"behavior: bracketed paste sequences are correct\" {\n   264→    try std.testing.expectEqualStrings(\"\\x1b[?2004h\", Backend.ENABLE_BRACKETED_PASTE);\n   265→    try std.testing.expectEqualStrings(\"\\x1b[?2004l\", Backend.DISABLE_BRACKETED_PASTE);\n   266→}\n   267→\n   268→test \"behavior: mouse SGR sequences are correct\" {\n   269→    try std.testing.expectEqualStrings(\"\\x1b[?1006h\", Backend.ENABLE_MOUSE_SGR);\n   270→    try std.testing.expectEqualStrings(\"\\x1b[?1006l\", Backend.DISABLE_MOUSE_SGR);\n   271→}\n   272→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "0055ab55-5117-462e-bf77-017593cadb66"
+tool_use_result:
+  type: text
+  file:
+    filePath: /home/hotschmoe/zithril/src/backend.zig
+    content: "// Terminal backend for zithril TUI framework\n// Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste\n\nconst std = @import(\"std\");\nconst builtin = @import(\"builtin\");\nconst posix = std.posix;\n\n/// Configuration options for terminal initialization.\npub const BackendConfig = struct {\n    /// Enter alternate screen buffer (preserves original terminal content).\n    alternate_screen: bool = true,\n    /// Hide cursor during TUI operation.\n    hide_cursor: bool = true,\n    /// Enable mouse event reporting.\n    mouse_capture: bool = false,\n    /// Enable bracketed paste mode (distinguish pasted text from typed).\n    bracketed_paste: bool = false,\n};\n\n/// Terminal backend state.\n/// Manages raw mode, alternate screen, and other terminal features.\n/// RAII pattern: deinit() restores terminal to original state.\npub const Backend = struct {\n    /// File descriptor for terminal output (typically stdout).\n    fd: posix.fd_t,\n    /// Original terminal settings, saved for restoration.\n    original_termios: ?posix.termios,\n    /// Configuration used during initialization.\n    config: BackendConfig,\n    /// Whether the backend is currently active.\n    active: bool,\n\n    /// Error type for backend operations.\n    pub const Error = error{\n        NotATty,\n        TerminalQueryFailed,\n        TerminalSetFailed,\n        IoError,\n    };\n\n    /// Initialize the terminal backend.\n    /// Enables raw mode and optional features based on config.\n    /// Returns error if stdout is not a TTY or terminal ops fail.\n    pub fn init(config: BackendConfig) Error!Backend {\n        const fd = posix.STDOUT_FILENO;\n\n        if (!posix.isatty(fd)) {\n            return Error.NotATty;\n        }\n\n        var self = Backend{\n            .fd = fd,\n            .original_termios = null,\n            .config = config,\n            .active = false,\n        };\n\n        try self.enterRawMode();\n        self.active = true;\n\n        if (config.alternate_screen) {\n            self.writeEscape(ENTER_ALTERNATE_SCREEN);\n        }\n\n        if (config.hide_cursor) {\n            self.writeEscape(HIDE_CURSOR);\n        }\n\n        if (config.mouse_capture) {\n            self.enableMouse();\n        }\n\n        if (config.bracketed_paste) {\n            self.writeEscape(ENABLE_BRACKETED_PASTE);\n        }\n\n        return self;\n    }\n\n    /// Restore terminal to original state.\n    /// Safe to call multiple times.\n    pub fn deinit(self: *Backend) void {\n        if (!self.active) return;\n\n        if (self.config.bracketed_paste) {\n            self.writeEscape(DISABLE_BRACKETED_PASTE);\n        }\n\n        if (self.config.mouse_capture) {\n            self.disableMouse();\n        }\n\n        if (self.config.hide_cursor) {\n            self.writeEscape(SHOW_CURSOR);\n        }\n\n        if (self.config.alternate_screen) {\n            self.writeEscape(LEAVE_ALTERNATE_SCREEN);\n        }\n\n        self.exitRawMode();\n        self.active = false;\n    }\n\n    /// Enter raw mode: disable line buffering, echo, and canonical mode.\n    fn enterRawMode(self: *Backend) Error!void {\n        const original = posix.tcgetattr(self.fd) catch {\n            return Error.TerminalQueryFailed;\n        };\n        self.original_termios = original;\n\n        var raw = original;\n\n        // Input flags: disable break handling, CR-to-NL, parity, strip, flow control\n        raw.iflag.BRKINT = false;\n        raw.iflag.ICRNL = false;\n        raw.iflag.INPCK = false;\n        raw.iflag.ISTRIP = false;\n        raw.iflag.IXON = false;\n\n        // Output flags: disable post-processing\n        raw.oflag.OPOST = false;\n\n        // Control flags: set character size to 8 bits\n        raw.cflag.CSIZE = .CS8;\n\n        // Local flags: disable echo, canonical mode, signals, extended input\n        raw.lflag.ECHO = false;\n        raw.lflag.ICANON = false;\n        raw.lflag.ISIG = false;\n        raw.lflag.IEXTEN = false;\n\n        // Set minimum chars for non-canonical read\n        raw.cc[@intFromEnum(posix.V.MIN)] = 0;\n        raw.cc[@intFromEnum(posix.V.TIME)] = 1;\n\n        posix.tcsetattr(self.fd, .FLUSH, raw) catch {\n            return Error.TerminalSetFailed;\n        };\n    }\n\n    /// Exit raw mode: restore original terminal settings.\n    fn exitRawMode(self: *Backend) void {\n        if (self.original_termios) |original| {\n            posix.tcsetattr(self.fd, .FLUSH, original) catch {};\n        }\n    }\n\n    /// Enable mouse reporting (SGR mode for better coordinate handling).\n    fn enableMouse(self: *Backend) void {\n        self.writeEscape(ENABLE_MOUSE_CAPTURE);\n        self.writeEscape(ENABLE_MOUSE_SGR);\n    }\n\n    /// Disable mouse reporting.\n    fn disableMouse(self: *Backend) void {\n        self.writeEscape(DISABLE_MOUSE_SGR);\n        self.writeEscape(DISABLE_MOUSE_CAPTURE);\n    }\n\n    /// Write an escape sequence to the terminal.\n    fn writeEscape(self: *Backend, seq: []const u8) void {\n        const file = std.fs.File{ .handle = self.fd };\n        file.writeAll(seq) catch {};\n    }\n\n    /// Flush output to terminal.\n    pub fn flush(self: *Backend) void {\n        const file = std.fs.File{ .handle = self.fd };\n        file.sync() catch {};\n    }\n\n    /// Write bytes to the terminal.\n    pub fn write(self: *Backend, data: []const u8) Error!void {\n        const file = std.fs.File{ .handle = self.fd };\n        file.writeAll(data) catch {\n            return Error.IoError;\n        };\n    }\n\n    /// Move cursor to home position (0, 0).\n    pub fn cursorHome(self: *Backend) void {\n        self.writeEscape(CURSOR_HOME);\n    }\n\n    /// Move cursor to specific position (0-indexed).\n    pub fn cursorTo(self: *Backend, x: u16, y: u16) void {\n        var buf: [32]u8 = undefined;\n        const seq = std.fmt.bufPrint(&buf, \"\\x1b[{d};{d}H\", .{ y + 1, x + 1 }) catch return;\n        self.writeEscape(seq);\n    }\n\n    /// Clear the entire screen.\n    pub fn clearScreen(self: *Backend) void {\n        self.writeEscape(CLEAR_SCREEN);\n    }\n\n    /// Get terminal size (width, height).\n    pub fn getSize(self: *Backend) struct { width: u16, height: u16 } {\n        var ws: posix.winsize = undefined;\n        const result = posix.system.ioctl(self.fd, posix.T.IOCGWINSZ, @intFromPtr(&ws));\n        if (result == 0) {\n            return .{ .width = ws.col, .height = ws.row };\n        }\n        return .{ .width = 80, .height = 24 };\n    }\n\n    // ANSI escape sequences\n    const ENTER_ALTERNATE_SCREEN = \"\\x1b[?1049h\";\n    const LEAVE_ALTERNATE_SCREEN = \"\\x1b[?1049l\";\n    const HIDE_CURSOR = \"\\x1b[?25l\";\n    const SHOW_CURSOR = \"\\x1b[?25h\";\n    const CLEAR_SCREEN = \"\\x1b[2J\";\n    const CURSOR_HOME = \"\\x1b[H\";\n\n    const ENABLE_MOUSE_CAPTURE = \"\\x1b[?1000h\\x1b[?1002h\\x1b[?1003h\";\n    const DISABLE_MOUSE_CAPTURE = \"\\x1b[?1003l\\x1b[?1002l\\x1b[?1000l\";\n    const ENABLE_MOUSE_SGR = \"\\x1b[?1006h\";\n    const DISABLE_MOUSE_SGR = \"\\x1b[?1006l\";\n\n    const ENABLE_BRACKETED_PASTE = \"\\x1b[?2004h\";\n    const DISABLE_BRACKETED_PASTE = \"\\x1b[?2004l\";\n};\n\n// ============================================================\n// SANITY TESTS - Backend configuration\n// ============================================================\n\ntest \"sanity: BackendConfig defaults\" {\n    const config = BackendConfig{};\n    try std.testing.expect(config.alternate_screen);\n    try std.testing.expect(config.hide_cursor);\n    try std.testing.expect(!config.mouse_capture);\n    try std.testing.expect(!config.bracketed_paste);\n}\n\ntest \"sanity: BackendConfig custom\" {\n    const config = BackendConfig{\n        .alternate_screen = false,\n        .hide_cursor = false,\n        .mouse_capture = true,\n        .bracketed_paste = true,\n    };\n    try std.testing.expect(!config.alternate_screen);\n    try std.testing.expect(!config.hide_cursor);\n    try std.testing.expect(config.mouse_capture);\n    try std.testing.expect(config.bracketed_paste);\n}\n\n// ============================================================\n// BEHAVIOR TESTS - Escape sequences\n// ============================================================\n\ntest \"behavior: escape sequences are correct format\" {\n    try std.testing.expectEqualStrings(\"\\x1b[?1049h\", Backend.ENTER_ALTERNATE_SCREEN);\n    try std.testing.expectEqualStrings(\"\\x1b[?1049l\", Backend.LEAVE_ALTERNATE_SCREEN);\n    try std.testing.expectEqualStrings(\"\\x1b[?25l\", Backend.HIDE_CURSOR);\n    try std.testing.expectEqualStrings(\"\\x1b[?25h\", Backend.SHOW_CURSOR);\n    try std.testing.expectEqualStrings(\"\\x1b[2J\", Backend.CLEAR_SCREEN);\n    try std.testing.expectEqualStrings(\"\\x1b[H\", Backend.CURSOR_HOME);\n}\n\ntest \"behavior: bracketed paste sequences are correct\" {\n    try std.testing.expectEqualStrings(\"\\x1b[?2004h\", Backend.ENABLE_BRACKETED_PASTE);\n    try std.testing.expectEqualStrings(\"\\x1b[?2004l\", Backend.DISABLE_BRACKETED_PASTE);\n}\n\ntest \"behavior: mouse SGR sequences are correct\" {\n    try std.testing.expectEqualStrings(\"\\x1b[?1006h\", Backend.ENABLE_MOUSE_SGR);\n    try std.testing.expectEqualStrings(\"\\x1b[?1006l\", Backend.DISABLE_MOUSE_SGR);\n}\n"
+    numLines: 272
+    startLine: 1
+    totalLines: 272
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01U4hi4YSJu87aTLqbsH6TGr
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01LNnNZurcrWvXBzXsVkuMtX
+      name: Read
+      input:
+        file_path: /home/hotschmoe/zithril/src/cell.zig
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 522
+    cache_read_input_tokens: 23696
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 522
+    output_tokens: 3
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: b9295342-7896-4a2f-88e1-25511f396e1f
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content}:
+    toolu_01LNnNZurcrWvXBzXsVkuMtX,tool_result,"     1→// Cell type for zithril TUI framework\n     2→// Represents a single character cell in the terminal buffer\n     3→\n     4→const std = @import(\"std\");\n     5→pub const rich_zig = @import(\"rich_zig\");\n     6→const style_mod = @import(\"style.zig\");\n     7→pub const Style = style_mod.Style;\n     8→\n     9→/// A single cell in the terminal buffer.\n    10→/// Each cell represents one character position, with its associated style and display width.\n    11→pub const Cell = struct {\n    12→    /// Unicode codepoint for the character displayed in this cell.\n    13→    /// Defaults to space (U+0020).\n    14→    char: u21 = ' ',\n    15→\n    16→    /// Visual style applied to this cell (colors, bold, italic, etc).\n    17→    style: Style = Style.empty,\n    18→\n    19→    /// Display width in terminal columns.\n    20→    /// - 1 for most characters (ASCII, basic Latin, etc.)\n    21→    /// - 2 for wide characters (CJK ideographs, emoji, fullwidth forms)\n    22→    /// - 0 for combining marks (handled specially during rendering)\n    23→    width: u8 = 1,\n    24→\n    25→    /// The default cell: a space with default style and width 1.\n    26→    pub const default: Cell = .{};\n    27→\n    28→    /// Create a cell with a specific character, using default style.\n    29→    pub fn init(char: u21) Cell {\n    30→        return .{\n    31→            .char = char,\n    32→            .style = Style.empty,\n    33→            .width = charWidth(char),\n    34→        };\n    35→    }\n    36→\n    37→    /// Create a cell with a character and style.\n    38→    pub fn styled(char: u21, s: Style) Cell {\n    39→        return .{\n    40→            .char = char,\n    41→            .style = s,\n    42→            .width = charWidth(char),\n    43→        };\n    44→    }\n    45→\n    46→    /// Create a cell with explicit width override.\n    47→    pub fn withWidth(char: u21, s: Style, w: u8) Cell {\n    48→        return .{\n    49→            .char = char,\n    50→            .style = s,\n    51→            .width = w,\n    52→        };\n    53→    }\n    54→\n    55→    /// Update the cell's character, automatically recalculating width.\n    56→    pub fn setChar(self: Cell, char: u21) Cell {\n    57→        return .{\n    58→            .char = char,\n    59→            .style = self.style,\n    60→            .width = charWidth(char),\n    61→        };\n    62→    }\n    63→\n    64→    /// Update the cell's style.\n    65→    pub fn setStyle(self: Cell, s: Style) Cell {\n    66→        return .{\n    67→            .char = self.char,\n    68→            .style = s,\n    69→            .width = self.width,\n    70→        };\n    71→    }\n    72→\n    73→    /// Merge another style on top of this cell's style.\n    74→    pub fn patchStyle(self: Cell, s: Style) Cell {\n    75→        return .{\n    76→            .char = self.char,\n    77→            .style = self.style.patch(s),\n    78→            .width = self.width,\n    79→        };\n    80→    }\n    81→\n    82→    /// Check if this cell is the default (space with empty style).\n    83→    pub fn isDefault(self: Cell) bool {\n    84→        return self.char == ' ' and self.style.isEmpty() and self.width == 1;\n    85→    }\n    86→\n    87→    /// Check equality with another cell.\n    88→    pub fn eql(self: Cell, other: Cell) bool {\n    89→        return self.char == other.char and\n    90→            self.style.eql(other.style) and\n    91→            self.width == other.width;\n    92→    }\n    93→\n    94→    /// Get the character width using rich_zig's cell width calculation.\n    95→    /// Returns 1 for most chars, 2 for wide (CJK/emoji), 0 for combining.\n    96→    pub fn charWidth(char: u21) u8 {\n    97→        return rich_zig.cells.getCharacterCellSize(char);\n    98→    }\n    99→\n   100→    /// Check if this cell contains a wide character (width 2).\n   101→    pub fn isWide(self: Cell) bool {\n   102→        return self.width == 2;\n   103→    }\n   104→\n   105→    /// Check if this cell contains a zero-width character (combining mark).\n   106→    pub fn isZeroWidth(self: Cell) bool {\n   107→        return self.width == 0;\n   108→    }\n   109→};\n   110→\n   111→// ============================================================\n   112→// SANITY TESTS - Basic Cell functionality\n   113→// ============================================================\n   114→\n   115→test \"sanity: Cell default is space with default style\" {\n   116→    const cell = Cell.default;\n   117→    try std.testing.expectEqual(@as(u21, ' '), cell.char);\n   118→    try std.testing.expect(cell.style.isEmpty());\n   119→    try std.testing.expectEqual(@as(u8, 1), cell.width);\n   120→}\n   121→\n   122→test \"sanity: Cell.init creates cell with correct width\" {\n   123→    const cell = Cell.init('A');\n   124→    try std.testing.expectEqual(@as(u21, 'A'), cell.char);\n   125→    try std.testing.expectEqual(@as(u8, 1), cell.width);\n   126→    try std.testing.expect(cell.style.isEmpty());\n   127→}\n   128→\n   129→test \"sanity: Cell.styled creates cell with style\" {\n   130→    const s = Style.init().bold().fg(.red);\n   131→    const cell = Cell.styled('X', s);\n   132→    try std.testing.expectEqual(@as(u21, 'X'), cell.char);\n   133→    try std.testing.expect(cell.style.hasAttribute(.bold));\n   134→}\n   135→\n   136→// ============================================================\n   137→// BEHAVIOR TESTS - Wide characters and combining marks\n   138→// ============================================================\n   139→\n   140→test \"behavior: Cell.init detects CJK as wide\" {\n   141→    const cell = Cell.init(0x4E2D);\n   142→    try std.testing.expectEqual(@as(u8, 2), cell.width);\n   143→    try std.testing.expect(cell.isWide());\n   144→}\n   145→\n   146→test \"behavior: Cell.init detects emoji as wide\" {\n   147→    const cell = Cell.init(0x1F600);\n   148→    try std.testing.expectEqual(@as(u8, 2), cell.width);\n   149→    try std.testing.expect(cell.isWide());\n   150→}\n   151→\n   152→test \"behavior: Cell.init detects combining mark as zero-width\" {\n   153→    const cell = Cell.init(0x0301);\n   154→    try std.testing.expectEqual(@as(u8, 0), cell.width);\n   155→    try std.testing.expect(cell.isZeroWidth());\n   156→}\n   157→\n   158→test \"behavior: Cell.isDefault detects default cell\" {\n   159→    try std.testing.expect(Cell.default.isDefault());\n   160→    try std.testing.expect(!Cell.init('X').isDefault());\n   161→    try std.testing.expect(!Cell.styled(' ', Style.init().bold()).isDefault());\n   162→}\n   163→\n   164→test \"behavior: Cell.setChar updates char and width\" {\n   165→    const cell = Cell.init('A');\n   166→    const updated = cell.setChar(0x4E2D);\n   167→    try std.testing.expectEqual(@as(u21, 0x4E2D), updated.char);\n   168→    try std.testing.expectEqual(@as(u8, 2), updated.width);\n   169→}\n   170→\n   171→test \"behavior: Cell.setStyle preserves char and width\" {\n   172→    const cell = Cell.init(0x4E2D);\n   173→    const styled_cell = cell.setStyle(Style.init().bold());\n   174→    try std.testing.expectEqual(@as(u21, 0x4E2D), styled_cell.char);\n   175→    try std.testing.expectEqual(@as(u8, 2), styled_cell.width);\n   176→    try std.testing.expect(styled_cell.style.hasAttribute(.bold));\n   177→}\n   178→\n   179→test \"behavior: Cell.patchStyle merges styles\" {\n   180→    const cell = Cell.styled('A', Style.init().bold());\n   181→    const patched = cell.patchStyle(Style.init().italic());\n   182→    try std.testing.expect(patched.style.hasAttribute(.bold));\n   183→    try std.testing.expect(patched.style.hasAttribute(.italic));\n   184→}\n   185→\n   186→test \"behavior: Cell.eql compares all fields\" {\n   187→    const c1 = Cell.styled('A', Style.init().bold());\n   188→    const c2 = Cell.styled('A', Style.init().bold());\n   189→    const c3 = Cell.styled('B', Style.init().bold());\n   190→    const c4 = Cell.styled('A', Style.init().italic());\n   191→\n   192→    try std.testing.expect(c1.eql(c2));\n   193→    try std.testing.expect(!c1.eql(c3));\n   194→    try std.testing.expect(!c1.eql(c4));\n   195→}\n   196→\n   197→test \"behavior: Cell.withWidth allows explicit width override\" {\n   198→    const cell = Cell.withWidth('A', Style.empty, 3);\n   199→    try std.testing.expectEqual(@as(u8, 3), cell.width);\n   200→}\n   201→\n   202→// ============================================================\n   203→// REGRESSION TESTS - Edge cases\n   204→// ============================================================\n   205→\n   206→test \"regression: ASCII characters have width 1\" {\n   207→    for (0x20..0x7F) |c| {\n   208→        const cell = Cell.init(@intCast(c));\n   209→        try std.testing.expectEqual(@as(u8, 1), cell.width);\n   210→    }\n   211→}\n   212→\n   213→test \"regression: control characters have width 0\" {\n   214→    const cell_null = Cell.init(0);\n   215→    try std.testing.expectEqual(@as(u8, 0), cell_null.width);\n   216→\n   217→    const cell_newline = Cell.init('\\n');\n   218→    try std.testing.expectEqual(@as(u8, 0), cell_newline.width);\n   219→}\n   220→\n   221→test \"regression: zero-width space has width 0\" {\n   222→    const cell = Cell.init(0x200B);\n   223→    try std.testing.expectEqual(@as(u8, 0), cell.width);\n   224→}\n   225→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: becb3f34-84cf-4d7d-8530-08c2cd10ce92
+tool_use_result:
+  type: text
+  file:
+    filePath: /home/hotschmoe/zithril/src/cell.zig
+    content: "// Cell type for zithril TUI framework\n// Represents a single character cell in the terminal buffer\n\nconst std = @import(\"std\");\npub const rich_zig = @import(\"rich_zig\");\nconst style_mod = @import(\"style.zig\");\npub const Style = style_mod.Style;\n\n/// A single cell in the terminal buffer.\n/// Each cell represents one character position, with its associated style and display width.\npub const Cell = struct {\n    /// Unicode codepoint for the character displayed in this cell.\n    /// Defaults to space (U+0020).\n    char: u21 = ' ',\n\n    /// Visual style applied to this cell (colors, bold, italic, etc).\n    style: Style = Style.empty,\n\n    /// Display width in terminal columns.\n    /// - 1 for most characters (ASCII, basic Latin, etc.)\n    /// - 2 for wide characters (CJK ideographs, emoji, fullwidth forms)\n    /// - 0 for combining marks (handled specially during rendering)\n    width: u8 = 1,\n\n    /// The default cell: a space with default style and width 1.\n    pub const default: Cell = .{};\n\n    /// Create a cell with a specific character, using default style.\n    pub fn init(char: u21) Cell {\n        return .{\n            .char = char,\n            .style = Style.empty,\n            .width = charWidth(char),\n        };\n    }\n\n    /// Create a cell with a character and style.\n    pub fn styled(char: u21, s: Style) Cell {\n        return .{\n            .char = char,\n            .style = s,\n            .width = charWidth(char),\n        };\n    }\n\n    /// Create a cell with explicit width override.\n    pub fn withWidth(char: u21, s: Style, w: u8) Cell {\n        return .{\n            .char = char,\n            .style = s,\n            .width = w,\n        };\n    }\n\n    /// Update the cell's character, automatically recalculating width.\n    pub fn setChar(self: Cell, char: u21) Cell {\n        return .{\n            .char = char,\n            .style = self.style,\n            .width = charWidth(char),\n        };\n    }\n\n    /// Update the cell's style.\n    pub fn setStyle(self: Cell, s: Style) Cell {\n        return .{\n            .char = self.char,\n            .style = s,\n            .width = self.width,\n        };\n    }\n\n    /// Merge another style on top of this cell's style.\n    pub fn patchStyle(self: Cell, s: Style) Cell {\n        return .{\n            .char = self.char,\n            .style = self.style.patch(s),\n            .width = self.width,\n        };\n    }\n\n    /// Check if this cell is the default (space with empty style).\n    pub fn isDefault(self: Cell) bool {\n        return self.char == ' ' and self.style.isEmpty() and self.width == 1;\n    }\n\n    /// Check equality with another cell.\n    pub fn eql(self: Cell, other: Cell) bool {\n        return self.char == other.char and\n            self.style.eql(other.style) and\n            self.width == other.width;\n    }\n\n    /// Get the character width using rich_zig's cell width calculation.\n    /// Returns 1 for most chars, 2 for wide (CJK/emoji), 0 for combining.\n    pub fn charWidth(char: u21) u8 {\n        return rich_zig.cells.getCharacterCellSize(char);\n    }\n\n    /// Check if this cell contains a wide character (width 2).\n    pub fn isWide(self: Cell) bool {\n        return self.width == 2;\n    }\n\n    /// Check if this cell contains a zero-width character (combining mark).\n    pub fn isZeroWidth(self: Cell) bool {\n        return self.width == 0;\n    }\n};\n\n// ============================================================\n// SANITY TESTS - Basic Cell functionality\n// ============================================================\n\ntest \"sanity: Cell default is space with default style\" {\n    const cell = Cell.default;\n    try std.testing.expectEqual(@as(u21, ' '), cell.char);\n    try std.testing.expect(cell.style.isEmpty());\n    try std.testing.expectEqual(@as(u8, 1), cell.width);\n}\n\ntest \"sanity: Cell.init creates cell with correct width\" {\n    const cell = Cell.init('A');\n    try std.testing.expectEqual(@as(u21, 'A'), cell.char);\n    try std.testing.expectEqual(@as(u8, 1), cell.width);\n    try std.testing.expect(cell.style.isEmpty());\n}\n\ntest \"sanity: Cell.styled creates cell with style\" {\n    const s = Style.init().bold().fg(.red);\n    const cell = Cell.styled('X', s);\n    try std.testing.expectEqual(@as(u21, 'X'), cell.char);\n    try std.testing.expect(cell.style.hasAttribute(.bold));\n}\n\n// ============================================================\n// BEHAVIOR TESTS - Wide characters and combining marks\n// ============================================================\n\ntest \"behavior: Cell.init detects CJK as wide\" {\n    const cell = Cell.init(0x4E2D);\n    try std.testing.expectEqual(@as(u8, 2), cell.width);\n    try std.testing.expect(cell.isWide());\n}\n\ntest \"behavior: Cell.init detects emoji as wide\" {\n    const cell = Cell.init(0x1F600);\n    try std.testing.expectEqual(@as(u8, 2), cell.width);\n    try std.testing.expect(cell.isWide());\n}\n\ntest \"behavior: Cell.init detects combining mark as zero-width\" {\n    const cell = Cell.init(0x0301);\n    try std.testing.expectEqual(@as(u8, 0), cell.width);\n    try std.testing.expect(cell.isZeroWidth());\n}\n\ntest \"behavior: Cell.isDefault detects default cell\" {\n    try std.testing.expect(Cell.default.isDefault());\n    try std.testing.expect(!Cell.init('X').isDefault());\n    try std.testing.expect(!Cell.styled(' ', Style.init().bold()).isDefault());\n}\n\ntest \"behavior: Cell.setChar updates char and width\" {\n    const cell = Cell.init('A');\n    const updated = cell.setChar(0x4E2D);\n    try std.testing.expectEqual(@as(u21, 0x4E2D), updated.char);\n    try std.testing.expectEqual(@as(u8, 2), updated.width);\n}\n\ntest \"behavior: Cell.setStyle preserves char and width\" {\n    const cell = Cell.init(0x4E2D);\n    const styled_cell = cell.setStyle(Style.init().bold());\n    try std.testing.expectEqual(@as(u21, 0x4E2D), styled_cell.char);\n    try std.testing.expectEqual(@as(u8, 2), styled_cell.width);\n    try std.testing.expect(styled_cell.style.hasAttribute(.bold));\n}\n\ntest \"behavior: Cell.patchStyle merges styles\" {\n    const cell = Cell.styled('A', Style.init().bold());\n    const patched = cell.patchStyle(Style.init().italic());\n    try std.testing.expect(patched.style.hasAttribute(.bold));\n    try std.testing.expect(patched.style.hasAttribute(.italic));\n}\n\ntest \"behavior: Cell.eql compares all fields\" {\n    const c1 = Cell.styled('A', Style.init().bold());\n    const c2 = Cell.styled('A', Style.init().bold());\n    const c3 = Cell.styled('B', Style.init().bold());\n    const c4 = Cell.styled('A', Style.init().italic());\n\n    try std.testing.expect(c1.eql(c2));\n    try std.testing.expect(!c1.eql(c3));\n    try std.testing.expect(!c1.eql(c4));\n}\n\ntest \"behavior: Cell.withWidth allows explicit width override\" {\n    const cell = Cell.withWidth('A', Style.empty, 3);\n    try std.testing.expectEqual(@as(u8, 3), cell.width);\n}\n\n// ============================================================\n// REGRESSION TESTS - Edge cases\n// ============================================================\n\ntest \"regression: ASCII characters have width 1\" {\n    for (0x20..0x7F) |c| {\n        const cell = Cell.init(@intCast(c));\n        try std.testing.expectEqual(@as(u8, 1), cell.width);\n    }\n}\n\ntest \"regression: control characters have width 0\" {\n    const cell_null = Cell.init(0);\n    try std.testing.expectEqual(@as(u8, 0), cell_null.width);\n\n    const cell_newline = Cell.init('\\n');\n    try std.testing.expectEqual(@as(u8, 0), cell_newline.width);\n}\n\ntest \"regression: zero-width space has width 0\" {\n    const cell = Cell.init(0x200B);\n    try std.testing.expectEqual(@as(u8, 0), cell.width);\n}\n"
+    numLines: 225
+    startLine: 1
+    totalLines: 225
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01U4hi4YSJu87aTLqbsH6TGr
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01PrkPcqSB4AHNU7w4bGAXcB
+      name: Read
+      input:
+        file_path: /home/hotschmoe/zithril/src/root.zig
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 522
+    cache_read_input_tokens: 23696
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 522
+    output_tokens: 3
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "9bb14522-c47b-4ee7-a181-999cc9a146d6"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content}:
+    toolu_01PrkPcqSB4AHNU7w4bGAXcB,tool_result,"     1→// zithril - Zig TUI framework\n     2→// Built on rich_zig for terminal rendering primitives\n     3→\n     4→const std = @import(\"std\");\n     5→pub const rich_zig = @import(\"rich_zig\");\n     6→\n     7→// Geometry types\n     8→pub const geometry = @import(\"geometry.zig\");\n     9→pub const Rect = geometry.Rect;\n    10→pub const Position = geometry.Position;\n    11→\n    12→// Style types (wrapper around rich_zig)\n    13→pub const style_mod = @import(\"style.zig\");\n    14→pub const Style = style_mod.Style;\n    15→pub const Color = style_mod.Color;\n    16→pub const StyleAttribute = style_mod.StyleAttribute;\n    17→\n    18→// Layout types\n    19→pub const layout_mod = @import(\"layout.zig\");\n    20→pub const Constraint = layout_mod.Constraint;\n    21→pub const Direction = layout_mod.Direction;\n    22→pub const layout = layout_mod.layout;\n    23→pub const BoundedRects = layout_mod.BoundedRects;\n    24→\n    25→// Event types\n    26→pub const event = @import(\"event.zig\");\n    27→pub const Event = event.Event;\n    28→pub const Key = event.Key;\n    29→pub const KeyCode = event.KeyCode;\n    30→pub const Modifiers = event.Modifiers;\n    31→pub const Mouse = event.Mouse;\n    32→pub const MouseKind = event.MouseKind;\n    33→pub const Size = event.Size;\n    34→\n    35→// Action types\n    36→pub const action = @import(\"action.zig\");\n    37→pub const Action = action.Action;\n    38→pub const Command = action.Command;\n    39→\n    40→// Cell type (buffer building block)\n    41→pub const cell_mod = @import(\"cell.zig\");\n    42→pub const Cell = cell_mod.Cell;\n    43→\n    44→// Terminal backend\n    45→pub const backend_mod = @import(\"backend.zig\");\n    46→pub const Backend = backend_mod.Backend;\n    47→pub const BackendConfig = backend_mod.BackendConfig;\n    48→\n    49→test \"style wrapper\" {\n    50→    const style = Style.init().bold().fg(.red);\n    51→    try std.testing.expect(style.hasAttribute(.bold));\n    52→\n    53→    const base = Style.init().fg(.green);\n    54→    const merged = base.patch(style);\n    55→    try std.testing.expect(merged.hasAttribute(.bold));\n    56→}\n    57→\n    58→test \"geometry re-export\" {\n    59→    const rect = Rect.init(0, 0, 80, 24);\n    60→    try std.testing.expectEqual(@as(u32, 1920), rect.area());\n    61→\n    62→    const pos = Position.init(10, 20);\n    63→    try std.testing.expectEqual(@as(u16, 10), pos.x);\n    64→}\n    65→\n    66→test \"layout re-export\" {\n    67→    const c1 = Constraint.len(10);\n    68→    const c2 = Constraint.minSize(20);\n    69→    const c3 = Constraint.maxSize(30);\n    70→    const c4 = Constraint.fractional(1, 3);\n    71→    const c5 = Constraint.flexible(2);\n    72→\n    73→    try std.testing.expectEqual(@as(u16, 10), c1.apply(100));\n    74→    try std.testing.expectEqual(@as(u16, 20), c2.apply(100));\n    75→    try std.testing.expectEqual(@as(u16, 30), c3.apply(100));\n    76→    try std.testing.expectEqual(@as(u16, 33), c4.apply(100));\n    77→    try std.testing.expectEqual(@as(u16, 100), c5.apply(100));\n    78→\n    79→    try std.testing.expect(Direction.horizontal != Direction.vertical);\n    80→}\n    81→\n    82→test \"event re-export\" {\n    83→    const key_event = Event{ .key = .{ .code = .escape, .modifiers = Modifiers.ctrl_only() } };\n    84→    try std.testing.expect(key_event == .key);\n    85→    try std.testing.expect(key_event.key.code == .escape);\n    86→    try std.testing.expect(key_event.key.modifiers.ctrl);\n    87→\n    88→    const mouse_event = Event{ .mouse = Mouse.init(5, 10, .down) };\n    89→    try std.testing.expect(mouse_event == .mouse);\n    90→    try std.testing.expect(mouse_event.mouse.kind == .down);\n    91→\n    92→    const resize_event = Event{ .resize = Size.init(120, 40) };\n    93→    try std.testing.expect(resize_event == .resize);\n    94→    try std.testing.expectEqual(@as(u16, 120), resize_event.resize.width);\n    95→\n    96→    const tick_event = Event{ .tick = {} };\n    97→    try std.testing.expect(tick_event == .tick);\n    98→\n    99→    const char_key = KeyCode.fromChar('q');\n   100→    try std.testing.expect(char_key.isChar());\n   101→\n   102→    const f5_key = KeyCode.fromF(5);\n   103→    try std.testing.expect(f5_key != null);\n   104→}\n   105→\n   106→test \"action re-export\" {\n   107→    const none_action = Action{ .none = {} };\n   108→    try std.testing.expect(none_action.isNone());\n   109→\n   110→    const quit_action = Action{ .quit = {} };\n   111→    try std.testing.expect(quit_action.isQuit());\n   112→\n   113→    const cmd_action = Action{ .command = Command.empty() };\n   114→    try std.testing.expect(cmd_action.isCommand());\n   115→\n   116→    try std.testing.expect(Action.none_action.isNone());\n   117→    try std.testing.expect(Action.quit_action.isQuit());\n   118→}\n   119→\n   120→test \"cell re-export\" {\n   121→    const cell = Cell.init('X');\n   122→    try std.testing.expectEqual(@as(u21, 'X'), cell.char);\n   123→    try std.testing.expectEqual(@as(u8, 1), cell.width);\n   124→\n   125→    const wide_cell = Cell.init(0x4E2D);\n   126→    try std.testing.expect(wide_cell.isWide());\n   127→\n   128→    const styled_cell = Cell.styled('A', Style.init().bold());\n   129→    try std.testing.expect(styled_cell.style.hasAttribute(.bold));\n   130→}\n   131→\n   132→test \"backend re-export\" {\n   133→    const default_config = BackendConfig{};\n   134→    try std.testing.expect(default_config.alternate_screen);\n   135→    try std.testing.expect(default_config.hide_cursor);\n   136→    try std.testing.expect(!default_config.mouse_capture);\n   137→    try std.testing.expect(!default_config.bracketed_paste);\n   138→\n   139→    const custom_config = BackendConfig{\n   140→        .mouse_capture = true,\n   141→        .bracketed_paste = true,\n   142→    };\n   143→    try std.testing.expect(custom_config.mouse_capture);\n   144→    try std.testing.expect(custom_config.bracketed_paste);\n   145→}\n   146→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "189a471b-5bc6-4d09-bae6-5c9a2f924afe"
+tool_use_result:
+  type: text
+  file:
+    filePath: /home/hotschmoe/zithril/src/root.zig
+    content: "// zithril - Zig TUI framework\n// Built on rich_zig for terminal rendering primitives\n\nconst std = @import(\"std\");\npub const rich_zig = @import(\"rich_zig\");\n\n// Geometry types\npub const geometry = @import(\"geometry.zig\");\npub const Rect = geometry.Rect;\npub const Position = geometry.Position;\n\n// Style types (wrapper around rich_zig)\npub const style_mod = @import(\"style.zig\");\npub const Style = style_mod.Style;\npub const Color = style_mod.Color;\npub const StyleAttribute = style_mod.StyleAttribute;\n\n// Layout types\npub const layout_mod = @import(\"layout.zig\");\npub const Constraint = layout_mod.Constraint;\npub const Direction = layout_mod.Direction;\npub const layout = layout_mod.layout;\npub const BoundedRects = layout_mod.BoundedRects;\n\n// Event types\npub const event = @import(\"event.zig\");\npub const Event = event.Event;\npub const Key = event.Key;\npub const KeyCode = event.KeyCode;\npub const Modifiers = event.Modifiers;\npub const Mouse = event.Mouse;\npub const MouseKind = event.MouseKind;\npub const Size = event.Size;\n\n// Action types\npub const action = @import(\"action.zig\");\npub const Action = action.Action;\npub const Command = action.Command;\n\n// Cell type (buffer building block)\npub const cell_mod = @import(\"cell.zig\");\npub const Cell = cell_mod.Cell;\n\n// Terminal backend\npub const backend_mod = @import(\"backend.zig\");\npub const Backend = backend_mod.Backend;\npub const BackendConfig = backend_mod.BackendConfig;\n\ntest \"style wrapper\" {\n    const style = Style.init().bold().fg(.red);\n    try std.testing.expect(style.hasAttribute(.bold));\n\n    const base = Style.init().fg(.green);\n    const merged = base.patch(style);\n    try std.testing.expect(merged.hasAttribute(.bold));\n}\n\ntest \"geometry re-export\" {\n    const rect = Rect.init(0, 0, 80, 24);\n    try std.testing.expectEqual(@as(u32, 1920), rect.area());\n\n    const pos = Position.init(10, 20);\n    try std.testing.expectEqual(@as(u16, 10), pos.x);\n}\n\ntest \"layout re-export\" {\n    const c1 = Constraint.len(10);\n    const c2 = Constraint.minSize(20);\n    const c3 = Constraint.maxSize(30);\n    const c4 = Constraint.fractional(1, 3);\n    const c5 = Constraint.flexible(2);\n\n    try std.testing.expectEqual(@as(u16, 10), c1.apply(100));\n    try std.testing.expectEqual(@as(u16, 20), c2.apply(100));\n    try std.testing.expectEqual(@as(u16, 30), c3.apply(100));\n    try std.testing.expectEqual(@as(u16, 33), c4.apply(100));\n    try std.testing.expectEqual(@as(u16, 100), c5.apply(100));\n\n    try std.testing.expect(Direction.horizontal != Direction.vertical);\n}\n\ntest \"event re-export\" {\n    const key_event = Event{ .key = .{ .code = .escape, .modifiers = Modifiers.ctrl_only() } };\n    try std.testing.expect(key_event == .key);\n    try std.testing.expect(key_event.key.code == .escape);\n    try std.testing.expect(key_event.key.modifiers.ctrl);\n\n    const mouse_event = Event{ .mouse = Mouse.init(5, 10, .down) };\n    try std.testing.expect(mouse_event == .mouse);\n    try std.testing.expect(mouse_event.mouse.kind == .down);\n\n    const resize_event = Event{ .resize = Size.init(120, 40) };\n    try std.testing.expect(resize_event == .resize);\n    try std.testing.expectEqual(@as(u16, 120), resize_event.resize.width);\n\n    const tick_event = Event{ .tick = {} };\n    try std.testing.expect(tick_event == .tick);\n\n    const char_key = KeyCode.fromChar('q');\n    try std.testing.expect(char_key.isChar());\n\n    const f5_key = KeyCode.fromF(5);\n    try std.testing.expect(f5_key != null);\n}\n\ntest \"action re-export\" {\n    const none_action = Action{ .none = {} };\n    try std.testing.expect(none_action.isNone());\n\n    const quit_action = Action{ .quit = {} };\n    try std.testing.expect(quit_action.isQuit());\n\n    const cmd_action = Action{ .command = Command.empty() };\n    try std.testing.expect(cmd_action.isCommand());\n\n    try std.testing.expect(Action.none_action.isNone());\n    try std.testing.expect(Action.quit_action.isQuit());\n}\n\ntest \"cell re-export\" {\n    const cell = Cell.init('X');\n    try std.testing.expectEqual(@as(u21, 'X'), cell.char);\n    try std.testing.expectEqual(@as(u8, 1), cell.width);\n\n    const wide_cell = Cell.init(0x4E2D);\n    try std.testing.expect(wide_cell.isWide());\n\n    const styled_cell = Cell.styled('A', Style.init().bold());\n    try std.testing.expect(styled_cell.style.hasAttribute(.bold));\n}\n\ntest \"backend re-export\" {\n    const default_config = BackendConfig{};\n    try std.testing.expect(default_config.alternate_screen);\n    try std.testing.expect(default_config.hide_cursor);\n    try std.testing.expect(!default_config.mouse_capture);\n    try std.testing.expect(!default_config.bracketed_paste);\n\n    const custom_config = BackendConfig{\n        .mouse_capture = true,\n        .bracketed_paste = true,\n    };\n    try std.testing.expect(custom_config.mouse_capture);\n    try std.testing.expect(custom_config.bracketed_paste);\n}\n"
+    numLines: 146
+    startLine: 1
+    totalLines: 146
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01HbJ8TZZGeDHL6uuWnhK6uB
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"Now let me run the tests to verify everything works before considering any simplifications:"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 10779
+    cache_read_input_tokens: 24218
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 10779
+    output_tokens: 4
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "362c8dbf-4973-4ebd-beaa-bb4d09d4eb05"
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01HbJ8TZZGeDHL6uuWnhK6uB
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01FgL44bCoUa7Wnz4j5FvJHZ
+      name: Bash
+      input:
+        command: zig build test 2>&1 | head -50
+        description: Run all tests to verify current state
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 10779
+    cache_read_input_tokens: 24218
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 10779
+    output_tokens: 4
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "4056ccc9-4b3d-4638-b6e8-771f3bbb384c"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01FgL44bCoUa7Wnz4j5FvJHZ,tool_result,"",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: a05b3857-b480-46ef-830e-59c635aa0f8d
+tool_use_result:
+  stdout: ""
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01Bq5n28zxozsCBPxwDWBENw
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01HF4kVfhiatMsYtQFT88t8c
+      name: Bash
+      input:
+        command: zig build test 2>&1 | head -100
+        description: Run all tests
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 217
+    cache_read_input_tokens: 34997
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 217
+    output_tokens: 25
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "337f4d0b-0abd-4b59-8b90-d876d411c1d9"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01HF4kVfhiatMsYtQFT88t8c,tool_result,"",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "0f88a911-7f19-4da7-9303-3b7230aeab86"
+tool_use_result:
+  stdout: ""
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_013ocZiB3gQgZtyPf52ygzcP
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"All tests pass. Let me review the code for potential simplifications. Looking at the files:\n\n**action.zig** - The code is clean. A few observations:\n- The `none_action` and `quit_action` constants are slightly verbose but provide clarity\n\n**backend.zig** - Clean structure. One minor issue:\n- The `getSize` function returns a struct literal that could use a named return type for consistency, but this is a style preference\n\n**cell.zig** - Well structured. All good.\n\n**root.zig** - Clean re-exports. Tests are thorough.\n\nLet me check if there are any unused imports or redundant code:"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 109
+    cache_read_input_tokens: 35214
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 109
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "0b07c5cd-45a0-44f8-b8fe-51e6513a5758"
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_013ocZiB3gQgZtyPf52ygzcP
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01Kt8pMxjYi9syboJpJh9FtX
+      name: Bash
+      input:
+        command: "zig build test 2>&1 | grep -i \"unused\\|warning\" || echo \"No warnings found\""
+        description: Check for unused imports or warnings
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 109
+    cache_read_input_tokens: 35214
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 109
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: f74b2b63-ba4b-4ccd-9134-32062506fe14
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01Kt8pMxjYi9syboJpJh9FtX,tool_result,No warnings found,false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: ff997b48-ad1e-4213-945e-534d9cb265e5
+tool_use_result:
+  stdout: No warnings found
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01SV1nKasXYAVvhKTY1c7vFt
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"Let me check the diff more closely to see if there are any obvious simplifications:"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 262
+    cache_read_input_tokens: 35323
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 262
+    output_tokens: 5
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: c25ddcac-55ce-4c47-8e88-a3048ab5317a
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01SV1nKasXYAVvhKTY1c7vFt
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01BMW2GqjkCRviUJbQn6jxFA
+      name: Bash
+      input:
+        command: git diff HEAD~3 -- src/action.zig src/backend.zig src/cell.zig src/root.zig
+        description: Show detailed diff for source files
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 262
+    cache_read_input_tokens: 35323
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 262
+    output_tokens: 5
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: d6828ca2-4782-4b30-8882-60ca3c30ffc3
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01BMW2GqjkCRviUJbQn6jxFA,tool_result,"diff --git a/src/action.zig b/src/action.zig\nnew file mode 100644\nindex 0000000..8e50775\n--- /dev/null\n+++ b/src/action.zig\n@@ -0,0 +1,114 @@\n+// Action types for zithril TUI framework\n+// Actions are returned by the update function to control application flow.\n+\n+const std = @import(\"std\");\n+\n+/// Actions returned by the update function to control the application.\n+/// The main loop inspects these to determine what to do next.\n+pub const Action = union(enum) {\n+    /// Continue running, no special action needed.\n+    none: void,\n+\n+    /// Exit the application cleanly.\n+    quit: void,\n+\n+    /// Execute an async command (future feature).\n+    /// Commands are executed by the runtime and results come back as events.\n+    command: Command,\n+\n+    /// Convenience constant for the common case of \"do nothing\".\n+    pub const none_action: Action = .{ .none = {} };\n+\n+    /// Convenience constant for quitting.\n+    pub const quit_action: Action = .{ .quit = {} };\n+\n+    /// Check if this action will terminate the application.\n+    pub fn isQuit(self: Action) bool {\n+        return self == .quit;\n+    }\n+\n+    /// Check if this is a no-op action.\n+    pub fn isNone(self: Action) bool {\n+        return self == .none;\n+    }\n+\n+    /// Check if this is a command action.\n+    pub fn isCommand(self: Action) bool {\n+        return self == .command;\n+    }\n+};\n+\n+/// Command type for async operations (future feature).\n+/// Commands are returned from update, executed by the runtime,\n+/// and results come back as events.\n+pub const Command = union(enum) {\n+    /// No command (placeholder for future expansion).\n+    none: void,\n+\n+    /// Batch multiple commands together.\n+    batch: []const Command,\n+\n+    /// Custom command with user-defined ID and data.\n+    custom: struct {\n+        id: u32,\n+        data: ?*anyopaque,\n+    },\n+\n+    /// Create an empty command.\n+    pub fn empty() Command {\n+        return .{ .none = {} };\n+    }\n+};\n+\n+// ============================================================\n+// SANITY TESTS - Basic type construction\n+// ============================================================\n+\n+test \"sanity: Action.none construction\" {\n+    const action = Action{ .none = {} };\n+    try std.testing.expect(action == .none);\n+    try std.testing.expect(action.isNone());\n+    try std.testing.expect(!action.isQuit());\n+}\n+\n+test \"sanity: Action.quit construction\" {\n+    const action = Action{ .quit = {} };\n+    try std.testing.expect(action == .quit);\n+    try std.testing.expect(action.isQuit());\n+    try std.testing.expect(!action.isNone());\n+}\n+\n+test \"sanity: Action.command construction\" {\n+    const action = Action{ .command = Command.empty() };\n+    try std.testing.expect(action == .command);\n+    try std.testing.expect(action.isCommand());\n+    try std.testing.expect(!action.isQuit());\n+}\n+\n+test \"sanity: Action convenience constants\" {\n+    try std.testing.expect(Action.none_action.isNone());\n+    try std.testing.expect(Action.quit_action.isQuit());\n+}\n+\n+// ============================================================\n+// BEHAVIOR TESTS - Command types\n+// ============================================================\n+\n+test \"behavior: Command.empty creates none command\" {\n+    const cmd = Command.empty();\n+    try std.testing.expect(cmd == .none);\n+}\n+\n+test \"behavior: Command.custom construction\" {\n+    const cmd = Command{ .custom = .{ .id = 42, .data = null } };\n+    try std.testing.expect(cmd == .custom);\n+    try std.testing.expectEqual(@as(u32, 42), cmd.custom.id);\n+    try std.testing.expect(cmd.custom.data == null);\n+}\n+\n+test \"behavior: Action with custom command\" {\n+    const cmd = Command{ .custom = .{ .id = 123, .data = null } };\n+    const action = Action{ .command = cmd };\n+    try std.testing.expect(action.isCommand());\n+    try std.testing.expectEqual(@as(u32, 123), action.command.custom.id);\n+}\ndiff --git a/src/backend.zig b/src/backend.zig\nnew file mode 100644\nindex 0000000..231f8b7\n--- /dev/null\n+++ b/src/backend.zig\n@@ -0,0 +1,271 @@\n+// Terminal backend for zithril TUI framework\n+// Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste\n+\n+const std = @import(\"std\");\n+const builtin = @import(\"builtin\");\n+const posix = std.posix;\n+\n+/// Configuration options for terminal initialization.\n+pub const BackendConfig = struct {\n+    /// Enter alternate screen buffer (preserves original terminal content).\n+    alternate_screen: bool = true,\n+    /// Hide cursor during TUI operation.\n+    hide_cursor: bool = true,\n+    /// Enable mouse event reporting.\n+    mouse_capture: bool = false,\n+    /// Enable bracketed paste mode (distinguish pasted text from typed).\n+    bracketed_paste: bool = false,\n+};\n+\n+/// Terminal backend state.\n+/// Manages raw mode, alternate screen, and other terminal features.\n+/// RAII pattern: deinit() restores terminal to original state.\n+pub const Backend = struct {\n+    /// File descriptor for terminal output (typically stdout).\n+    fd: posix.fd_t,\n+    /// Original terminal settings, saved for restoration.\n+    original_termios: ?posix.termios,\n+    /// Configuration used during initialization.\n+    config: BackendConfig,\n+    /// Whether the backend is currently active.\n+    active: bool,\n+\n+    /// Error type for backend operations.\n+    pub const Error = error{\n+        NotATty,\n+        TerminalQueryFailed,\n+        TerminalSetFailed,\n+        IoError,\n+    };\n+\n+    /// Initialize the terminal backend.\n+    /// Enables raw mode and optional features based on config.\n+    /// Returns error if stdout is not a TTY or terminal ops fail.\n+    pub fn init(config: BackendConfig) Error!Backend {\n+        const fd = posix.STDOUT_FILENO;\n+\n+        if (!posix.isatty(fd)) {\n+            return Error.NotATty;\n+        }\n+\n+        var self = Backend{\n+            .fd = fd,\n+            .original_termios = null,\n+            .config = config,\n+            .active = false,\n+        };\n+\n+        try self.enterRawMode();\n+        self.active = true;\n+\n+        if (config.alternate_screen) {\n+            self.writeEscape(ENTER_ALTERNATE_SCREEN);\n+        }\n+\n+        if (config.hide_cursor) {\n+            self.writeEscape(HIDE_CURSOR);\n+        }\n+\n+        if (config.mouse_capture) {\n+            self.enableMouse();\n+        }\n+\n+        if (config.bracketed_paste) {\n+            self.writeEscape(ENABLE_BRACKETED_PASTE);\n+        }\n+\n+        return self;\n+    }\n+\n+    /// Restore terminal to original state.\n+    /// Safe to call multiple times.\n+    pub fn deinit(self: *Backend) void {\n+        if (!self.active) return;\n+\n+        if (self.config.bracketed_paste) {\n+            self.writeEscape(DISABLE_BRACKETED_PASTE);\n+        }\n+\n+        if (self.config.mouse_capture) {\n+            self.disableMouse();\n+        }\n+\n+        if (self.config.hide_cursor) {\n+            self.writeEscape(SHOW_CURSOR);\n+        }\n+\n+        if (self.config.alternate_screen) {\n+            self.writeEscape(LEAVE_ALTERNATE_SCREEN);\n+        }\n+\n+        self.exitRawMode();\n+        self.active = false;\n+    }\n+\n+    /// Enter raw mode: disable line buffering, echo, and canonical mode.\n+    fn enterRawMode(self: *Backend) Error!void {\n+        const original = posix.tcgetattr(self.fd) catch {\n+            return Error.TerminalQueryFailed;\n+        };\n+        self.original_termios = original;\n+\n+        var raw = original;\n+\n+        // Input flags: disable break handling, CR-to-NL, parity, strip, flow control\n+        raw.iflag.BRKINT = false;\n+        raw.iflag.ICRNL = false;\n+        raw.iflag.INPCK = false;\n+        raw.iflag.ISTRIP = false;\n+        raw.iflag.IXON = false;\n+\n+        // Output flags: disable post-processing\n+        raw.oflag.OPOST = false;\n+\n+        // Control flags: set character size to 8 bits\n+        raw.cflag.CSIZE = .CS8;\n+\n+        // Local flags: disable echo, canonical mode, signals, extended input\n+        raw.lflag.ECHO = false;\n+        raw.lflag.ICANON = false;\n+        raw.lflag.ISIG = false;\n+        raw.lflag.IEXTEN = false;\n+\n+        // Set minimum chars for non-canonical read\n+        raw.cc[@intFromEnum(posix.V.MIN)] = 0;\n+        raw.cc[@intFromEnum(posix.V.TIME)] = 1;\n+\n+        posix.tcsetattr(self.fd, .FLUSH, raw) catch {\n+            return Error.TerminalSetFailed;\n+        };\n+    }\n+\n+    /// Exit raw mode: restore original terminal settings.\n+    fn exitRawMode(self: *Backend) void {\n+        if (self.original_termios) |original| {\n+            posix.tcsetattr(self.fd, .FLUSH, original) catch {};\n+        }\n+    }\n+\n+    /// Enable mouse reporting (SGR mode for better coordinate handling).\n+    fn enableMouse(self: *Backend) void {\n+        self.writeEscape(ENABLE_MOUSE_CAPTURE);\n+        self.writeEscape(ENABLE_MOUSE_SGR);\n+    }\n+\n+    /// Disable mouse reporting.\n+    fn disableMouse(self: *Backend) void {\n+        self.writeEscape(DISABLE_MOUSE_SGR);\n+        self.writeEscape(DISABLE_MOUSE_CAPTURE);\n+    }\n+\n+    /// Write an escape sequence to the terminal.\n+    fn writeEscape(self: *Backend, seq: []const u8) void {\n+        const file = std.fs.File{ .handle = self.fd };\n+        file.writeAll(seq) catch {};\n+    }\n+\n+    /// Flush output to terminal.\n+    pub fn flush(self: *Backend) void {\n+        const file = std.fs.File{ .handle = self.fd };\n+        file.sync() catch {};\n+    }\n+\n+    /// Write bytes to the terminal.\n+    pub fn write(self: *Backend, data: []const u8) Error!void {\n+        const file = std.fs.File{ .handle = self.fd };\n+        file.writeAll(data) catch {\n+            return Error.IoError;\n+        };\n+    }\n+\n+    /// Move cursor to home position (0, 0).\n+    pub fn cursorHome(self: *Backend) void {\n+        self.writeEscape(CURSOR_HOME);\n+    }\n+\n+    /// Move cursor to specific position (0-indexed).\n+    pub fn cursorTo(self: *Backend, x: u16, y: u16) void {\n+        var buf: [32]u8 = undefined;\n+        const seq = std.fmt.bufPrint(&buf, \"\\x1b[{d};{d}H\", .{ y + 1, x + 1 }) catch return;\n+        self.writeEscape(seq);\n+    }\n+\n+    /// Clear the entire screen.\n+    pub fn clearScreen(self: *Backend) void {\n+        self.writeEscape(CLEAR_SCREEN);\n+    }\n+\n+    /// Get terminal size (width, height).\n+    pub fn getSize(self: *Backend) struct { width: u16, height: u16 } {\n+        var ws: posix.winsize = undefined;\n+        const result = posix.system.ioctl(self.fd, posix.T.IOCGWINSZ, @intFromPtr(&ws));\n+        if (result == 0) {\n+            return .{ .width = ws.col, .height = ws.row };\n+        }\n+        return .{ .width = 80, .height = 24 };\n+    }\n+\n+    // ANSI escape sequences\n+    const ENTER_ALTERNATE_SCREEN = \"\\x1b[?1049h\";\n+    const LEAVE_ALTERNATE_SCREEN = \"\\x1b[?1049l\";\n+    const HIDE_CURSOR = \"\\x1b[?25l\";\n+    const SHOW_CURSOR = \"\\x1b[?25h\";\n+    const CLEAR_SCREEN = \"\\x1b[2J\";\n+    const CURSOR_HOME = \"\\x1b[H\";\n+\n+    const ENABLE_MOUSE_CAPTURE = \"\\x1b[?1000h\\x1b[?1002h\\x1b[?1003h\";\n+    const DISABLE_MOUSE_CAPTURE = \"\\x1b[?1003l\\x1b[?1002l\\x1b[?1000l\";\n+    const ENABLE_MOUSE_SGR = \"\\x1b[?1006h\";\n+    const DISABLE_MOUSE_SGR = \"\\x1b[?1006l\";\n+\n+    const ENABLE_BRACKETED_PASTE = \"\\x1b[?2004h\";\n+    const DISABLE_BRACKETED_PASTE = \"\\x1b[?2004l\";\n+};\n+\n+// ============================================================\n+// SANITY TESTS - Backend configuration\n+// ============================================================\n+\n+test \"sanity: BackendConfig defaults\" {\n+    const config = BackendConfig{};\n+    try std.testing.expect(config.alternate_screen);\n+    try std.testing.expect(config.hide_cursor);\n+    try std.testing.expect(!config.mouse_capture);\n+    try std.testing.expect(!config.bracketed_paste);\n+}\n+\n+test \"sanity: BackendConfig custom\" {\n+    const config = BackendConfig{\n+        .alternate_screen = false,\n+        .hide_cursor = false,\n+        .mouse_capture = true,\n+        .bracketed_paste = true,\n+    };\n+    try std.testing.expect(!config.alternate_screen);\n+    try std.testing.expect(!config.hide_cursor);\n+    try std.testing.expect(config.mouse_capture);\n+    try std.testing.expect(config.bracketed_paste);\n+}\n+\n+// ============================================================\n+// BEHAVIOR TESTS - Escape sequences\n+// ============================================================\n+\n+test \"behavior: escape sequences are correct format\" {\n+    try std.testing.expectEqualStrings(\"\\x1b[?1049h\", Backend.ENTER_ALTERNATE_SCREEN);\n+    try std.testing.expectEqualStrings(\"\\x1b[?1049l\", Backend.LEAVE_ALTERNATE_SCREEN);\n+    try std.testing.expectEqualStrings(\"\\x1b[?25l\", Backend.HIDE_CURSOR);\n+    try std.testing.expectEqualStrings(\"\\x1b[?25h\", Backend.SHOW_CURSOR);\n+    try std.testing.expectEqualStrings(\"\\x1b[2J\", Backend.CLEAR_SCREEN);\n+    try std.testing.expectEqualStrings(\"\\x1b[H\", Backend.CURSOR_HOME);\n+}\n+\n+test \"behavior: bracketed paste sequences are correct\" {\n+    try std.testing.expectEqualStrings(\"\\x1b[?2004h\", Backend.ENABLE_BRACKETED_PASTE);\n+    try std.testing.expectEqualStrings(\"\\x1b[?2004l\", Backend.DISABLE_BRACKETED_PASTE);\n+}\n+\n+test \"behavior: mouse SGR sequences are correct\" {\n+    try std.testing.expectEqualStrings(\"\\x1b[?1006h\", Backend.ENABLE_MOUSE_SGR);\n+    try std.testing.expectEqualStrings(\"\\x1b[?1006l\", Backend.DISABLE_MOUSE_SGR);\n+}\ndiff --git a/src/cell.zig b/src/cell.zig\nnew file mode 100644\nindex 0000000..e625bd3\n--- /dev/null\n+++ b/src/cell.zig\n@@ -0,0 +1,224 @@\n+// Cell type for zithril TUI framework\n+// Represents a single character cell in the terminal buffer\n+\n+const std = @import(\"std\");\n+pub const rich_zig = @import(\"rich_zig\");\n+const style_mod = @import(\"style.zig\");\n+pub const Style = style_mod.Style;\n+\n+/// A single cell in the terminal buffer.\n+/// Each cell represents one character position, with its associated style and display width.\n+pub const Cell = struct {\n+    /// Unicode codepoint for the character displayed in this cell.\n+    /// Defaults to space (U+0020).\n+    char: u21 = ' ',\n+\n+    /// Visual style applied to this cell (colors, bold, italic, etc).\n+    style: Style = Style.empty,\n+\n+    /// Display width in terminal columns.\n+    /// - 1 for most characters (ASCII, basic Latin, etc.)\n+    /// - 2 for wide characters (CJK ideographs, emoji, fullwidth forms)\n+    /// - 0 for combining marks (handled specially during rendering)\n+    width: u8 = 1,\n+\n+    /// The default cell: a space with default style and width 1.\n+    pub const default: Cell = .{};\n+\n+    /// Create a cell with a specific character, using default style.\n+    pub fn init(char: u21) Cell {\n+        return .{\n+            .char = char,\n+            .style = Style.empty,\n+            .width = charWidth(char),\n+        };\n+    }\n+\n+    /// Create a cell with a character and style.\n+    pub fn styled(char: u21, s: Style) Cell {\n+        return .{\n+            .char = char,\n+            .style = s,\n+            .width = charWidth(char),\n+        };\n+    }\n+\n+    /// Create a cell with explicit width override.\n+    pub fn withWidth(char: u21, s: Style, w: u8) Cell {\n+        return .{\n+            .char = char,\n+            .style = s,\n+            .width = w,\n+        };\n+    }\n+\n+    /// Update the cell's character, automatically recalculating width.\n+    pub fn setChar(self: Cell, char: u21) Cell {\n+        return .{\n+            .char = char,\n+            .style = self.style,\n+            .width = charWidth(char),\n+        };\n+    }\n+\n+    /// Update the cell's style.\n+    pub fn setStyle(self: Cell, s: Style) Cell {\n+        return .{\n+            .char = self.char,\n+            .style = s,\n+            .width = self.width,\n+        };\n+    }\n+\n+    /// Merge another style on top of this cell's style.\n+    pub fn patchStyle(self: Cell, s: Style) Cell {\n+        return .{\n+            .char = self.char,\n+            .style = self.style.patch(s),\n+            .width = self.width,\n+        };\n+    }\n+\n+    /// Check if this cell is the default (space with empty style).\n+    pub fn isDefault(self: Cell) bool {\n+        return self.char == ' ' and self.style.isEmpty() and self.width == 1;\n+    }\n+\n+    /// Check equality with another cell.\n+    pub fn eql(self: Cell, other: Cell) bool {\n+        return self.char == other.char and\n+            self.style.eql(other.style) and\n+            self.width == other.width;\n+    }\n+\n+    /// Get the character width using rich_zig's cell width calculation.\n+    /// Returns 1 for most chars, 2 for wide (CJK/emoji), 0 for combining.\n+    pub fn charWidth(char: u21) u8 {\n+        return rich_zig.cells.getCharacterCellSize(char);\n+    }\n+\n+    /// Check if this cell contains a wide character (width 2).\n+    pub fn isWide(self: Cell) bool {\n+        return self.width == 2;\n+    }\n+\n+    /// Check if this cell contains a zero-width character (combining mark).\n+    pub fn isZeroWidth(self: Cell) bool {\n+        return self.width == 0;\n+    }\n+};\n+\n+// ============================================================\n+// SANITY TESTS - Basic Cell functionality\n+// ============================================================\n+\n+test \"sanity: Cell default is space with default style\" {\n+    const cell = Cell.default;\n+    try std.testing.expectEqual(@as(u21, ' '), cell.char);\n+    try std.testing.expect(cell.style.isEmpty());\n+    try std.testing.expectEqual(@as(u8, 1), cell.width);\n+}\n+\n+test \"sanity: Cell.init creates cell with correct width\" {\n+    const cell = Cell.init('A');\n+    try std.testing.expectEqual(@as(u21, 'A'), cell.char);\n+    try std.testing.expectEqual(@as(u8, 1), cell.width);\n+    try std.testing.expect(cell.style.isEmpty());\n+}\n+\n+test \"sanity: Cell.styled creates cell with style\" {\n+    const s = Style.init().bold().fg(.red);\n+    const cell = Cell.styled('X', s);\n+    try std.testing.expectEqual(@as(u21, 'X'), cell.char);\n+    try std.testing.expect(cell.style.hasAttribute(.bold));\n+}\n+\n+// ============================================================\n+// BEHAVIOR TESTS - Wide characters and combining marks\n+// ============================================================\n+\n+test \"behavior: Cell.init detects CJK as wide\" {\n+    const cell = Cell.init(0x4E2D);\n+    try std.testing.expectEqual(@as(u8, 2), cell.width);\n+    try std.testing.expect(cell.isWide());\n+}\n+\n+test \"behavior: Cell.init detects emoji as wide\" {\n+    const cell = Cell.init(0x1F600);\n+    try std.testing.expectEqual(@as(u8, 2), cell.width);\n+    try std.testing.expect(cell.isWide());\n+}\n+\n+test \"behavior: Cell.init detects combining mark as zero-width\" {\n+    const cell = Cell.init(0x0301);\n+    try std.testing.expectEqual(@as(u8, 0), cell.width);\n+    try std.testing.expect(cell.isZeroWidth());\n+}\n+\n+test \"behavior: Cell.isDefault detects default cell\" {\n+    try std.testing.expect(Cell.default.isDefault());\n+    try std.testing.expect(!Cell.init('X').isDefault());\n+    try std.testing.expect(!Cell.styled(' ', Style.init().bold()).isDefault());\n+}\n+\n+test \"behavior: Cell.setChar updates char and width\" {\n+    const cell = Cell.init('A');\n+    const updated = cell.setChar(0x4E2D);\n+    try std.testing.expectEqual(@as(u21, 0x4E2D), updated.char);\n+    try std.testing.expectEqual(@as(u8, 2), updated.width);\n+}\n+\n+test \"behavior: Cell.setStyle preserves char and width\" {\n+    const cell = Cell.init(0x4E2D);\n+    const styled_cell = cell.setStyle(Style.init().bold());\n+    try std.testing.expectEqual(@as(u21, 0x4E2D), styled_cell.char);\n+    try std.testing.expectEqual(@as(u8, 2), styled_cell.width);\n+    try std.testing.expect(styled_cell.style.hasAttribute(.bold));\n+}\n+\n+test \"behavior: Cell.patchStyle merges styles\" {\n+    const cell = Cell.styled('A', Style.init().bold());\n+    const patched = cell.patchStyle(Style.init().italic());\n+    try std.testing.expect(patched.style.hasAttribute(.bold));\n+    try std.testing.expect(patched.style.hasAttribute(.italic));\n+}\n+\n+test \"behavior: Cell.eql compares all fields\" {\n+    const c1 = Cell.styled('A', Style.init().bold());\n+    const c2 = Cell.styled('A', Style.init().bold());\n+    const c3 = Cell.styled('B', Style.init().bold());\n+    const c4 = Cell.styled('A', Style.init().italic());\n+\n+    try std.testing.expect(c1.eql(c2));\n+    try std.testing.expect(!c1.eql(c3));\n+    try std.testing.expect(!c1.eql(c4));\n+}\n+\n+test \"behavior: Cell.withWidth allows explicit width override\" {\n+    const cell = Cell.withWidth('A', Style.empty, 3);\n+    try std.testing.expectEqual(@as(u8, 3), cell.width);\n+}\n+\n+// ============================================================\n+// REGRESSION TESTS - Edge cases\n+// ============================================================\n+\n+test \"regression: ASCII characters have width 1\" {\n+    for (0x20..0x7F) |c| {\n+        const cell = Cell.init(@intCast(c));\n+        try std.testing.expectEqual(@as(u8, 1), cell.width);\n+    }\n+}\n+\n+test \"regression: control characters have width 0\" {\n+    const cell_null = Cell.init(0);\n+    try std.testing.expectEqual(@as(u8, 0), cell_null.width);\n+\n+    const cell_newline = Cell.init('\\n');\n+    try std.testing.expectEqual(@as(u8, 0), cell_newline.width);\n+}\n+\n+test \"regression: zero-width space has width 0\" {\n+    const cell = Cell.init(0x200B);\n+    try std.testing.expectEqual(@as(u8, 0), cell.width);\n+}\ndiff --git a/src/root.zig b/src/root.zig\nindex cfbca09..fff527e 100644\n--- a/src/root.zig\n+++ b/src/root.zig\n@@ -32,6 +32,20 @@ pub const Mouse = event.Mouse;\n pub const MouseKind = event.MouseKind;\n pub const Size = event.Size;\n \n+// Action types\n+pub const action = @import(\"action.zig\");\n+pub const Action = action.Action;\n+pub const Command = action.Command;\n+\n+// Cell type (buffer building block)\n+pub const cell_mod = @import(\"cell.zig\");\n+pub const Cell = cell_mod.Cell;\n+\n+// Terminal backend\n+pub const backend_mod = @import(\"backend.zig\");\n+pub const Backend = backend_mod.Backend;\n+pub const BackendConfig = backend_mod.BackendConfig;\n+\n test \"style wrapper\" {\n     const style = Style.init().bold().fg(.red);\n     try std.testing.expect(style.hasAttribute(.bold));\n@@ -88,3 +102,44 @@ test \"event re-export\" {\n     const f5_key = KeyCode.fromF(5);\n     try std.testing.expect(f5_key != null);\n }\n+\n+test \"action re-export\" {\n+    const none_action = Action{ .none = {} };\n+    try std.testing.expect(none_action.isNone());\n+\n+    const quit_action = Action{ .quit = {} };\n+    try std.testing.expect(quit_action.isQuit());\n+\n+    const cmd_action = Action{ .command = Command.empty() };\n+    try std.testing.expect(cmd_action.isCommand());\n+\n+    try std.testing.expect(Action.none_action.isNone());\n+    try std.testing.expect(Action.quit_action.isQuit());\n+}\n+\n+test \"cell re-export\" {\n+    const cell = Cell.init('X');\n+    try std.testing.expectEqual(@as(u21, 'X'), cell.char);\n+    try std.testing.expectEqual(@as(u8, 1), cell.width);\n+\n+    const wide_cell = Cell.init(0x4E2D);\n+    try std.testing.expect(wide_cell.isWide());\n+\n+    const styled_cell = Cell.styled('A', Style.init().bold());\n+    try std.testing.expect(styled_cell.style.hasAttribute(.bold));\n+}\n+\n+test \"backend re-export\" {\n+    const default_config = BackendConfig{};\n+    try std.testing.expect(default_config.alternate_screen);\n+    try std.testing.expect(default_config.hide_cursor);\n+    try std.testing.expect(!default_config.mouse_capture);\n+    try std.testing.expect(!default_config.bracketed_paste);\n+\n+    const custom_config = BackendConfig{\n+        .mouse_capture = true,\n+        .bracketed_paste = true,\n+    };\n+    try std.testing.expect(custom_config.mouse_capture);\n+    try std.testing.expect(custom_config.bracketed_paste);\n+}",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "7fb889fb-1a9a-455e-a444-bbfb33d6c660"
+tool_use_result:
+  stdout: "diff --git a/src/action.zig b/src/action.zig\nnew file mode 100644\nindex 0000000..8e50775\n--- /dev/null\n+++ b/src/action.zig\n@@ -0,0 +1,114 @@\n+// Action types for zithril TUI framework\n+// Actions are returned by the update function to control application flow.\n+\n+const std = @import(\"std\");\n+\n+/// Actions returned by the update function to control the application.\n+/// The main loop inspects these to determine what to do next.\n+pub const Action = union(enum) {\n+    /// Continue running, no special action needed.\n+    none: void,\n+\n+    /// Exit the application cleanly.\n+    quit: void,\n+\n+    /// Execute an async command (future feature).\n+    /// Commands are executed by the runtime and results come back as events.\n+    command: Command,\n+\n+    /// Convenience constant for the common case of \"do nothing\".\n+    pub const none_action: Action = .{ .none = {} };\n+\n+    /// Convenience constant for quitting.\n+    pub const quit_action: Action = .{ .quit = {} };\n+\n+    /// Check if this action will terminate the application.\n+    pub fn isQuit(self: Action) bool {\n+        return self == .quit;\n+    }\n+\n+    /// Check if this is a no-op action.\n+    pub fn isNone(self: Action) bool {\n+        return self == .none;\n+    }\n+\n+    /// Check if this is a command action.\n+    pub fn isCommand(self: Action) bool {\n+        return self == .command;\n+    }\n+};\n+\n+/// Command type for async operations (future feature).\n+/// Commands are returned from update, executed by the runtime,\n+/// and results come back as events.\n+pub const Command = union(enum) {\n+    /// No command (placeholder for future expansion).\n+    none: void,\n+\n+    /// Batch multiple commands together.\n+    batch: []const Command,\n+\n+    /// Custom command with user-defined ID and data.\n+    custom: struct {\n+        id: u32,\n+        data: ?*anyopaque,\n+    },\n+\n+    /// Create an empty command.\n+    pub fn empty() Command {\n+        return .{ .none = {} };\n+    }\n+};\n+\n+// ============================================================\n+// SANITY TESTS - Basic type construction\n+// ============================================================\n+\n+test \"sanity: Action.none construction\" {\n+    const action = Action{ .none = {} };\n+    try std.testing.expect(action == .none);\n+    try std.testing.expect(action.isNone());\n+    try std.testing.expect(!action.isQuit());\n+}\n+\n+test \"sanity: Action.quit construction\" {\n+    const action = Action{ .quit = {} };\n+    try std.testing.expect(action == .quit);\n+    try std.testing.expect(action.isQuit());\n+    try std.testing.expect(!action.isNone());\n+}\n+\n+test \"sanity: Action.command construction\" {\n+    const action = Action{ .command = Command.empty() };\n+    try std.testing.expect(action == .command);\n+    try std.testing.expect(action.isCommand());\n+    try std.testing.expect(!action.isQuit());\n+}\n+\n+test \"sanity: Action convenience constants\" {\n+    try std.testing.expect(Action.none_action.isNone());\n+    try std.testing.expect(Action.quit_action.isQuit());\n+}\n+\n+// ============================================================\n+// BEHAVIOR TESTS - Command types\n+// ============================================================\n+\n+test \"behavior: Command.empty creates none command\" {\n+    const cmd = Command.empty();\n+    try std.testing.expect(cmd == .none);\n+}\n+\n+test \"behavior: Command.custom construction\" {\n+    const cmd = Command{ .custom = .{ .id = 42, .data = null } };\n+    try std.testing.expect(cmd == .custom);\n+    try std.testing.expectEqual(@as(u32, 42), cmd.custom.id);\n+    try std.testing.expect(cmd.custom.data == null);\n+}\n+\n+test \"behavior: Action with custom command\" {\n+    const cmd = Command{ .custom = .{ .id = 123, .data = null } };\n+    const action = Action{ .command = cmd };\n+    try std.testing.expect(action.isCommand());\n+    try std.testing.expectEqual(@as(u32, 123), action.command.custom.id);\n+}\ndiff --git a/src/backend.zig b/src/backend.zig\nnew file mode 100644\nindex 0000000..231f8b7\n--- /dev/null\n+++ b/src/backend.zig\n@@ -0,0 +1,271 @@\n+// Terminal backend for zithril TUI framework\n+// Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste\n+\n+const std = @import(\"std\");\n+const builtin = @import(\"builtin\");\n+const posix = std.posix;\n+\n+/// Configuration options for terminal initialization.\n+pub const BackendConfig = struct {\n+    /// Enter alternate screen buffer (preserves original terminal content).\n+    alternate_screen: bool = true,\n+    /// Hide cursor during TUI operation.\n+    hide_cursor: bool = true,\n+    /// Enable mouse event reporting.\n+    mouse_capture: bool = false,\n+    /// Enable bracketed paste mode (distinguish pasted text from typed).\n+    bracketed_paste: bool = false,\n+};\n+\n+/// Terminal backend state.\n+/// Manages raw mode, alternate screen, and other terminal features.\n+/// RAII pattern: deinit() restores terminal to original state.\n+pub const Backend = struct {\n+    /// File descriptor for terminal output (typically stdout).\n+    fd: posix.fd_t,\n+    /// Original terminal settings, saved for restoration.\n+    original_termios: ?posix.termios,\n+    /// Configuration used during initialization.\n+    config: BackendConfig,\n+    /// Whether the backend is currently active.\n+    active: bool,\n+\n+    /// Error type for backend operations.\n+    pub const Error = error{\n+        NotATty,\n+        TerminalQueryFailed,\n+        TerminalSetFailed,\n+        IoError,\n+    };\n+\n+    /// Initialize the terminal backend.\n+    /// Enables raw mode and optional features based on config.\n+    /// Returns error if stdout is not a TTY or terminal ops fail.\n+    pub fn init(config: BackendConfig) Error!Backend {\n+        const fd = posix.STDOUT_FILENO;\n+\n+        if (!posix.isatty(fd)) {\n+            return Error.NotATty;\n+        }\n+\n+        var self = Backend{\n+            .fd = fd,\n+            .original_termios = null,\n+            .config = config,\n+            .active = false,\n+        };\n+\n+        try self.enterRawMode();\n+        self.active = true;\n+\n+        if (config.alternate_screen) {\n+            self.writeEscape(ENTER_ALTERNATE_SCREEN);\n+        }\n+\n+        if (config.hide_cursor) {\n+            self.writeEscape(HIDE_CURSOR);\n+        }\n+\n+        if (config.mouse_capture) {\n+            self.enableMouse();\n+        }\n+\n+        if (config.bracketed_paste) {\n+            self.writeEscape(ENABLE_BRACKETED_PASTE);\n+        }\n+\n+        return self;\n+    }\n+\n+    /// Restore terminal to original state.\n+    /// Safe to call multiple times.\n+    pub fn deinit(self: *Backend) void {\n+        if (!self.active) return;\n+\n+        if (self.config.bracketed_paste) {\n+            self.writeEscape(DISABLE_BRACKETED_PASTE);\n+        }\n+\n+        if (self.config.mouse_capture) {\n+            self.disableMouse();\n+        }\n+\n+        if (self.config.hide_cursor) {\n+            self.writeEscape(SHOW_CURSOR);\n+        }\n+\n+        if (self.config.alternate_screen) {\n+            self.writeEscape(LEAVE_ALTERNATE_SCREEN);\n+        }\n+\n+        self.exitRawMode();\n+        self.active = false;\n+    }\n+\n+    /// Enter raw mode: disable line buffering, echo, and canonical mode.\n+    fn enterRawMode(self: *Backend) Error!void {\n+        const original = posix.tcgetattr(self.fd) catch {\n+            return Error.TerminalQueryFailed;\n+        };\n+        self.original_termios = original;\n+\n+        var raw = original;\n+\n+        // Input flags: disable break handling, CR-to-NL, parity, strip, flow control\n+        raw.iflag.BRKINT = false;\n+        raw.iflag.ICRNL = false;\n+        raw.iflag.INPCK = false;\n+        raw.iflag.ISTRIP = false;\n+        raw.iflag.IXON = false;\n+\n+        // Output flags: disable post-processing\n+        raw.oflag.OPOST = false;\n+\n+        // Control flags: set character size to 8 bits\n+        raw.cflag.CSIZE = .CS8;\n+\n+        // Local flags: disable echo, canonical mode, signals, extended input\n+        raw.lflag.ECHO = false;\n+        raw.lflag.ICANON = false;\n+        raw.lflag.ISIG = false;\n+        raw.lflag.IEXTEN = false;\n+\n+        // Set minimum chars for non-canonical read\n+        raw.cc[@intFromEnum(posix.V.MIN)] = 0;\n+        raw.cc[@intFromEnum(posix.V.TIME)] = 1;\n+\n+        posix.tcsetattr(self.fd, .FLUSH, raw) catch {\n+            return Error.TerminalSetFailed;\n+        };\n+    }\n+\n+    /// Exit raw mode: restore original terminal settings.\n+    fn exitRawMode(self: *Backend) void {\n+        if (self.original_termios) |original| {\n+            posix.tcsetattr(self.fd, .FLUSH, original) catch {};\n+        }\n+    }\n+\n+    /// Enable mouse reporting (SGR mode for better coordinate handling).\n+    fn enableMouse(self: *Backend) void {\n+        self.writeEscape(ENABLE_MOUSE_CAPTURE);\n+        self.writeEscape(ENABLE_MOUSE_SGR);\n+    }\n+\n+    /// Disable mouse reporting.\n+    fn disableMouse(self: *Backend) void {\n+        self.writeEscape(DISABLE_MOUSE_SGR);\n+        self.writeEscape(DISABLE_MOUSE_CAPTURE);\n+    }\n+\n+    /// Write an escape sequence to the terminal.\n+    fn writeEscape(self: *Backend, seq: []const u8) void {\n+        const file = std.fs.File{ .handle = self.fd };\n+        file.writeAll(seq) catch {};\n+    }\n+\n+    /// Flush output to terminal.\n+    pub fn flush(self: *Backend) void {\n+        const file = std.fs.File{ .handle = self.fd };\n+        file.sync() catch {};\n+    }\n+\n+    /// Write bytes to the terminal.\n+    pub fn write(self: *Backend, data: []const u8) Error!void {\n+        const file = std.fs.File{ .handle = self.fd };\n+        file.writeAll(data) catch {\n+            return Error.IoError;\n+        };\n+    }\n+\n+    /// Move cursor to home position (0, 0).\n+    pub fn cursorHome(self: *Backend) void {\n+        self.writeEscape(CURSOR_HOME);\n+    }\n+\n+    /// Move cursor to specific position (0-indexed).\n+    pub fn cursorTo(self: *Backend, x: u16, y: u16) void {\n+        var buf: [32]u8 = undefined;\n+        const seq = std.fmt.bufPrint(&buf, \"\\x1b[{d};{d}H\", .{ y + 1, x + 1 }) catch return;\n+        self.writeEscape(seq);\n+    }\n+\n+    /// Clear the entire screen.\n+    pub fn clearScreen(self: *Backend) void {\n+        self.writeEscape(CLEAR_SCREEN);\n+    }\n+\n+    /// Get terminal size (width, height).\n+    pub fn getSize(self: *Backend) struct { width: u16, height: u16 } {\n+        var ws: posix.winsize = undefined;\n+        const result = posix.system.ioctl(self.fd, posix.T.IOCGWINSZ, @intFromPtr(&ws));\n+        if (result == 0) {\n+            return .{ .width = ws.col, .height = ws.row };\n+        }\n+        return .{ .width = 80, .height = 24 };\n+    }\n+\n+    // ANSI escape sequences\n+    const ENTER_ALTERNATE_SCREEN = \"\\x1b[?1049h\";\n+    const LEAVE_ALTERNATE_SCREEN = \"\\x1b[?1049l\";\n+    const HIDE_CURSOR = \"\\x1b[?25l\";\n+    const SHOW_CURSOR = \"\\x1b[?25h\";\n+    const CLEAR_SCREEN = \"\\x1b[2J\";\n+    const CURSOR_HOME = \"\\x1b[H\";\n+\n+    const ENABLE_MOUSE_CAPTURE = \"\\x1b[?1000h\\x1b[?1002h\\x1b[?1003h\";\n+    const DISABLE_MOUSE_CAPTURE = \"\\x1b[?1003l\\x1b[?1002l\\x1b[?1000l\";\n+    const ENABLE_MOUSE_SGR = \"\\x1b[?1006h\";\n+    const DISABLE_MOUSE_SGR = \"\\x1b[?1006l\";\n+\n+    const ENABLE_BRACKETED_PASTE = \"\\x1b[?2004h\";\n+    const DISABLE_BRACKETED_PASTE = \"\\x1b[?2004l\";\n+};\n+\n+// ============================================================\n+// SANITY TESTS - Backend configuration\n+// ============================================================\n+\n+test \"sanity: BackendConfig defaults\" {\n+    const config = BackendConfig{};\n+    try std.testing.expect(config.alternate_screen);\n+    try std.testing.expect(config.hide_cursor);\n+    try std.testing.expect(!config.mouse_capture);\n+    try std.testing.expect(!config.bracketed_paste);\n+}\n+\n+test \"sanity: BackendConfig custom\" {\n+    const config = BackendConfig{\n+        .alternate_screen = false,\n+        .hide_cursor = false,\n+        .mouse_capture = true,\n+        .bracketed_paste = true,\n+    };\n+    try std.testing.expect(!config.alternate_screen);\n+    try std.testing.expect(!config.hide_cursor);\n+    try std.testing.expect(config.mouse_capture);\n+    try std.testing.expect(config.bracketed_paste);\n+}\n+\n+// ============================================================\n+// BEHAVIOR TESTS - Escape sequences\n+// ============================================================\n+\n+test \"behavior: escape sequences are correct format\" {\n+    try std.testing.expectEqualStrings(\"\\x1b[?1049h\", Backend.ENTER_ALTERNATE_SCREEN);\n+    try std.testing.expectEqualStrings(\"\\x1b[?1049l\", Backend.LEAVE_ALTERNATE_SCREEN);\n+    try std.testing.expectEqualStrings(\"\\x1b[?25l\", Backend.HIDE_CURSOR);\n+    try std.testing.expectEqualStrings(\"\\x1b[?25h\", Backend.SHOW_CURSOR);\n+    try std.testing.expectEqualStrings(\"\\x1b[2J\", Backend.CLEAR_SCREEN);\n+    try std.testing.expectEqualStrings(\"\\x1b[H\", Backend.CURSOR_HOME);\n+}\n+\n+test \"behavior: bracketed paste sequences are correct\" {\n+    try std.testing.expectEqualStrings(\"\\x1b[?2004h\", Backend.ENABLE_BRACKETED_PASTE);\n+    try std.testing.expectEqualStrings(\"\\x1b[?2004l\", Backend.DISABLE_BRACKETED_PASTE);\n+}\n+\n+test \"behavior: mouse SGR sequences are correct\" {\n+    try std.testing.expectEqualStrings(\"\\x1b[?1006h\", Backend.ENABLE_MOUSE_SGR);\n+    try std.testing.expectEqualStrings(\"\\x1b[?1006l\", Backend.DISABLE_MOUSE_SGR);\n+}\ndiff --git a/src/cell.zig b/src/cell.zig\nnew file mode 100644\nindex 0000000..e625bd3\n--- /dev/null\n+++ b/src/cell.zig\n@@ -0,0 +1,224 @@\n+// Cell type for zithril TUI framework\n+// Represents a single character cell in the terminal buffer\n+\n+const std = @import(\"std\");\n+pub const rich_zig = @import(\"rich_zig\");\n+const style_mod = @import(\"style.zig\");\n+pub const Style = style_mod.Style;\n+\n+/// A single cell in the terminal buffer.\n+/// Each cell represents one character position, with its associated style and display width.\n+pub const Cell = struct {\n+    /// Unicode codepoint for the character displayed in this cell.\n+    /// Defaults to space (U+0020).\n+    char: u21 = ' ',\n+\n+    /// Visual style applied to this cell (colors, bold, italic, etc).\n+    style: Style = Style.empty,\n+\n+    /// Display width in terminal columns.\n+    /// - 1 for most characters (ASCII, basic Latin, etc.)\n+    /// - 2 for wide characters (CJK ideographs, emoji, fullwidth forms)\n+    /// - 0 for combining marks (handled specially during rendering)\n+    width: u8 = 1,\n+\n+    /// The default cell: a space with default style and width 1.\n+    pub const default: Cell = .{};\n+\n+    /// Create a cell with a specific character, using default style.\n+    pub fn init(char: u21) Cell {\n+        return .{\n+            .char = char,\n+            .style = Style.empty,\n+            .width = charWidth(char),\n+        };\n+    }\n+\n+    /// Create a cell with a character and style.\n+    pub fn styled(char: u21, s: Style) Cell {\n+        return .{\n+            .char = char,\n+            .style = s,\n+            .width = charWidth(char),\n+        };\n+    }\n+\n+    /// Create a cell with explicit width override.\n+    pub fn withWidth(char: u21, s: Style, w: u8) Cell {\n+        return .{\n+            .char = char,\n+            .style = s,\n+            .width = w,\n+        };\n+    }\n+\n+    /// Update the cell's character, automatically recalculating width.\n+    pub fn setChar(self: Cell, char: u21) Cell {\n+        return .{\n+            .char = char,\n+            .style = self.style,\n+            .width = charWidth(char),\n+        };\n+    }\n+\n+    /// Update the cell's style.\n+    pub fn setStyle(self: Cell, s: Style) Cell {\n+        return .{\n+            .char = self.char,\n+            .style = s,\n+            .width = self.width,\n+        };\n+    }\n+\n+    /// Merge another style on top of this cell's style.\n+    pub fn patchStyle(self: Cell, s: Style) Cell {\n+        return .{\n+            .char = self.char,\n+            .style = self.style.patch(s),\n+            .width = self.width,\n+        };\n+    }\n+\n+    /// Check if this cell is the default (space with empty style).\n+    pub fn isDefault(self: Cell) bool {\n+        return self.char == ' ' and self.style.isEmpty() and self.width == 1;\n+    }\n+\n+    /// Check equality with another cell.\n+    pub fn eql(self: Cell, other: Cell) bool {\n+        return self.char == other.char and\n+            self.style.eql(other.style) and\n+            self.width == other.width;\n+    }\n+\n+    /// Get the character width using rich_zig's cell width calculation.\n+    /// Returns 1 for most chars, 2 for wide (CJK/emoji), 0 for combining.\n+    pub fn charWidth(char: u21) u8 {\n+        return rich_zig.cells.getCharacterCellSize(char);\n+    }\n+\n+    /// Check if this cell contains a wide character (width 2).\n+    pub fn isWide(self: Cell) bool {\n+        return self.width == 2;\n+    }\n+\n+    /// Check if this cell contains a zero-width character (combining mark).\n+    pub fn isZeroWidth(self: Cell) bool {\n+        return self.width == 0;\n+    }\n+};\n+\n+// ============================================================\n+// SANITY TESTS - Basic Cell functionality\n+// ============================================================\n+\n+test \"sanity: Cell default is space with default style\" {\n+    const cell = Cell.default;\n+    try std.testing.expectEqual(@as(u21, ' '), cell.char);\n+    try std.testing.expect(cell.style.isEmpty());\n+    try std.testing.expectEqual(@as(u8, 1), cell.width);\n+}\n+\n+test \"sanity: Cell.init creates cell with correct width\" {\n+    const cell = Cell.init('A');\n+    try std.testing.expectEqual(@as(u21, 'A'), cell.char);\n+    try std.testing.expectEqual(@as(u8, 1), cell.width);\n+    try std.testing.expect(cell.style.isEmpty());\n+}\n+\n+test \"sanity: Cell.styled creates cell with style\" {\n+    const s = Style.init().bold().fg(.red);\n+    const cell = Cell.styled('X', s);\n+    try std.testing.expectEqual(@as(u21, 'X'), cell.char);\n+    try std.testing.expect(cell.style.hasAttribute(.bold));\n+}\n+\n+// ============================================================\n+// BEHAVIOR TESTS - Wide characters and combining marks\n+// ============================================================\n+\n+test \"behavior: Cell.init detects CJK as wide\" {\n+    const cell = Cell.init(0x4E2D);\n+    try std.testing.expectEqual(@as(u8, 2), cell.width);\n+    try std.testing.expect(cell.isWide());\n+}\n+\n+test \"behavior: Cell.init detects emoji as wide\" {\n+    const cell = Cell.init(0x1F600);\n+    try std.testing.expectEqual(@as(u8, 2), cell.width);\n+    try std.testing.expect(cell.isWide());\n+}\n+\n+test \"behavior: Cell.init detects combining mark as zero-width\" {\n+    const cell = Cell.init(0x0301);\n+    try std.testing.expectEqual(@as(u8, 0), cell.width);\n+    try std.testing.expect(cell.isZeroWidth());\n+}\n+\n+test \"behavior: Cell.isDefault detects default cell\" {\n+    try std.testing.expect(Cell.default.isDefault());\n+    try std.testing.expect(!Cell.init('X').isDefault());\n+    try std.testing.expect(!Cell.styled(' ', Style.init().bold()).isDefault());\n+}\n+\n+test \"behavior: Cell.setChar updates char and width\" {\n+    const cell = Cell.init('A');\n+    const updated = cell.setChar(0x4E2D);\n+    try std.testing.expectEqual(@as(u21, 0x4E2D), updated.char);\n+    try std.testing.expectEqual(@as(u8, 2), updated.width);\n+}\n+\n+test \"behavior: Cell.setStyle preserves char and width\" {\n+    const cell = Cell.init(0x4E2D);\n+    const styled_cell = cell.setStyle(Style.init().bold());\n+    try std.testing.expectEqual(@as(u21, 0x4E2D), styled_cell.char);\n+    try std.testing.expectEqual(@as(u8, 2), styled_cell.width);\n+    try std.testing.expect(styled_cell.style.hasAttribute(.bold));\n+}\n+\n+test \"behavior: Cell.patchStyle merges styles\" {\n+    const cell = Cell.styled('A', Style.init().bold());\n+    const patched = cell.patchStyle(Style.init().italic());\n+    try std.testing.expect(patched.style.hasAttribute(.bold));\n+    try std.testing.expect(patched.style.hasAttribute(.italic));\n+}\n+\n+test \"behavior: Cell.eql compares all fields\" {\n+    const c1 = Cell.styled('A', Style.init().bold());\n+    const c2 = Cell.styled('A', Style.init().bold());\n+    const c3 = Cell.styled('B', Style.init().bold());\n+    const c4 = Cell.styled('A', Style.init().italic());\n+\n+    try std.testing.expect(c1.eql(c2));\n+    try std.testing.expect(!c1.eql(c3));\n+    try std.testing.expect(!c1.eql(c4));\n+}\n+\n+test \"behavior: Cell.withWidth allows explicit width override\" {\n+    const cell = Cell.withWidth('A', Style.empty, 3);\n+    try std.testing.expectEqual(@as(u8, 3), cell.width);\n+}\n+\n+// ============================================================\n+// REGRESSION TESTS - Edge cases\n+// ============================================================\n+\n+test \"regression: ASCII characters have width 1\" {\n+    for (0x20..0x7F) |c| {\n+        const cell = Cell.init(@intCast(c));\n+        try std.testing.expectEqual(@as(u8, 1), cell.width);\n+    }\n+}\n+\n+test \"regression: control characters have width 0\" {\n+    const cell_null = Cell.init(0);\n+    try std.testing.expectEqual(@as(u8, 0), cell_null.width);\n+\n+    const cell_newline = Cell.init('\\n');\n+    try std.testing.expectEqual(@as(u8, 0), cell_newline.width);\n+}\n+\n+test \"regression: zero-width space has width 0\" {\n+    const cell = Cell.init(0x200B);\n+    try std.testing.expectEqual(@as(u8, 0), cell.width);\n+}\ndiff --git a/src/root.zig b/src/root.zig\nindex cfbca09..fff527e 100644\n--- a/src/root.zig\n+++ b/src/root.zig\n@@ -32,6 +32,20 @@ pub const Mouse = event.Mouse;\n pub const MouseKind = event.MouseKind;\n pub const Size = event.Size;\n \n+// Action types\n+pub const action = @import(\"action.zig\");\n+pub const Action = action.Action;\n+pub const Command = action.Command;\n+\n+// Cell type (buffer building block)\n+pub const cell_mod = @import(\"cell.zig\");\n+pub const Cell = cell_mod.Cell;\n+\n+// Terminal backend\n+pub const backend_mod = @import(\"backend.zig\");\n+pub const Backend = backend_mod.Backend;\n+pub const BackendConfig = backend_mod.BackendConfig;\n+\n test \"style wrapper\" {\n     const style = Style.init().bold().fg(.red);\n     try std.testing.expect(style.hasAttribute(.bold));\n@@ -88,3 +102,44 @@ test \"event re-export\" {\n     const f5_key = KeyCode.fromF(5);\n     try std.testing.expect(f5_key != null);\n }\n+\n+test \"action re-export\" {\n+    const none_action = Action{ .none = {} };\n+    try std.testing.expect(none_action.isNone());\n+\n+    const quit_action = Action{ .quit = {} };\n+    try std.testing.expect(quit_action.isQuit());\n+\n+    const cmd_action = Action{ .command = Command.empty() };\n+    try std.testing.expect(cmd_action.isCommand());\n+\n+    try std.testing.expect(Action.none_action.isNone());\n+    try std.testing.expect(Action.quit_action.isQuit());\n+}\n+\n+test \"cell re-export\" {\n+    const cell = Cell.init('X');\n+    try std.testing.expectEqual(@as(u21, 'X'), cell.char);\n+    try std.testing.expectEqual(@as(u8, 1), cell.width);\n+\n+    const wide_cell = Cell.init(0x4E2D);\n+    try std.testing.expect(wide_cell.isWide());\n+\n+    const styled_cell = Cell.styled('A', Style.init().bold());\n+    try std.testing.expect(styled_cell.style.hasAttribute(.bold));\n+}\n+\n+test \"backend re-export\" {\n+    const default_config = BackendConfig{};\n+    try std.testing.expect(default_config.alternate_screen);\n+    try std.testing.expect(default_config.hide_cursor);\n+    try std.testing.expect(!default_config.mouse_capture);\n+    try std.testing.expect(!default_config.bracketed_paste);\n+\n+    const custom_config = BackendConfig{\n+        .mouse_capture = true,\n+        .bracketed_paste = true,\n+    };\n+    try std.testing.expect(custom_config.mouse_capture);\n+    try std.testing.expect(custom_config.bracketed_paste);\n+}"
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01KgbBexVommQ8VC8nfmSKNL
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"After reviewing the code, I see a minor issue in `backend.zig` - the `builtin` import is not used. Let me verify:"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 7994
+    cache_read_input_tokens: 35585
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 7994
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: cd7c5a07-28b8-4a16-86c8-773cf06780cf
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01KgbBexVommQ8VC8nfmSKNL
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01Qy6XLAJzkz8M8D4zo5uBfF
+      name: Grep
+      input:
+        pattern: builtin
+        path: /home/hotschmoe/zithril/src/backend.zig
+        output_mode: content
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 7994
+    cache_read_input_tokens: 35585
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 7994
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "4f1704d3-3917-42f0-8da3-e1eca718d79a"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content}:
+    toolu_01Qy6XLAJzkz8M8D4zo5uBfF,tool_result,"5:const builtin = @import(\"builtin\");"
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "874581e9-0f8f-49f9-baf0-70985504b906"
+tool_use_result:
+  mode: content
+  numFiles: 0
+  filenames[0]:
+  content: "5:const builtin = @import(\"builtin\");"
+  numLines: 1
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_019kMwUpymuLXShxsAKjerBi
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"The `builtin` import at line 5 is unused. This is the only simplification I see - the code is otherwise clean and well-structured. Let me remove it:"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 163
+    cache_read_input_tokens: 43579
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 163
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "3d8748c7-ec07-4444-8eef-e23bb3406a17"
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_019kMwUpymuLXShxsAKjerBi
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_012Ny6nStYG9tPuVLhzGS5qN
+      name: Edit
+      input:
+        replace_all: false
+        file_path: /home/hotschmoe/zithril/src/backend.zig
+        old_string: "const std = @import(\"std\");\nconst builtin = @import(\"builtin\");\nconst posix = std.posix;"
+        new_string: "const std = @import(\"std\");\nconst posix = std.posix;"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 163
+    cache_read_input_tokens: 43579
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 163
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "104d7e4c-50c6-4452-b98e-a17bf67735fd"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content}:
+    toolu_012Ny6nStYG9tPuVLhzGS5qN,tool_result,The file /home/hotschmoe/zithril/src/backend.zig has been updated successfully.
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "6571a371-195f-42c6-8f7c-313b72ee3adf"
+tool_use_result:
+  filePath: /home/hotschmoe/zithril/src/backend.zig
+  oldString: "const std = @import(\"std\");\nconst builtin = @import(\"builtin\");\nconst posix = std.posix;"
+  newString: "const std = @import(\"std\");\nconst posix = std.posix;"
+  originalFile: "// Terminal backend for zithril TUI framework\n// Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste\n\nconst std = @import(\"std\");\nconst builtin = @import(\"builtin\");\nconst posix = std.posix;\n\n/// Configuration options for terminal initialization.\npub const BackendConfig = struct {\n    /// Enter alternate screen buffer (preserves original terminal content).\n    alternate_screen: bool = true,\n    /// Hide cursor during TUI operation.\n    hide_cursor: bool = true,\n    /// Enable mouse event reporting.\n    mouse_capture: bool = false,\n    /// Enable bracketed paste mode (distinguish pasted text from typed).\n    bracketed_paste: bool = false,\n};\n\n/// Terminal backend state.\n/// Manages raw mode, alternate screen, and other terminal features.\n/// RAII pattern: deinit() restores terminal to original state.\npub const Backend = struct {\n    /// File descriptor for terminal output (typically stdout).\n    fd: posix.fd_t,\n    /// Original terminal settings, saved for restoration.\n    original_termios: ?posix.termios,\n    /// Configuration used during initialization.\n    config: BackendConfig,\n    /// Whether the backend is currently active.\n    active: bool,\n\n    /// Error type for backend operations.\n    pub const Error = error{\n        NotATty,\n        TerminalQueryFailed,\n        TerminalSetFailed,\n        IoError,\n    };\n\n    /// Initialize the terminal backend.\n    /// Enables raw mode and optional features based on config.\n    /// Returns error if stdout is not a TTY or terminal ops fail.\n    pub fn init(config: BackendConfig) Error!Backend {\n        const fd = posix.STDOUT_FILENO;\n\n        if (!posix.isatty(fd)) {\n            return Error.NotATty;\n        }\n\n        var self = Backend{\n            .fd = fd,\n            .original_termios = null,\n            .config = config,\n            .active = false,\n        };\n\n        try self.enterRawMode();\n        self.active = true;\n\n        if (config.alternate_screen) {\n            self.writeEscape(ENTER_ALTERNATE_SCREEN);\n        }\n\n        if (config.hide_cursor) {\n            self.writeEscape(HIDE_CURSOR);\n        }\n\n        if (config.mouse_capture) {\n            self.enableMouse();\n        }\n\n        if (config.bracketed_paste) {\n            self.writeEscape(ENABLE_BRACKETED_PASTE);\n        }\n\n        return self;\n    }\n\n    /// Restore terminal to original state.\n    /// Safe to call multiple times.\n    pub fn deinit(self: *Backend) void {\n        if (!self.active) return;\n\n        if (self.config.bracketed_paste) {\n            self.writeEscape(DISABLE_BRACKETED_PASTE);\n        }\n\n        if (self.config.mouse_capture) {\n            self.disableMouse();\n        }\n\n        if (self.config.hide_cursor) {\n            self.writeEscape(SHOW_CURSOR);\n        }\n\n        if (self.config.alternate_screen) {\n            self.writeEscape(LEAVE_ALTERNATE_SCREEN);\n        }\n\n        self.exitRawMode();\n        self.active = false;\n    }\n\n    /// Enter raw mode: disable line buffering, echo, and canonical mode.\n    fn enterRawMode(self: *Backend) Error!void {\n        const original = posix.tcgetattr(self.fd) catch {\n            return Error.TerminalQueryFailed;\n        };\n        self.original_termios = original;\n\n        var raw = original;\n\n        // Input flags: disable break handling, CR-to-NL, parity, strip, flow control\n        raw.iflag.BRKINT = false;\n        raw.iflag.ICRNL = false;\n        raw.iflag.INPCK = false;\n        raw.iflag.ISTRIP = false;\n        raw.iflag.IXON = false;\n\n        // Output flags: disable post-processing\n        raw.oflag.OPOST = false;\n\n        // Control flags: set character size to 8 bits\n        raw.cflag.CSIZE = .CS8;\n\n        // Local flags: disable echo, canonical mode, signals, extended input\n        raw.lflag.ECHO = false;\n        raw.lflag.ICANON = false;\n        raw.lflag.ISIG = false;\n        raw.lflag.IEXTEN = false;\n\n        // Set minimum chars for non-canonical read\n        raw.cc[@intFromEnum(posix.V.MIN)] = 0;\n        raw.cc[@intFromEnum(posix.V.TIME)] = 1;\n\n        posix.tcsetattr(self.fd, .FLUSH, raw) catch {\n            return Error.TerminalSetFailed;\n        };\n    }\n\n    /// Exit raw mode: restore original terminal settings.\n    fn exitRawMode(self: *Backend) void {\n        if (self.original_termios) |original| {\n            posix.tcsetattr(self.fd, .FLUSH, original) catch {};\n        }\n    }\n\n    /// Enable mouse reporting (SGR mode for better coordinate handling).\n    fn enableMouse(self: *Backend) void {\n        self.writeEscape(ENABLE_MOUSE_CAPTURE);\n        self.writeEscape(ENABLE_MOUSE_SGR);\n    }\n\n    /// Disable mouse reporting.\n    fn disableMouse(self: *Backend) void {\n        self.writeEscape(DISABLE_MOUSE_SGR);\n        self.writeEscape(DISABLE_MOUSE_CAPTURE);\n    }\n\n    /// Write an escape sequence to the terminal.\n    fn writeEscape(self: *Backend, seq: []const u8) void {\n        const file = std.fs.File{ .handle = self.fd };\n        file.writeAll(seq) catch {};\n    }\n\n    /// Flush output to terminal.\n    pub fn flush(self: *Backend) void {\n        const file = std.fs.File{ .handle = self.fd };\n        file.sync() catch {};\n    }\n\n    /// Write bytes to the terminal.\n    pub fn write(self: *Backend, data: []const u8) Error!void {\n        const file = std.fs.File{ .handle = self.fd };\n        file.writeAll(data) catch {\n            return Error.IoError;\n        };\n    }\n\n    /// Move cursor to home position (0, 0).\n    pub fn cursorHome(self: *Backend) void {\n        self.writeEscape(CURSOR_HOME);\n    }\n\n    /// Move cursor to specific position (0-indexed).\n    pub fn cursorTo(self: *Backend, x: u16, y: u16) void {\n        var buf: [32]u8 = undefined;\n        const seq = std.fmt.bufPrint(&buf, \"\\x1b[{d};{d}H\", .{ y + 1, x + 1 }) catch return;\n        self.writeEscape(seq);\n    }\n\n    /// Clear the entire screen.\n    pub fn clearScreen(self: *Backend) void {\n        self.writeEscape(CLEAR_SCREEN);\n    }\n\n    /// Get terminal size (width, height).\n    pub fn getSize(self: *Backend) struct { width: u16, height: u16 } {\n        var ws: posix.winsize = undefined;\n        const result = posix.system.ioctl(self.fd, posix.T.IOCGWINSZ, @intFromPtr(&ws));\n        if (result == 0) {\n            return .{ .width = ws.col, .height = ws.row };\n        }\n        return .{ .width = 80, .height = 24 };\n    }\n\n    // ANSI escape sequences\n    const ENTER_ALTERNATE_SCREEN = \"\\x1b[?1049h\";\n    const LEAVE_ALTERNATE_SCREEN = \"\\x1b[?1049l\";\n    const HIDE_CURSOR = \"\\x1b[?25l\";\n    const SHOW_CURSOR = \"\\x1b[?25h\";\n    const CLEAR_SCREEN = \"\\x1b[2J\";\n    const CURSOR_HOME = \"\\x1b[H\";\n\n    const ENABLE_MOUSE_CAPTURE = \"\\x1b[?1000h\\x1b[?1002h\\x1b[?1003h\";\n    const DISABLE_MOUSE_CAPTURE = \"\\x1b[?1003l\\x1b[?1002l\\x1b[?1000l\";\n    const ENABLE_MOUSE_SGR = \"\\x1b[?1006h\";\n    const DISABLE_MOUSE_SGR = \"\\x1b[?1006l\";\n\n    const ENABLE_BRACKETED_PASTE = \"\\x1b[?2004h\";\n    const DISABLE_BRACKETED_PASTE = \"\\x1b[?2004l\";\n};\n\n// ============================================================\n// SANITY TESTS - Backend configuration\n// ============================================================\n\ntest \"sanity: BackendConfig defaults\" {\n    const config = BackendConfig{};\n    try std.testing.expect(config.alternate_screen);\n    try std.testing.expect(config.hide_cursor);\n    try std.testing.expect(!config.mouse_capture);\n    try std.testing.expect(!config.bracketed_paste);\n}\n\ntest \"sanity: BackendConfig custom\" {\n    const config = BackendConfig{\n        .alternate_screen = false,\n        .hide_cursor = false,\n        .mouse_capture = true,\n        .bracketed_paste = true,\n    };\n    try std.testing.expect(!config.alternate_screen);\n    try std.testing.expect(!config.hide_cursor);\n    try std.testing.expect(config.mouse_capture);\n    try std.testing.expect(config.bracketed_paste);\n}\n\n// ============================================================\n// BEHAVIOR TESTS - Escape sequences\n// ============================================================\n\ntest \"behavior: escape sequences are correct format\" {\n    try std.testing.expectEqualStrings(\"\\x1b[?1049h\", Backend.ENTER_ALTERNATE_SCREEN);\n    try std.testing.expectEqualStrings(\"\\x1b[?1049l\", Backend.LEAVE_ALTERNATE_SCREEN);\n    try std.testing.expectEqualStrings(\"\\x1b[?25l\", Backend.HIDE_CURSOR);\n    try std.testing.expectEqualStrings(\"\\x1b[?25h\", Backend.SHOW_CURSOR);\n    try std.testing.expectEqualStrings(\"\\x1b[2J\", Backend.CLEAR_SCREEN);\n    try std.testing.expectEqualStrings(\"\\x1b[H\", Backend.CURSOR_HOME);\n}\n\ntest \"behavior: bracketed paste sequences are correct\" {\n    try std.testing.expectEqualStrings(\"\\x1b[?2004h\", Backend.ENABLE_BRACKETED_PASTE);\n    try std.testing.expectEqualStrings(\"\\x1b[?2004l\", Backend.DISABLE_BRACKETED_PASTE);\n}\n\ntest \"behavior: mouse SGR sequences are correct\" {\n    try std.testing.expectEqualStrings(\"\\x1b[?1006h\", Backend.ENABLE_MOUSE_SGR);\n    try std.testing.expectEqualStrings(\"\\x1b[?1006l\", Backend.DISABLE_MOUSE_SGR);\n}\n"
+  structuredPatch[1]:
+    - oldStart: 2
+      oldLines: 7
+      newStart: 2
+      newLines: 6
+      lines[7]: " // Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste"," "," const std = @import(\"std\");","-const builtin = @import(\"builtin\");"," const posix = std.posix;"," "," /// Configuration options for terminal initialization."
+  userModified: false
+  replaceAll: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01Gk91jKBpLiDCWv8m5AYyX2
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"Now let me verify tests still pass:"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 245
+    cache_read_input_tokens: 43742
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 245
+    output_tokens: 4
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "5722e0ca-7449-437e-88a3-45a5495e3cac"
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01Gk91jKBpLiDCWv8m5AYyX2
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01XkXAYaKxLawm1jsDau3iZG
+      name: Bash
+      input:
+        command: zig build test 2>&1
+        description: Verify tests pass after removing unused import
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 245
+    cache_read_input_tokens: 43742
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 245
+    output_tokens: 4
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "867afee0-4d7b-45fa-820c-886fbd846586"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01XkXAYaKxLawm1jsDau3iZG,tool_result,"",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: d95fa858-7416-4b74-a5b4-fabf23ad2af6
+tool_use_result:
+  stdout: ""
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_0199P32MYnYX6DQVGQdZbTUE
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"Tests pass. Let me check the current git status and commit the simplification:"
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 205
+    cache_read_input_tokens: 43987
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 205
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: d7718543-6cd3-4c07-bbba-93e5ac4f4d02
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_0199P32MYnYX6DQVGQdZbTUE
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_015wuuyT65ZjYXH59zDodX6L
+      name: Bash
+      input:
+        command: git status
+        description: Check git status
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 205
+    cache_read_input_tokens: 43987
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 205
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "50cec1ee-85fa-4825-afcf-46ddeb8af818"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_015wuuyT65ZjYXH59zDodX6L,tool_result,"On branch dev-hotschmoe\nYour branch is ahead of 'origin/dev-hotschmoe' by 1 commit.\n  (use \"git push\" to publish your local commits)\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   .beads/issues.jsonl\n\tmodified:   .hot_ralph/state.json\n\tmodified:   src/backend.zig\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.hot_ralph/20260201_073534_plan_mode.md\n\t.hot_ralph/20260201_074127_plan_simplify.md\n\nno changes added to commit (use \"git add\" and/or \"git commit -a\")",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "4cd3c0ef-50d1-4748-b463-611e6a2ca1cf"
+tool_use_result:
+  stdout: "On branch dev-hotschmoe\nYour branch is ahead of 'origin/dev-hotschmoe' by 1 commit.\n  (use \"git push\" to publish your local commits)\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   .beads/issues.jsonl\n\tmodified:   .hot_ralph/state.json\n\tmodified:   src/backend.zig\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.hot_ralph/20260201_073534_plan_mode.md\n\t.hot_ralph/20260201_074127_plan_simplify.md\n\nno changes added to commit (use \"git add\" and/or \"git commit -a\")"
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_0199P32MYnYX6DQVGQdZbTUE
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01NSFtHPS4ZChpA8bUtUoxWA
+      name: Bash
+      input:
+        command: git diff src/backend.zig
+        description: Show the simplification diff
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 205
+    cache_read_input_tokens: 43987
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 205
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "177642e4-dd14-4036-8367-7ab930743110"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01NSFtHPS4ZChpA8bUtUoxWA,tool_result,"diff --git a/src/backend.zig b/src/backend.zig\nindex 231f8b7..846a236 100644\n--- a/src/backend.zig\n+++ b/src/backend.zig\n@@ -2,7 +2,6 @@\n // Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste\n \n const std = @import(\"std\");\n-const builtin = @import(\"builtin\");\n const posix = std.posix;\n \n /// Configuration options for terminal initialization.",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "20bf9329-d71d-4f68-8056-022514d2448b"
+tool_use_result:
+  stdout: "diff --git a/src/backend.zig b/src/backend.zig\nindex 231f8b7..846a236 100644\n--- a/src/backend.zig\n+++ b/src/backend.zig\n@@ -2,7 +2,6 @@\n // Handles raw mode, alternate screen, cursor control, mouse, and bracketed paste\n \n const std = @import(\"std\");\n-const builtin = @import(\"builtin\");\n const posix = std.posix;\n \n /// Configuration options for terminal initialization."
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01Ud6fNhUpBLQoGJ3Gn5caKZ
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_01GX6esCcCsVmCJosAGYKYcx
+      name: Bash
+      input:
+        command: git log --oneline -5
+        description: Check recent commit messages for style
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 560
+    cache_read_input_tokens: 44192
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 560
+    output_tokens: 25
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "752f091c-cae3-4ec6-9fb2-48e37c6ba039"
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_01GX6esCcCsVmCJosAGYKYcx,tool_result,"df26b74 Add Cell struct and Terminal Backend for buffer/terminal subsystems\ndf68797 Plan mode: complete 2 tasks\n411bcba Add Action union for application control flow\nf6d0913 Plan mode: complete 2 tasks\n00a0123 Extract shrinkByTag helper to reduce layout solver duplication",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: d512169c-1ceb-4df2-a1cd-66733a76657d
+tool_use_result:
+  stdout: "df26b74 Add Cell struct and Terminal Backend for buffer/terminal subsystems\ndf68797 Plan mode: complete 2 tasks\n411bcba Add Action union for application control flow\nf6d0913 Plan mode: complete 2 tasks\n00a0123 Extract shrinkByTag helper to reduce layout solver duplication"
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_016Xw84yLkayRNqWbpKm6BHT
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_018w7us3pM4nuPMyvD8WEtFo
+      name: Bash
+      input:
+        command: "git add src/backend.zig && git commit -m \"$(cat <<'EOF'\nRemove unused builtin import from backend.zig\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\""
+        description: Commit the simplification
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 166
+    cache_read_input_tokens: 44752
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 166
+    output_tokens: 25
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: d18f0a92-9c03-4a26-bce9-afab54ea7939
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_018w7us3pM4nuPMyvD8WEtFo,tool_result,"[dev-hotschmoe eab35b2] Remove unused builtin import from backend.zig\n 1 file changed, 1 deletion(-)",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "8dff3fdd-4fd8-4ee4-be74-e8b44e2cbd66"
+tool_use_result:
+  stdout: "[dev-hotschmoe eab35b2] Remove unused builtin import from backend.zig\n 1 file changed, 1 deletion(-)"
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_01YYEBgRwyq5ttLoCBskBMf4
+  type: message
+  role: assistant
+  content[1]:
+    - type: tool_use
+      id: toolu_017K7qGYgHMj2WRUHEq8mYaG
+      name: Bash
+      input:
+        command: git status
+        description: Verify commit status
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 179
+    cache_read_input_tokens: 44918
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 179
+    output_tokens: 25
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: a29eff98-4ac1-4845-b1a8-d414a17fd033
+type: user
+message:
+  role: user
+  content[1]{tool_use_id,type,content,is_error}:
+    toolu_017K7qGYgHMj2WRUHEq8mYaG,tool_result,"On branch dev-hotschmoe\nYour branch is ahead of 'origin/dev-hotschmoe' by 2 commits.\n  (use \"git push\" to publish your local commits)\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   .beads/issues.jsonl\n\tmodified:   .hot_ralph/state.json\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.hot_ralph/20260201_073534_plan_mode.md\n\t.hot_ralph/20260201_074127_plan_simplify.md\n\nno changes added to commit (use \"git add\" and/or \"git commit -a\")",false
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "7678e1b1-64b0-4006-8336-9add52ef7e86"
+tool_use_result:
+  stdout: "On branch dev-hotschmoe\nYour branch is ahead of 'origin/dev-hotschmoe' by 2 commits.\n  (use \"git push\" to publish your local commits)\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   .beads/issues.jsonl\n\tmodified:   .hot_ralph/state.json\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.hot_ralph/20260201_073534_plan_mode.md\n\t.hot_ralph/20260201_074127_plan_simplify.md\n\nno changes added to commit (use \"git add\" and/or \"git commit -a\")"
+  stderr: ""
+  interrupted: false
+  isImage: false
+type: assistant
+message:
+  model: claude-opus-4-5-20251101
+  id: msg_017DBgTFcYY8QbWFPLvhAxtb
+  type: message
+  role: assistant
+  content[1]{type,text}:
+    text,"**Summary:**\n\nReviewed the recent code changes from the \"Plan mode batch\" task:\n- `action.zig` - Clean, well-structured Action union type\n- `backend.zig` - Terminal backend with raw mode handling\n- `cell.zig` - Cell type for buffer representation  \n- `root.zig` - Module re-exports\n\n**Simplification applied:**\n- Removed unused `builtin` import from `backend.zig`\n\nAll tests pass. The code is otherwise clean and doesn't need further simplification."
+  stop_reason: null
+  stop_sequence: null
+  usage:
+    input_tokens: 0
+    cache_creation_input_tokens: 286
+    cache_read_input_tokens: 45097
+    cache_creation:
+      ephemeral_5m_input_tokens: 0
+      ephemeral_1h_input_tokens: 286
+    output_tokens: 1
+    service_tier: standard
+  context_management: null
+parent_tool_use_id: null
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+uuid: "501dd60d-8cfc-4936-aec5-5f9ad0507889"
+type: result
+subtype: success
+is_error: false
+duration_ms: 64146
+duration_api_ms: 74441
+num_turns: 19
+result: "**Summary:**\n\nReviewed the recent code changes from the \"Plan mode batch\" task:\n- `action.zig` - Clean, well-structured Action union type\n- `backend.zig` - Terminal backend with raw mode handling\n- `cell.zig` - Cell type for buffer representation  \n- `root.zig` - Module re-exports\n\n**Simplification applied:**\n- Removed unused `builtin` import from `backend.zig`\n\nAll tests pass. The code is otherwise clean and doesn't need further simplification."
+session_id: "7a42b394-7831-4bf1-8415-fec891012eaa"
+total_cost_usd: 0.499986
+usage:
+  input_tokens: 2
+  cache_creation_input_tokens: 27379
+  cache_read_input_tokens: 517304
+  output_tokens: 2020
+  server_tool_use:
+    web_search_requests: 0
+    web_fetch_requests: 0
+  service_tier: standard
+  cache_creation:
+    ephemeral_1h_input_tokens: 27379
+    ephemeral_5m_input_tokens: 0
+modelUsage:
+  "claude-opus-4-5-20251101":
+    inputTokens: 2
+    outputTokens: 2020
+    cacheReadInputTokens: 517304
+    cacheCreationInputTokens: 27379
+    webSearchRequests: 0
+    costUSD: 0.48028075000000003
+    contextWindow: 200000
+    maxOutputTokens: 64000
+  "claude-haiku-4-5-20251001":
+    inputTokens: 7224
+    outputTokens: 447
+    cacheReadInputTokens: 0
+    cacheCreationInputTokens: 8197
+    webSearchRequests: 0
+    costUSD: 0.019705249999999997
+    contextWindow: 200000
+    maxOutputTokens: 64000
+permission_denials[0]:
+uuid: cf2ceec2-0713-402c-bec1-07d09d701a8e

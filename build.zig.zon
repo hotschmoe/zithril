@@ -1,0 +1,19 @@
+.{
+    .name = .zithril,
+    .version = "0.7.2",
+    .fingerprint = 0xaf01d6c98876eadb, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .rich_zig = .{
+            .url = "git+https://github.com/hotschmoe/rich_zig#2a5a02620b6c1d904441a03321b3921a58cf7541",
+            .hash = "rich_zig-1.1.2-cZcAnLIXCwCEu81UIp4Y6AgoGwoqYra-Ub-CUV7FcuC3",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}
