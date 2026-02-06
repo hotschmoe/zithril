@@ -140,27 +140,46 @@ pub const Input = struct {
     }
 
     /// Parse CSI sequences with parameters.
+    /// Handles both traditional CSI params (`;` separated) and Kitty keyboard
+    /// protocol sub-parameters (`:` separated within a param).
     fn parseCsiParams(self: *Self, bytes: []const u8) ?Event {
         _ = self;
 
-        // Find the final character
         var i: usize = 0;
         var param1: u16 = 0;
         var param2: u16 = 0;
-        var in_second_param = false;
+        var kitty_action: u16 = 0;
+        var param_index: u8 = 0;
+        var skip_sub: bool = false;
+        var in_action_sub: bool = false;
 
         while (i < bytes.len) : (i += 1) {
             const c = bytes[i];
             if (c >= '0' and c <= '9') {
-                if (in_second_param) {
-                    param2 = param2 * 10 + (c - '0');
-                } else {
-                    param1 = param1 * 10 + (c - '0');
+                const digit = c - '0';
+                if (in_action_sub) {
+                    kitty_action = kitty_action * 10 + digit;
+                } else if (!skip_sub) {
+                    switch (param_index) {
+                        0 => param1 = param1 * 10 + digit,
+                        1 => param2 = param2 * 10 + digit,
+                        else => {},
+                    }
                 }
             } else if (c == ';') {
-                in_second_param = true;
+                param_index += 1;
+                skip_sub = false;
+                in_action_sub = false;
+            } else if (c == ':') {
+                if (param_index == 1) {
+                    in_action_sub = true;
+                } else {
+                    skip_sub = true;
+                }
             } else {
-                // Final character
+                if (c == 'u') {
+                    return parseKittyKey(param1, param2, kitty_action);
+                }
                 return parseCsiFinal(c, param1, param2);
             }
         }
@@ -202,6 +221,51 @@ pub const Input = struct {
             'S' => Event{ .key = .{ .code = .{ .f = 4 }, .modifiers = mods } }, // F4
             else => null,
         };
+    }
+
+    /// Parse a Kitty keyboard protocol sequence.
+    /// Format: CSI codepoint ; modifiers:action u
+    /// Codepoints map to Unicode for printable keys, or private-use-area values
+    /// for special keys (57348+ per the Kitty keyboard protocol spec).
+    fn parseKittyKey(codepoint: u16, modifiers_param: u16, action_param: u16) ?Event {
+        const key_action: event_mod.KeyAction = switch (action_param) {
+            2 => .repeat,
+            3 => .release,
+            else => .press,
+        };
+
+        const mods = modifiersFromParam(modifiers_param);
+
+        const code: ?KeyCode = switch (codepoint) {
+            27 => .escape,
+            13 => .enter,
+            9 => if (mods.shift) .backtab else .tab,
+            127 => .backspace,
+            57348 => .insert,
+            57349 => .delete,
+            57350 => .left,
+            57351 => .right,
+            57352 => .up,
+            57353 => .down,
+            57354 => .page_up,
+            57355 => .page_down,
+            57356 => .home,
+            57357 => .end,
+            57364...57375 => |cp| .{ .f = @intCast(cp - 57363) },
+            else => if (codepoint >= 32 and codepoint < 57344)
+                .{ .char = @intCast(codepoint) }
+            else
+                null,
+        };
+
+        if (code) |c| {
+            return Event{ .key = .{
+                .code = c,
+                .modifiers = mods,
+                .action = key_action,
+            } };
+        }
+        return null;
     }
 
     /// Convert modifier parameter to Modifiers struct.
@@ -733,4 +797,228 @@ test "regression: Alt+Backspace (ESC 0x7F) parses as alt+backspace" {
     try std.testing.expect(event.?.key.code == .backspace);
     try std.testing.expect(event.?.key.modifiers.alt);
     try std.testing.expect(!event.?.key.modifiers.ctrl);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Kitty keyboard protocol (CSI u)
+// ============================================================
+
+test "kitty: parse simple character 'a'" {
+    var input = Input.init();
+    // CSI 97 u = 'a' key
+    const event = input.parse("\x1b[97u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .char);
+    try std.testing.expectEqual(@as(u21, 'a'), event.?.key.code.char);
+    try std.testing.expect(event.?.key.action == .press);
+}
+
+test "kitty: parse Shift+a" {
+    var input = Input.init();
+    // CSI 97;2u = Shift+'a'
+    const event = input.parse("\x1b[97;2u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .char);
+    try std.testing.expectEqual(@as(u21, 'a'), event.?.key.code.char);
+    try std.testing.expect(event.?.key.modifiers.shift);
+    try std.testing.expect(!event.?.key.modifiers.ctrl);
+}
+
+test "kitty: parse Ctrl+c" {
+    var input = Input.init();
+    // CSI 99;5u = Ctrl+'c'
+    const event = input.parse("\x1b[99;5u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .char);
+    try std.testing.expectEqual(@as(u21, 'c'), event.?.key.code.char);
+    try std.testing.expect(event.?.key.modifiers.ctrl);
+}
+
+test "kitty: parse Ctrl+Alt+Shift+a" {
+    var input = Input.init();
+    // modifiers = 1 + shift(1) + alt(2) + ctrl(4) = 8
+    const event = input.parse("\x1b[97;8u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.modifiers.shift);
+    try std.testing.expect(event.?.key.modifiers.alt);
+    try std.testing.expect(event.?.key.modifiers.ctrl);
+}
+
+test "kitty: parse escape key" {
+    var input = Input.init();
+    const event = input.parse("\x1b[27u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .escape);
+}
+
+test "kitty: parse enter key" {
+    var input = Input.init();
+    const event = input.parse("\x1b[13u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .enter);
+}
+
+test "kitty: parse tab key" {
+    var input = Input.init();
+    const event = input.parse("\x1b[9u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .tab);
+}
+
+test "kitty: parse Shift+Tab as backtab" {
+    var input = Input.init();
+    const event = input.parse("\x1b[9;2u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .backtab);
+}
+
+test "kitty: parse backspace key" {
+    var input = Input.init();
+    const event = input.parse("\x1b[127u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .backspace);
+}
+
+test "kitty: parse arrow keys (private use area)" {
+    var input = Input.init();
+
+    const up = input.parse("\x1b[57352u");
+    try std.testing.expect(up != null);
+    try std.testing.expect(up.?.key.code == .up);
+
+    const down = input.parse("\x1b[57353u");
+    try std.testing.expect(down != null);
+    try std.testing.expect(down.?.key.code == .down);
+
+    const left = input.parse("\x1b[57350u");
+    try std.testing.expect(left != null);
+    try std.testing.expect(left.?.key.code == .left);
+
+    const right = input.parse("\x1b[57351u");
+    try std.testing.expect(right != null);
+    try std.testing.expect(right.?.key.code == .right);
+}
+
+test "kitty: parse navigation keys" {
+    var input = Input.init();
+
+    const home = input.parse("\x1b[57356u");
+    try std.testing.expect(home != null);
+    try std.testing.expect(home.?.key.code == .home);
+
+    const end = input.parse("\x1b[57357u");
+    try std.testing.expect(end != null);
+    try std.testing.expect(end.?.key.code == .end);
+
+    const pgup = input.parse("\x1b[57354u");
+    try std.testing.expect(pgup != null);
+    try std.testing.expect(pgup.?.key.code == .page_up);
+
+    const pgdn = input.parse("\x1b[57355u");
+    try std.testing.expect(pgdn != null);
+    try std.testing.expect(pgdn.?.key.code == .page_down);
+
+    const ins = input.parse("\x1b[57348u");
+    try std.testing.expect(ins != null);
+    try std.testing.expect(ins.?.key.code == .insert);
+
+    const del = input.parse("\x1b[57349u");
+    try std.testing.expect(del != null);
+    try std.testing.expect(del.?.key.code == .delete);
+}
+
+test "kitty: parse function keys F1-F12" {
+    var input = Input.init();
+
+    const f1 = input.parse("\x1b[57364u");
+    try std.testing.expect(f1 != null);
+    try std.testing.expect(f1.?.key.code == .f);
+    try std.testing.expectEqual(@as(u8, 1), f1.?.key.code.f);
+
+    const f12 = input.parse("\x1b[57375u");
+    try std.testing.expect(f12 != null);
+    try std.testing.expect(f12.?.key.code == .f);
+    try std.testing.expectEqual(@as(u8, 12), f12.?.key.code.f);
+}
+
+test "kitty: parse key press action (explicit)" {
+    var input = Input.init();
+    // CSI 97;1:1u = 'a' press (modifiers=1/none, action=1/press)
+    const event = input.parse("\x1b[97;1:1u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .char);
+    try std.testing.expectEqual(@as(u21, 'a'), event.?.key.code.char);
+    try std.testing.expect(event.?.key.action == .press);
+}
+
+test "kitty: parse key repeat action" {
+    var input = Input.init();
+    // CSI 97;1:2u = 'a' repeat
+    const event = input.parse("\x1b[97;1:2u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.action == .repeat);
+}
+
+test "kitty: parse key release action" {
+    var input = Input.init();
+    // CSI 97;1:3u = 'a' release
+    const event = input.parse("\x1b[97;1:3u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.action == .release);
+}
+
+test "kitty: parse Ctrl+a release" {
+    var input = Input.init();
+    // CSI 97;5:3u = Ctrl+'a' release (modifiers=5/ctrl, action=3/release)
+    const event = input.parse("\x1b[97;5:3u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .char);
+    try std.testing.expectEqual(@as(u21, 'a'), event.?.key.code.char);
+    try std.testing.expect(event.?.key.modifiers.ctrl);
+    try std.testing.expect(event.?.key.action == .release);
+}
+
+test "kitty: parse with shifted key sub-param ignored" {
+    var input = Input.init();
+    // CSI 97:65u = 'a' with shifted key 'A' (65) - we ignore sub-param on param1
+    const event = input.parse("\x1b[97:65u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .char);
+    try std.testing.expectEqual(@as(u21, 'a'), event.?.key.code.char);
+}
+
+test "kitty: unknown private-use codepoint returns null" {
+    var input = Input.init();
+    // Codepoint 57400 is in PUA but not mapped
+    const event = input.parse("\x1b[57400u");
+    try std.testing.expect(event == null);
+}
+
+test "kitty: default action is press" {
+    var input = Input.init();
+    // No action sub-param means press
+    const event = input.parse("\x1b[97u");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.action == .press);
+}
+
+test "regression: CSI u does not break traditional CSI sequences" {
+    var input = Input.init();
+
+    // Traditional arrow keys still work
+    const up = input.parse("\x1b[A");
+    try std.testing.expect(up != null);
+    try std.testing.expect(up.?.key.code == .up);
+
+    // Traditional function keys still work
+    const f5 = input.parse("\x1b[15~");
+    try std.testing.expect(f5 != null);
+    try std.testing.expect(f5.?.key.code == .f);
+    try std.testing.expectEqual(@as(u8, 5), f5.?.key.code.f);
+
+    // Traditional Shift+Up still works
+    const shift_up = input.parse("\x1b[1;2A");
+    try std.testing.expect(shift_up != null);
+    try std.testing.expect(shift_up.?.key.code == .up);
+    try std.testing.expect(shift_up.?.key.modifiers.shift);
 }

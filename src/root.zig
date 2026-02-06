@@ -51,6 +51,7 @@ pub const event = @import("event.zig");
 pub const Event = event.Event;
 pub const Key = event.Key;
 pub const KeyCode = event.KeyCode;
+pub const KeyAction = event.KeyAction;
 pub const Modifiers = event.Modifiers;
 pub const Mouse = event.Mouse;
 pub const MouseKind = event.MouseKind;

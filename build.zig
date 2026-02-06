@@ -66,6 +66,7 @@ pub fn build(b: *std.Build) void {
         "list",
         "tabs",
         "ralph",
+        "mouse_demo",
     };
 
     var prev_step: *std.Build.Step = b.getInstallStep();
