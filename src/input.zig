@@ -47,8 +47,8 @@ pub const Input = struct {
             return self.parseEscape(bytes);
         }
 
-        // Handle control characters
-        if (bytes[0] < 0x20) {
+        // Handle control characters (0x00-0x1F and DEL 0x7F)
+        if (bytes[0] < 0x20 or bytes[0] == 0x7f) {
             return self.parseControl(bytes[0]);
         }
 
@@ -93,6 +93,11 @@ pub const Input = struct {
         // Alt+Escape
         if (second == 0x1b) {
             return Event{ .key = .{ .code = .escape, .modifiers = .{ .alt = true } } };
+        }
+
+        // Alt+Backspace (DEL)
+        if (second == 0x7f) {
+            return Event{ .key = .{ .code = .backspace, .modifiers = .{ .alt = true } } };
         }
 
         // Alt+key (printable ASCII)
@@ -711,4 +716,21 @@ test "regression: modifiersFromParam handles edge cases" {
     try std.testing.expect(all_mods.shift);
     try std.testing.expect(all_mods.alt);
     try std.testing.expect(all_mods.ctrl);
+}
+
+test "regression: 0x7F (DEL) parses as backspace, not char" {
+    var input = Input.init();
+    const event = input.parse("\x7f");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .backspace);
+    try std.testing.expect(!event.?.key.modifiers.any());
+}
+
+test "regression: Alt+Backspace (ESC 0x7F) parses as alt+backspace" {
+    var input = Input.init();
+    const event = input.parse("\x1b\x7f");
+    try std.testing.expect(event != null);
+    try std.testing.expect(event.?.key.code == .backspace);
+    try std.testing.expect(event.?.key.modifiers.alt);
+    try std.testing.expect(!event.?.key.modifiers.ctrl);
 }
