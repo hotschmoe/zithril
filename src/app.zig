@@ -260,43 +260,80 @@ pub fn App(comptime State: type) type {
         }
 
         /// Poll for an input event from the terminal.
-        /// Returns null if no event is available within the timeout.
+        /// Uses poll() (POSIX) or WaitForSingleObject() (Windows) to wait up to
+        /// timeout_ns nanoseconds for input. Returns null on timeout.
         fn pollEvent(input: *Input, backend: *Backend, timeout_ns: ?u64) RunError!?Event {
-            _ = timeout_ns; // TODO: Implement proper polling with timeout
+            _ = backend;
 
-            // Read available input bytes
+            // Convert timeout: null -> block indefinitely, else nanoseconds -> milliseconds
+            const timeout_ms: i32 = if (timeout_ns) |ns|
+                @intCast(ns / std.time.ns_per_ms)
+            else
+                -1;
+
+            if (is_windows) {
+                return pollEventWindows(input, timeout_ms);
+            } else {
+                return pollEventPosix(input, timeout_ms);
+            }
+        }
+
+        fn pollEventPosix(input: *Input, timeout_ms: i32) RunError!?Event {
+            var fds = [1]std.posix.pollfd{
+                .{
+                    .fd = std.posix.STDIN_FILENO,
+                    .events = std.posix.POLL.IN,
+                    .revents = 0,
+                },
+            };
+
+            const ready = std.posix.poll(&fds, timeout_ms) catch {
+                return RunError.IoError;
+            };
+
+            if (ready == 0) return null;
+
             var buf: [256]u8 = undefined;
-            const bytes_read = if (is_windows) blk: {
-                const stdin_handle = windows.GetStdHandle(windows.STD_INPUT_HANDLE) catch {
-                    return RunError.IoError;
-                };
-                const file = std.fs.File{ .handle = stdin_handle };
-                break :blk file.read(&buf) catch |err| {
-                    switch (err) {
-                        error.WouldBlock => return null,
-                        else => return RunError.IoError,
-                    }
-                };
-            } else blk: {
-                break :blk std.posix.read(std.posix.STDIN_FILENO, &buf) catch |err| {
-                    switch (err) {
-                        error.WouldBlock => return null,
-                        else => return RunError.IoError,
-                    }
+            const bytes_read = std.posix.read(std.posix.STDIN_FILENO, &buf) catch |err| {
+                return switch (err) {
+                    error.WouldBlock => null,
+                    else => RunError.IoError,
                 };
             };
 
-            if (bytes_read == 0) {
-                return null;
-            }
+            if (bytes_read == 0) return null;
 
-            // Parse input bytes into events
-            if (input.parse(buf[0..bytes_read])) |parsed_event| {
-                _ = backend; // Backend used for future resize detection
-                return parsed_event;
-            }
+            return input.parse(buf[0..bytes_read]);
+        }
 
-            return null;
+        fn pollEventWindows(input: *Input, timeout_ms: i32) RunError!?Event {
+            if (!is_windows) unreachable;
+
+            const stdin_handle = windows.GetStdHandle(windows.STD_INPUT_HANDLE) catch {
+                return RunError.IoError;
+            };
+
+            const wait_ms: u32 = if (timeout_ms < 0)
+                windows.INFINITE
+            else
+                @intCast(timeout_ms);
+
+            const result = windows.kernel32.WaitForSingleObject(stdin_handle, wait_ms);
+            if (result == windows.WAIT_TIMEOUT) return null;
+            if (result == windows.WAIT_FAILED) return RunError.IoError;
+
+            var buf: [256]u8 = undefined;
+            const file = std.fs.File{ .handle = stdin_handle };
+            const bytes_read = file.read(&buf) catch |err| {
+                return switch (err) {
+                    error.WouldBlock => null,
+                    else => RunError.IoError,
+                };
+            };
+
+            if (bytes_read == 0) return null;
+
+            return input.parse(buf[0..bytes_read]);
         }
 
         /// Render buffer changes to the terminal using buffered Output.

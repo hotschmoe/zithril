@@ -234,6 +234,7 @@ var emergency_config: ?BackendConfig = null;
 const EmergencyState = if (is_windows) struct {
     input_mode: u32,
     output_mode: u32,
+    output_codepage: u32,
 } else struct {
     termios: std.posix.termios,
 };
@@ -306,10 +307,11 @@ fn emergencyCleanupWindows() void {
         }
     }
 
-    // Restore console modes
+    // Restore console modes and codepage
     if (emergency_original_state) |state| {
         _ = windows.kernel32.SetConsoleMode(stdin_handle, state.input_mode);
         _ = windows.kernel32.SetConsoleMode(stdout_handle, state.output_mode);
+        _ = windows.kernel32.SetConsoleOutputCP(state.output_codepage);
     }
 
     // Clear global state
@@ -496,6 +498,7 @@ pub const Backend = struct {
     const OriginalState = if (is_windows) struct {
         input_mode: u32,
         output_mode: u32,
+        output_codepage: u32,
     } else struct {
         termios: std.posix.termios,
     };
@@ -590,22 +593,27 @@ pub const Backend = struct {
         const color_support = detectColorSupport();
         const caps = TerminalCapabilities.fromTerminalType(term_type, color_support);
 
-        // Save original console modes
+        // Save original console modes and codepage
         var input_mode: u32 = 0;
         _ = windows.kernel32.GetConsoleMode(stdin_handle, &input_mode);
         var output_mode: u32 = 0;
         _ = windows.kernel32.GetConsoleMode(stdout_handle, &output_mode);
+        const original_codepage = windows.kernel32.GetConsoleOutputCP();
 
         var self = Backend{
             .handle = stdout_handle,
             .original_state = .{
                 .input_mode = input_mode,
                 .output_mode = output_mode,
+                .output_codepage = original_codepage,
             },
             .config = config,
             .active = false,
             .capabilities = caps,
         };
+
+        // Set console output codepage to UTF-8 so multi-byte characters render correctly
+        _ = rich_zig.terminal.enableUtf8();
 
         // Enable virtual terminal processing for ANSI sequences
         const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
@@ -636,6 +644,7 @@ pub const Backend = struct {
         emergency_original_state = .{
             .input_mode = input_mode,
             .output_mode = output_mode,
+            .output_codepage = original_codepage,
         };
         emergency_config = config;
         global_backend = &self;
@@ -733,9 +742,11 @@ pub const Backend = struct {
         raw.lflag.ISIG = false;
         raw.lflag.IEXTEN = false;
 
-        // Set minimum chars for non-canonical read
+        // Non-blocking read: VMIN=0, VTIME=0 means read() returns immediately
+        // with whatever is available (including 0 bytes). Timeout handling is
+        // done by poll() in the event loop for precise tick timing.
         raw.cc[@intFromEnum(std.posix.V.MIN)] = 0;
-        raw.cc[@intFromEnum(std.posix.V.TIME)] = 1;
+        raw.cc[@intFromEnum(std.posix.V.TIME)] = 0;
 
         std.posix.tcsetattr(self.handle, .FLUSH, raw) catch {
             return Error.TerminalSetFailed;
@@ -757,6 +768,7 @@ pub const Backend = struct {
             const stdin_handle = windows.GetStdHandle(windows.STD_INPUT_HANDLE) catch return;
             _ = windows.kernel32.SetConsoleMode(stdin_handle, state.input_mode);
             _ = windows.kernel32.SetConsoleMode(self.handle, state.output_mode);
+            _ = windows.kernel32.SetConsoleOutputCP(state.output_codepage);
         }
     }
 
