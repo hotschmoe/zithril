@@ -159,6 +159,7 @@ zig build run-rung              # Run ladder logic demo
 zig build run-dashboard         # Run system dashboard demo
 zig build run-explorer          # Run file explorer demo
 zig build run-dataviz           # Run data visualization gallery
+zig build run-showcase          # Run rich text feature showcase
 zig build test                  # Run all tests
 zig fmt src/                    # Format before commits
 ```
@@ -194,9 +195,13 @@ zig fmt src/                    # Format before commits
 |                  zithril                          |
 |  App        Event loop, terminal setup/teardown  |
 |  Frame      Layout methods, render dispatch      |
-|  Layout     Constraint solver                    |
+|  Layout     Constraint solver + Measurement      |
 |  Buffer     Cell grid with diff support          |
 |  Widgets    Block, List, Table, Gauge, Text...   |
+|  Theme      Named style registry                 |
+|  ANSI       Parse/strip escape sequences         |
+|  Highlight  Pattern-based text highlighting      |
+|  Pretty     Comptime Zig value formatter         |
 +--------------------------------------------------+
                       |
                       v
@@ -362,6 +367,19 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
 | `BigText` | Large 8x8 bitmap text |
 | `CodeEditor` | Syntax-highlighted code viewer |
 
+## Rich Text Modules (6)
+
+Wrappers around rich_zig v1.3.0 features:
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `Theme` | `src/theme.zig` | Named style registry (define once, look up by name) |
+| `ANSI` | `src/ansi.zig` | Parse/strip ANSI escape sequences, convert to Segments |
+| `Measurement` | `src/measurement.zig` | Min/max width measurement, constraint conversion |
+| `Highlighter` | `src/highlighter.zig` | Pattern-based text highlighting (numbers, bools, strings, URLs) |
+| `Pretty` | `src/pretty.zig` | Comptime pretty printer for Zig values |
+| `Style attrs` | `src/style.zig` | underline2 (SGR 21), frame (SGR 51), encircle (SGR 52), overline (SGR 53) |
+
 ---
 
 ## Bug Severity
@@ -489,10 +507,15 @@ When making commits, update `version` in `build.zig.zon`:
 - [x] Data visualization (Sparkline, BarChart, Chart, Canvas, LineGauge)
 - [x] Navigation widgets (Tree, Menu, Calendar)
 - [x] Specialty widgets (BigText, CodeEditor)
+- [x] Theming system (named style registry)
+- [x] ANSI parsing (fromAnsi, stripAnsi, parseAnsiToSegments)
+- [x] Pattern highlighting (repr, custom rules)
+- [x] Pretty printing (comptime Zig value formatter)
+- [x] Measurement protocol (constraint-to-measurement conversion)
+- [x] Extended style attributes (underline2, frame, encircle, overline)
 - [ ] Mouse event wiring to app event loop
 - [ ] Async command dispatch in runtime
 - [ ] Image rendering via graphics protocols
-- [ ] Theming system
 
 
 <!-- br-agent-instructions-v1 -->

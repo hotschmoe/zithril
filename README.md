@@ -262,6 +262,33 @@ const Command = enum {
 | `ScrollableList` | List with built-in scrolling |
 | `CodeEditor` | Syntax-highlighted code viewer |
 
+## Rich Text Features
+
+Wrappers around rich_zig v1.3.0 for rich text processing:
+
+| Module | Purpose |
+|--------|---------|
+| `Theme` | Named style registry -- define once, reference by name |
+| `fromAnsi` / `stripAnsi` | Parse or strip ANSI escape sequences |
+| `parseAnsiToSegments` | Convert ANSI text to styled Segments for buffer rendering |
+| `Highlighter` | Pattern-based text highlighting (numbers, bools, strings, URLs) |
+| `Pretty` | Comptime pretty printer for Zig values with configurable themes |
+| `Measurement` | Min/max width measurement with constraint conversion |
+
+```zig
+// Theme: define styles once, look up by name
+var theme = try zithril.Theme.defaultTheme(allocator);
+defer theme.deinit();
+const style = theme.get("error").?;  // bold red
+
+// ANSI: parse escape sequences into styled text
+const stripped = try zithril.stripAnsi(allocator, "\x1b[1mBold\x1b[0m");
+
+// Measurement: convert constraints to min/max measurements
+const m = zithril.fromConstraint(zithril.Constraint.len(30), 100);
+// m.minimum == 30, m.maximum == 30
+```
+
 ### Widget Examples
 
 ```zig
@@ -310,17 +337,20 @@ frame.render(zithril.BarChart{
 Styles can be applied to any widget:
 
 ```zig
-const style = zithril.Style{
-    .fg = .red,              // Foreground color
-    .bg = .black,            // Background color
-    .bold = true,
-    .italic = false,
-    .underline = false,
-    .dim = false,
-    .blink = false,
-    .reverse = false,
-    .strikethrough = false,
-};
+const style = zithril.Style.init()
+    .fg(.red)              // Foreground color
+    .bg(.black)            // Background color
+    .bold()                // Bold text
+    .italic()              // Italic text
+    .underline()           // Single underline
+    .underline2()          // Double underline (SGR 21)
+    .dim()                 // Dim/faint text
+    .reverse()             // Reverse video
+    .strikethrough()       // Strikethrough
+    .overline()            // Overline (SGR 53)
+    .frame()               // Frame (SGR 51)
+    .encircle()            // Encircle (SGR 52)
+    .hidden();             // Hidden/concealed text
 ```
 
 **Colors:**
@@ -491,12 +521,14 @@ Larger applications that stress-test the framework:
 | **dashboard** | System monitoring -- Sparkline, BarChart, Gauge, LineGauge, BigText, Table |
 | **explorer** | File browser -- Tree, Menu, TextInput, CodeEditor, Tabs, focus management |
 | **dataviz** | Visualization gallery -- Chart, Canvas, Calendar, BigText, 5 pages |
+| **showcase** | Rich text features -- Theme, ANSI parsing, Highlighter, Pretty printer, new style attributes, Measurement |
 
 ```bash
 zig build run-rung
 zig build run-dashboard
 zig build run-explorer
 zig build run-dataviz
+zig build run-showcase
 ```
 
 ## Architecture
@@ -515,9 +547,13 @@ zig build run-dataviz
 │                                                                     │
 │   App        Event loop, terminal setup/teardown                   │
 │   Frame      Layout methods, render dispatch                        │
-│   Layout     Constraint solver                                      │
+│   Layout     Constraint solver + Measurement protocol              │
 │   Buffer     Cell grid with diff support                           │
 │   Widgets    Block, List, Table, Gauge, Text, Paragraph, ...       │
+│   Theme      Named style registry for consistent theming           │
+│   ANSI       Parse/strip ANSI escape sequences                     │
+│   Highlight  Pattern-based text highlighting (repr, custom rules)  │
+│   Pretty     Comptime pretty printer for Zig values                │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -567,10 +603,15 @@ zig build run-dataviz
 - [x] Data visualization (Sparkline, BarChart, Chart, Canvas, LineGauge)
 - [x] Navigation widgets (Tree, Menu, Calendar)
 - [x] Specialty widgets (BigText, CodeEditor)
+- [x] Theming system (named style registry)
+- [x] ANSI parsing (fromAnsi, stripAnsi, parseAnsiToSegments)
+- [x] Pattern highlighting (repr, custom rules)
+- [x] Pretty printing (comptime Zig value formatter)
+- [x] Measurement protocol (constraint-to-measurement conversion)
+- [x] Extended style attributes (underline2, frame, encircle, overline)
 - [ ] Mouse event wiring to app event loop
 - [ ] Async command dispatch in runtime
 - [ ] Image rendering via graphics protocols
-- [ ] Theming system
 
 ## Contributing to rich_zig
 
