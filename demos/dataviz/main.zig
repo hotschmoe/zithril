@@ -33,6 +33,14 @@ const State = struct {
     };
 };
 
+fn navigate(state: *State, forward: bool) void {
+    if (forward) {
+        if (state.current_page < State.page_names.len - 1) state.current_page += 1;
+    } else {
+        if (state.current_page > 0) state.current_page -= 1;
+    }
+}
+
 fn update(state: *State, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
@@ -40,19 +48,11 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
                 .char => |c| {
                     if (c == 'q') return .quit;
                     if (c == 'c' and key.modifiers.ctrl) return .quit;
-                    if (c == 'h' or c == 'H') {
-                        if (state.current_page > 0) state.current_page -= 1;
-                    }
-                    if (c == 'l' or c == 'L') {
-                        if (state.current_page < State.page_names.len - 1) state.current_page += 1;
-                    }
+                    if (c == 'h' or c == 'H') navigate(state, false);
+                    if (c == 'l' or c == 'L') navigate(state, true);
                 },
-                .left => {
-                    if (state.current_page > 0) state.current_page -= 1;
-                },
-                .right => {
-                    if (state.current_page < State.page_names.len - 1) state.current_page += 1;
-                },
+                .left => navigate(state, false),
+                .right => navigate(state, true),
                 else => {},
             }
         },
@@ -186,29 +186,20 @@ fn renderSparklinesPage(frame: *FrameType, area: zithril.Rect) void {
         zithril.Constraint.len(3),
     });
 
-    const cpu_block = zithril.Block{ .title = "CPU Usage", .border = .rounded, .border_style = zithril.Style.init().fg(.green) };
-    frame.render(cpu_block, layout.get(0));
-    frame.render(zithril.Sparkline{
-        .data = &cpu_data,
-        .style = zithril.Style.init().fg(.green),
-        .max = 100.0,
-    }, cpu_block.inner(layout.get(0)));
-
-    const mem_block = zithril.Block{ .title = "Memory Usage", .border = .rounded, .border_style = zithril.Style.init().fg(.yellow) };
-    frame.render(mem_block, layout.get(1));
-    frame.render(zithril.Sparkline{
-        .data = &mem_data,
-        .style = zithril.Style.init().fg(.yellow),
-        .max = 100.0,
-    }, mem_block.inner(layout.get(1)));
-
-    const net_block = zithril.Block{ .title = "Network Traffic", .border = .rounded, .border_style = zithril.Style.init().fg(.cyan) };
-    frame.render(net_block, layout.get(2));
-    frame.render(zithril.Sparkline{
-        .data = &net_data,
-        .style = zithril.Style.init().fg(.cyan),
-        .max = 100.0,
-    }, net_block.inner(layout.get(2)));
+    const sparklines = [_]struct { title: []const u8, data: []const f64, color: zithril.Color }{
+        .{ .title = "CPU Usage", .data = &cpu_data, .color = .green },
+        .{ .title = "Memory Usage", .data = &mem_data, .color = .yellow },
+        .{ .title = "Network Traffic", .data = &net_data, .color = .cyan },
+    };
+    for (sparklines, 0..) |s, i| {
+        const block = zithril.Block{ .title = s.title, .border = .rounded, .border_style = zithril.Style.init().fg(s.color) };
+        frame.render(block, layout.get(i));
+        frame.render(zithril.Sparkline{
+            .data = s.data,
+            .style = zithril.Style.init().fg(s.color),
+            .max = 100.0,
+        }, block.inner(layout.get(i)));
+    }
 
     frame.render(zithril.LineGauge{
         .ratio = 0.73,
