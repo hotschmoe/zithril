@@ -1287,10 +1287,12 @@ pub fn Output(comptime buffer_size: usize) type {
         }
 
         /// Set the text style using rich_zig ANSI rendering.
+        /// Resets before applying a new style to prevent attribute bleeding
+        /// (e.g., a previous cell's background color persisting into the next cell).
         pub fn setStyle(self: *Self, style: Style) void {
-            // Skip if same as last style
             if (self.last_style) |last| {
                 if (last.eql(style)) return;
+                self.writeRaw("\x1b[0m");
             }
 
             style.renderAnsi(self.color_system, self.writer()) catch {};
