@@ -156,6 +156,23 @@ fn renderAdaptivePanel(_: *const State, frame: *FrameType, area: zithril.Rect) v
     }, lines.get(4));
 }
 
+fn renderGradientSamples(frame: *FrameType, line: zithril.Rect, colors: *const [5]ColorTriplet) void {
+    const samples = [_]usize{ 0, 2, 4 };
+    var x_off: u16 = 1;
+    for (samples) |i| {
+        var buf: [8]u8 = undefined;
+        const hex = std.fmt.bufPrint(&buf, "#{x:0>2}{x:0>2}{x:0>2}", .{
+            colors[i].r, colors[i].g, colors[i].b,
+        }) catch "#??????";
+        const sub = zithril.Rect.init(line.x +| x_off, line.y, @min(7, line.width -| x_off), 1);
+        frame.render(zithril.Text{
+            .content = hex,
+            .style = zithril.Style.init().fg(zithril.Color.fromRgb(colors[i].r, colors[i].g, colors[i].b)),
+        }, sub);
+        x_off +|= 8;
+    }
+}
+
 fn renderGradientPanel(_: *const State, frame: *FrameType, area: zithril.Rect) void {
     const lines = panelLines(frame, area, "Color Gradients", zithril.Color.fromRgb(128, 0, 255)) orelse return;
 
@@ -180,33 +197,15 @@ fn renderGradientPanel(_: *const State, frame: *FrameType, area: zithril.Rect) v
         .style = zithril.Style.init().bold(),
     }, lines.get(0));
 
-    // Show RGB gradient as colored text
-    var rgb_buf: [40]u8 = undefined;
-    const rgb_text = std.fmt.bufPrint(&rgb_buf, " #{x:0>2}{x:0>2}{x:0>2} #{x:0>2}{x:0>2}{x:0>2} #{x:0>2}{x:0>2}{x:0>2}", .{
-        rgb_out[0].r, rgb_out[0].g, rgb_out[0].b,
-        rgb_out[2].r, rgb_out[2].g, rgb_out[2].b,
-        rgb_out[4].r, rgb_out[4].g, rgb_out[4].b,
-    }) catch " gradient";
-    frame.render(zithril.Text{
-        .content = rgb_text,
-        .style = zithril.Style.init().fg(zithril.Color.fromRgb(rgb_out[2].r, rgb_out[2].g, rgb_out[2].b)),
-    }, lines.get(1));
+    // Show RGB gradient: each hex value colored with its own gradient color
+    renderGradientSamples(frame, lines.get(1), &rgb_out);
 
     frame.render(zithril.Text{
         .content = "HSL red->green:",
         .style = zithril.Style.init().bold(),
     }, lines.get(2));
 
-    var hsl_buf: [40]u8 = undefined;
-    const hsl_text = std.fmt.bufPrint(&hsl_buf, " #{x:0>2}{x:0>2}{x:0>2} #{x:0>2}{x:0>2}{x:0>2} #{x:0>2}{x:0>2}{x:0>2}", .{
-        hsl_out[0].r, hsl_out[0].g, hsl_out[0].b,
-        hsl_out[2].r, hsl_out[2].g, hsl_out[2].b,
-        hsl_out[4].r, hsl_out[4].g, hsl_out[4].b,
-    }) catch " gradient";
-    frame.render(zithril.Text{
-        .content = hsl_text,
-        .style = zithril.Style.init().fg(zithril.Color.fromRgb(hsl_out[2].r, hsl_out[2].g, hsl_out[2].b)),
-    }, lines.get(3));
+    renderGradientSamples(frame, lines.get(3), &hsl_out);
 
     frame.render(zithril.Text{
         .content = "HSL avoids muddy midpoints",
