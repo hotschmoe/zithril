@@ -863,7 +863,7 @@ pub fn TestHarness(comptime State: type) type {
 
         // -- Buffer access --
 
-        pub fn getCell(self: Self, x: u16, y: u16) @import("cell.zig").Cell {
+        pub fn getCell(self: Self, x: u16, y: u16) Cell {
             return self.current_buf.get(x, y);
         }
 
@@ -899,30 +899,14 @@ pub fn TestHarness(comptime State: type) type {
         }
 
         pub fn expectSnapshot(self: Self, expected: []const u8) !void {
-            const text = try bufferToText(self.allocator, self.current_buf);
-            defer self.allocator.free(text);
-            if (!std.mem.eql(u8, text, expected)) {
-                // Build line-by-line diff
-                std.debug.print("SNAPSHOT MISMATCH:\n", .{});
-                var expected_lines = std.mem.splitScalar(u8, expected, '\n');
-                var actual_lines = std.mem.splitScalar(u8, text, '\n');
-                var line_num: usize = 0;
-                while (true) {
-                    const exp_line = expected_lines.next();
-                    const act_line = actual_lines.next();
-                    if (exp_line == null and act_line == null) break;
-                    const e = exp_line orelse "";
-                    const a = act_line orelse "";
-                    if (!std.mem.eql(u8, e, a)) {
-                        std.debug.print(
-                            \\Line {d}:
-                            \\  Expected: "{s}"
-                            \\  Actual:   "{s}"
-                            \\
-                        , .{ line_num, e, a });
-                    }
-                    line_num += 1;
-                }
+            var snap = try Snapshot.fromBuffer(self.allocator, self.current_buf);
+            defer snap.deinit();
+            if (!snap.matches(expected)) {
+                var expected_snap = try Snapshot.fromText(self.allocator, expected, self.current_buf.width, self.current_buf.height);
+                defer expected_snap.deinit();
+                const diff_text = try expected_snap.diff(self.allocator, snap);
+                defer self.allocator.free(diff_text);
+                std.debug.print("SNAPSHOT MISMATCH:\n{s}\n", .{diff_text});
                 return error.TestExpectedEqual;
             }
         }
@@ -930,18 +914,15 @@ pub fn TestHarness(comptime State: type) type {
         // -- Golden file operations --
 
         pub fn saveSnapshot(self: Self, path: []const u8) !void {
-            const text = try bufferToText(self.allocator, self.current_buf);
-            defer self.allocator.free(text);
-            const file = try std.fs.cwd().createFile(path, .{});
-            defer file.close();
-            try file.writeAll(text);
+            var snap = try Snapshot.fromBuffer(self.allocator, self.current_buf);
+            defer snap.deinit();
+            try snap.saveToFile(path);
         }
 
         pub fn expectSnapshotFile(self: Self, path: []const u8) !void {
-            const text = try bufferToText(self.allocator, self.current_buf);
-            defer self.allocator.free(text);
-
-            const file = std.fs.cwd().openFile(path, .{}) catch |err| {
+            var snap = try Snapshot.fromBuffer(self.allocator, self.current_buf);
+            defer snap.deinit();
+            snap.expectMatchesFile(self.allocator, path) catch |err| {
                 if (err == error.FileNotFound) {
                     std.debug.print(
                         \\GOLDEN FILE NOT FOUND: {s}
@@ -952,34 +933,6 @@ pub fn TestHarness(comptime State: type) type {
                 }
                 return err;
             };
-            defer file.close();
-
-            const expected = try file.readToEndAlloc(self.allocator, 1024 * 1024);
-            defer self.allocator.free(expected);
-
-            if (!std.mem.eql(u8, text, expected)) {
-                std.debug.print("SNAPSHOT MISMATCH: {s}\n\n", .{path});
-                var expected_lines = std.mem.splitScalar(u8, expected, '\n');
-                var actual_lines = std.mem.splitScalar(u8, text, '\n');
-                var line_num: usize = 0;
-                while (true) {
-                    const exp_line = expected_lines.next();
-                    const act_line = actual_lines.next();
-                    if (exp_line == null and act_line == null) break;
-                    const e = exp_line orelse "";
-                    const a = act_line orelse "";
-                    if (!std.mem.eql(u8, e, a)) {
-                        std.debug.print(
-                            \\Line {d}:
-                            \\  Expected: "{s}"
-                            \\  Actual:   "{s}"
-                            \\
-                        , .{ line_num, e, a });
-                    }
-                    line_num += 1;
-                }
-                return error.TestExpectedEqual;
-            }
         }
     };
 }
