@@ -1,14 +1,3 @@
-// Scenario DSL for zithril TUI framework
-// Parse and execute .scenario files that drive TestHarness through scripted interactions.
-//
-// Usage:
-//   const scenario = @import("scenario.zig");
-//   var runner = scenario.ScenarioRunner(MyState).init(allocator, &state, update, view);
-//   defer runner.deinit();
-//   var result = try runner.run(scenario_text);
-//   defer result.deinit();
-//   if (!result.passed) { ... handle failures ... }
-
 const std = @import("std");
 const testing_mod = @import("testing.zig");
 const event_mod = @import("event.zig");
@@ -24,10 +13,6 @@ const MouseKind = event_mod.MouseKind;
 const Action = action_mod.Action;
 const Style = style_mod.Style;
 const StyleAttribute = style_mod.StyleAttribute;
-
-// ============================================================
-// DIRECTIVE
-// ============================================================
 
 pub const Directive = union(enum) {
     size: struct { width: u16, height: u16 },
@@ -57,7 +42,6 @@ pub const Directive = union(enum) {
 
 pub const ActionKind = enum { none, quit };
 
-// Runtime-bound style attribute (not comptime)
 pub const BoundStyleAttr = enum {
     bold,
     italic,
@@ -82,10 +66,6 @@ pub const BoundStyleAttr = enum {
     }
 };
 
-// ============================================================
-// PARSE ERROR
-// ============================================================
-
 pub const ParseError = error{
     UnknownDirective,
     MissingArgument,
@@ -98,10 +78,6 @@ pub const ParseError = error{
     EmptyScenario,
     OutOfMemory,
 };
-
-// ============================================================
-// SCENARIO PARSER
-// ============================================================
 
 pub const ScenarioParser = struct {
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) ParseError![]Directive {
@@ -264,18 +240,13 @@ pub const ScenarioParser = struct {
         return ParseError.UnknownDirective;
     }
 
-    // -- Helpers --
-
     fn parseKeyDirective(arg: []const u8) ParseError!Directive {
-        // Check for modifier prefixes: ctrl+x, alt+x, shift+x, ctrl+alt+x
         if (std.mem.indexOf(u8, arg, "+")) |_| {
             return parseModifiedKey(arg);
         }
-        // Single character key
         if (arg.len == 1) {
             return Directive{ .key = arg[0] };
         }
-        // Special key name
         if (parseSpecialKey(arg)) |code| {
             return Directive{ .key_special = code };
         }
@@ -301,7 +272,6 @@ pub const ScenarioParser = struct {
             }
         }
 
-        // remaining is the key itself
         if (remaining.len == 1) {
             return Directive{ .key_with_mods = .{
                 .code = KeyCode.fromChar(remaining[0]),
@@ -342,7 +312,6 @@ pub const ScenarioParser = struct {
             if (std.mem.eql(u8, name, entry[0])) return entry[1];
         }
 
-        // Function keys: f1..f12
         if (name.len >= 2 and name[0] == 'f') {
             const num = std.fmt.parseInt(u8, name[1..], 10) catch return null;
             return KeyCode.fromF(num);
@@ -373,7 +342,6 @@ pub const ScenarioParser = struct {
         const trimmed = std.mem.trimLeft(u8, input, " \t");
         if (trimmed.len < 2) return null;
         if (trimmed[0] != '"') return null;
-        // Find closing quote
         if (std.mem.indexOfScalarPos(u8, trimmed, 1, '"')) |end| {
             return trimmed[1..end];
         }
@@ -389,7 +357,6 @@ pub const ScenarioParser = struct {
     }
 };
 
-// Simple space-delimited token iterator that preserves remaining text for quoted strings
 const TokenIterator = struct {
     source: []const u8,
     pos: usize,
@@ -399,7 +366,6 @@ const TokenIterator = struct {
     }
 
     fn next(self: *TokenIterator) ?[]const u8 {
-        // Skip spaces
         while (self.pos < self.source.len and self.source[self.pos] == ' ') {
             self.pos += 1;
         }
@@ -419,10 +385,6 @@ const TokenIterator = struct {
         return self.source[self.pos..];
     }
 };
-
-// ============================================================
-// SCENARIO RESULT
-// ============================================================
 
 pub const ScenarioResult = struct {
     passed: bool,
@@ -465,10 +427,6 @@ pub const ScenarioResult = struct {
     }
 };
 
-// ============================================================
-// SCENARIO RUNNER
-// ============================================================
-
 pub fn ScenarioRunner(comptime State: type) type {
     return struct {
         const Self = @This();
@@ -480,7 +438,6 @@ pub fn ScenarioRunner(comptime State: type) type {
         state: *State,
         update_fn: *const fn (*State, Event) Action,
         view_fn: *const fn (*State, *FrameType) void,
-        golden_dir: []const u8,
 
         pub fn init(
             allocator: std.mem.Allocator,
@@ -493,12 +450,7 @@ pub fn ScenarioRunner(comptime State: type) type {
                 .state = state,
                 .update_fn = update_fn,
                 .view_fn = view_fn,
-                .golden_dir = "tests/golden",
             };
-        }
-
-        pub fn deinit(self: *Self) void {
-            _ = self;
         }
 
         pub fn run(self: *Self, scenario_text: []const u8) !ScenarioResult {
@@ -508,17 +460,14 @@ pub fn ScenarioRunner(comptime State: type) type {
             var result = ScenarioResult.init(self.allocator);
             result.total_directives = directives.len;
 
-            // Determine size from first directive (if size directive)
             var width: u16 = 80;
             var height: u16 = 24;
             var start_idx: usize = 0;
 
-            if (directives.len > 0) {
-                if (directives[0] == .size) {
-                    width = directives[0].size.width;
-                    height = directives[0].size.height;
-                    start_idx = 1;
-                }
+            if (directives.len > 0 and directives[0] == .size) {
+                width = directives[0].size.width;
+                height = directives[0].size.height;
+                start_idx = 1;
             }
 
             var harness = try Harness.init(self.allocator, .{
@@ -532,7 +481,6 @@ pub fn ScenarioRunner(comptime State: type) type {
 
             var i = start_idx;
             var source_line: usize = 0;
-            // Build line mapping: directive index -> source line number
             var line_map: std.ArrayListUnmanaged(usize) = .{};
             defer line_map.deinit(self.allocator);
             {
@@ -553,9 +501,8 @@ pub fn ScenarioRunner(comptime State: type) type {
                 const directive = directives[i];
 
                 switch (directive) {
-                    .size => {}, // Already handled above if first
+                    .size => {},
                     .repeat => |n| {
-                        // Repeat the NEXT directive n times
                         if (i + 1 < directives.len) {
                             i += 1;
                             const next_directive = directives[i];
@@ -651,7 +598,6 @@ pub fn ScenarioRunner(comptime State: type) type {
                     };
                 },
                 .expect_style => |es| {
-                    // Runtime style check - cannot use comptime harness.expectStyle
                     const cell = harness.current_buf.get(es.x, es.y);
                     const rich_attr = es.attr.toStyleAttribute();
                     if (!cell.style.hasAttribute(rich_attr)) {
@@ -689,10 +635,6 @@ pub fn ScenarioRunner(comptime State: type) type {
     };
 }
 
-// ============================================================
-// SANITY TESTS
-// ============================================================
-
 test "sanity: parse empty input" {
     const directives = try ScenarioParser.parse(std.testing.allocator, "");
     defer std.testing.allocator.free(directives);
@@ -724,10 +666,6 @@ test "sanity: parseLine returns null for comment" {
     const result = try ScenarioParser.parseLine("# comment");
     try std.testing.expect(result == null);
 }
-
-// ============================================================
-// BEHAVIOR TESTS - Parser
-// ============================================================
 
 test "behavior: parse size directive" {
     const result = (try ScenarioParser.parseLine("size 100 50")).?;
@@ -948,10 +886,6 @@ test "behavior: parse multi-line scenario" {
     try std.testing.expect(directives[4] == .expect_string);
 }
 
-// ============================================================
-// BEHAVIOR TESTS - Runner
-// ============================================================
-
 const RunnerTestHelpers = struct {
     const CounterState = struct {
         count: i32 = 0,
@@ -960,10 +894,9 @@ const RunnerTestHelpers = struct {
         quit_requested: bool = false,
     };
 
-    const RunnerAction = action_mod.Action;
-    const RunnerFrameType = @import("frame.zig").Frame(64);
+    const FrameType = @import("frame.zig").Frame(64);
 
-    fn update(state: *CounterState, ev: Event) RunnerAction {
+    fn update(state: *CounterState, ev: Event) Action {
         switch (ev) {
             .key => |k| {
                 switch (k.code) {
@@ -971,7 +904,7 @@ const RunnerTestHelpers = struct {
                         state.last_key = c;
                         if (c == 'q') {
                             state.quit_requested = true;
-                            return RunnerAction{ .quit = {} };
+                            return .{ .quit = {} };
                         }
                         if (c == '+') state.count += 1;
                         if (c == '-') state.count -= 1;
@@ -984,10 +917,10 @@ const RunnerTestHelpers = struct {
             },
             else => {},
         }
-        return RunnerAction{ .none = {} };
+        return .{ .none = {} };
     }
 
-    fn view(state: *CounterState, frame: *RunnerFrameType) void {
+    fn view(state: *CounterState, frame: *FrameType) void {
         var count_buf: [32]u8 = undefined;
         const count_str = std.fmt.bufPrint(&count_buf, "Count: {d}", .{state.count}) catch "?";
         frame.buffer.setString(0, 0, count_str, Style.empty);
@@ -999,7 +932,7 @@ const RunnerTestHelpers = struct {
         }
     }
 
-    fn styledView(state: *CounterState, frame: *RunnerFrameType) void {
+    fn styledView(state: *CounterState, frame: *FrameType) void {
         _ = state;
         frame.buffer.setString(0, 0, "Bold", Style.init().bold());
         frame.buffer.setString(0, 1, "Normal", Style.empty);
@@ -1014,7 +947,6 @@ test "behavior: ScenarioRunner basic key and assertion" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1036,7 +968,6 @@ test "behavior: ScenarioRunner multiple increments" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1059,7 +990,6 @@ test "behavior: ScenarioRunner detects assertion failure" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1081,7 +1011,6 @@ test "behavior: ScenarioRunner tick directive" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1104,7 +1033,6 @@ test "behavior: ScenarioRunner tick_n directive" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1125,7 +1053,6 @@ test "behavior: ScenarioRunner repeat directive" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1148,7 +1075,6 @@ test "behavior: ScenarioRunner quit detection" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1170,7 +1096,6 @@ test "behavior: ScenarioRunner expect_action none" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1191,7 +1116,6 @@ test "behavior: ScenarioRunner expect_cell" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1211,7 +1135,6 @@ test "behavior: ScenarioRunner expect_empty" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1231,7 +1154,6 @@ test "behavior: ScenarioRunner expect_style" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.styledView,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1251,7 +1173,6 @@ test "behavior: ScenarioRunner type_text directive" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1272,7 +1193,6 @@ test "behavior: ScenarioRunner default size without size directive" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\expect_string 0 0 "Count: 0"
@@ -1291,7 +1211,6 @@ test "behavior: ScenarioRunner multiple failures collected" {
         RunnerTestHelpers.update,
         RunnerTestHelpers.view,
     );
-    defer runner.deinit();
 
     const scenario =
         \\size 40 10
@@ -1305,10 +1224,6 @@ test "behavior: ScenarioRunner multiple failures collected" {
     try std.testing.expect(!result.passed);
     try std.testing.expectEqual(@as(usize, 3), result.failCount());
 }
-
-// ============================================================
-// REGRESSION TESTS - Edge cases
-// ============================================================
 
 test "regression: trailing whitespace in lines" {
     const result = try ScenarioParser.parseLine("key a   ");

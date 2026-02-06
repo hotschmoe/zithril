@@ -1,7 +1,3 @@
-// QA Analysis auditing tools for zithril TUI framework
-// Provides heuristic-based accessibility and usability audits
-// for buffers and interactive harness sessions.
-
 const std = @import("std");
 const buffer_mod = @import("buffer.zig");
 const cell_mod = @import("cell.zig");
@@ -10,13 +6,12 @@ const style_mod = @import("style.zig");
 const color_mod = @import("color.zig");
 const testing_mod = @import("testing.zig");
 
-pub const Buffer = buffer_mod.Buffer;
-pub const Cell = cell_mod.Cell;
-pub const Rect = geometry_mod.Rect;
-pub const Style = style_mod.Style;
-pub const Color = style_mod.Color;
-pub const ColorTriplet = color_mod.ColorTriplet;
-pub const WcagLevel = color_mod.WcagLevel;
+const Buffer = buffer_mod.Buffer;
+const Cell = cell_mod.Cell;
+const Rect = geometry_mod.Rect;
+const Style = style_mod.Style;
+const Color = style_mod.Color;
+const ColorTriplet = color_mod.ColorTriplet;
 
 pub const Severity = enum {
     pass,
@@ -152,19 +147,6 @@ pub const AuditReport = struct {
     }
 };
 
-// Region tracking for contrast audit: contiguous cells on the same row with same fg/bg.
-const ColorRegion = struct {
-    row: u16,
-    start_x: u16,
-    end_x: u16, // exclusive
-    fg_triplet: ColorTriplet,
-    bg_triplet: ColorTriplet,
-};
-
-fn colorKey(color: Color) ?ColorTriplet {
-    return color.getTriplet();
-}
-
 pub fn auditContrast(allocator: std.mem.Allocator, buf: *const Buffer) !AuditResult {
     var findings: std.ArrayListUnmanaged(Finding) = .{};
     errdefer {
@@ -194,16 +176,15 @@ pub fn auditContrast(allocator: std.mem.Allocator, buf: *const Buffer) !AuditRes
                 continue;
             }
 
-            const fg_triplet = colorKey(fg_color) orelse {
+            const fg_triplet = fg_color.getTriplet() orelse {
                 x += 1;
                 continue;
             };
-            const bg_triplet = colorKey(bg_color) orelse {
+            const bg_triplet = bg_color.getTriplet() orelse {
                 x += 1;
                 continue;
             };
 
-            // Find extent of contiguous region with same fg/bg
             const start_x = x;
             x += 1;
             while (x < buf.width) {
@@ -211,8 +192,8 @@ pub fn auditContrast(allocator: std.mem.Allocator, buf: *const Buffer) !AuditRes
                 const next_fg = next_cell.style.getForeground() orelse break;
                 const next_bg = next_cell.style.getBackground() orelse break;
                 if (next_fg.color_type == .default or next_bg.color_type == .default) break;
-                const next_fg_tri = colorKey(next_fg) orelse break;
-                const next_bg_tri = colorKey(next_bg) orelse break;
+                const next_fg_tri = next_fg.getTriplet() orelse break;
+                const next_bg_tri = next_bg.getTriplet() orelse break;
                 if (!next_fg_tri.eql(fg_triplet) or !next_bg_tri.eql(bg_triplet)) break;
                 x += 1;
             }
@@ -274,12 +255,10 @@ pub fn auditKeyboardNav(
         findings.deinit(allocator);
     }
 
-    // Snapshot the initial buffer state
     const initial_cells = try allocator.alloc(Cell, harness.current_buf.cells.len);
     defer allocator.free(initial_cells);
     @memcpy(initial_cells, harness.current_buf.cells);
 
-    // Previous state for detecting per-tab changes
     const prev_cells = try allocator.alloc(Cell, harness.current_buf.cells.len);
     defer allocator.free(prev_cells);
     @memcpy(prev_cells, harness.current_buf.cells);
@@ -291,7 +270,6 @@ pub fn auditKeyboardNav(
     while (tab_i < config.max_tabs) : (tab_i += 1) {
         harness.pressSpecial(.tab);
 
-        // Compare current buffer to previous
         const changed_rect = diffBoundingRect(
             harness.current_buf,
             prev_cells,
@@ -311,7 +289,6 @@ pub fn auditKeyboardNav(
             });
         }
 
-        // Check if we've returned to the initial state
         if (std.mem.eql(Cell, harness.current_buf.cells, initial_cells)) {
             cycle_complete = true;
             break;
@@ -364,7 +341,6 @@ pub fn auditFocusVisibility(
         findings.deinit(allocator);
     }
 
-    // Snapshot the initial buffer state
     const initial_cells = try allocator.alloc(Cell, harness.current_buf.cells.len);
     defer allocator.free(initial_cells);
     @memcpy(initial_cells, harness.current_buf.cells);
@@ -389,7 +365,6 @@ pub fn auditFocusVisibility(
         if (changed_rect) |rect| {
             stop_num += 1;
 
-            // Check if the style actually changed for the affected cells
             const has_style_change = detectStyleChange(
                 harness.current_buf,
                 prev_cells,
@@ -446,7 +421,6 @@ pub fn auditFocusVisibility(
     };
 }
 
-// Compute the bounding rectangle of all cells that differ between the buffer and a cell snapshot.
 fn diffBoundingRect(
     buf: Buffer,
     prev_cells: []const Cell,
@@ -480,7 +454,6 @@ fn diffBoundingRect(
     return Rect.init(min_x, min_y, max_x - min_x, max_y - min_y);
 }
 
-// Detect whether any cell in the given rect has a style change between the current buffer and prev.
 fn detectStyleChange(
     buf: Buffer,
     prev_cells: []const Cell,
@@ -502,10 +475,6 @@ fn detectStyleChange(
     }
     return false;
 }
-
-// ============================================================
-// SANITY TESTS
-// ============================================================
 
 test "sanity: AuditResult init and deinit with no findings" {
     var result = AuditResult{
@@ -540,16 +509,11 @@ test "sanity: AuditReport summary with no results" {
     try std.testing.expect(std.mem.indexOf(u8, text, "0 findings") != null);
 }
 
-// ============================================================
-// BEHAVIOR TESTS
-// ============================================================
-
 test "behavior: AuditResult counts findings by severity" {
     const alloc = std.testing.allocator;
     var findings_list: std.ArrayListUnmanaged(Finding) = .{};
     defer findings_list.deinit(alloc);
 
-    // Manually build findings with allocated messages
     const msg_pass = try alloc.dupe(u8, "pass finding");
     errdefer alloc.free(msg_pass);
     const msg_warn = try alloc.dupe(u8, "warn finding");
@@ -594,7 +558,6 @@ test "behavior: AuditReport aggregates multiple results" {
     var report = AuditReport.init(alloc);
     defer report.deinit();
 
-    // Result 1: one pass
     const msg1 = try alloc.dupe(u8, "good contrast");
     var findings1: [1]Finding = .{.{
         .severity = .pass,
@@ -609,7 +572,6 @@ test "behavior: AuditReport aggregates multiple results" {
         .allocator = alloc,
     });
 
-    // Result 2: one fail
     const msg2 = try alloc.dupe(u8, "no tab stops");
     var findings2: [1]Finding = .{.{
         .severity = .fail,
@@ -650,7 +612,6 @@ test "behavior: auditContrast detects bad contrast" {
     var buf = try Buffer.init(alloc, 20, 5);
     defer buf.deinit();
 
-    // Dark gray on black: very low contrast
     const low_contrast_style = Style.init()
         .fg(Color.fromRgb(30, 30, 30))
         .bg(Color.fromRgb(0, 0, 0));
@@ -668,7 +629,6 @@ test "behavior: auditContrast passes good contrast" {
     var buf = try Buffer.init(alloc, 20, 5);
     defer buf.deinit();
 
-    // Black on white: maximum contrast
     const high_contrast_style = Style.init()
         .fg(Color.fromRgb(0, 0, 0))
         .bg(Color.fromRgb(255, 255, 255));
@@ -687,8 +647,6 @@ test "behavior: auditContrast warns on AA but not AAA" {
     var buf = try Buffer.init(alloc, 20, 5);
     defer buf.deinit();
 
-    // Ratio around 5:1 (passes AA, fails AAA)
-    // Gray (~118) on black gives approximately 5.0:1
     const aa_style = Style.init()
         .fg(Color.fromRgb(118, 118, 118))
         .bg(Color.fromRgb(0, 0, 0));
@@ -720,7 +678,6 @@ test "behavior: auditContrast groups contiguous same-style cells" {
     var result = try auditContrast(alloc, &buf);
     defer result.deinit();
 
-    // Should produce exactly 2 findings (one per contiguous region)
     try std.testing.expectEqual(@as(usize, 2), result.findings.len);
     try std.testing.expectEqual(@as(u16, 0), result.findings[0].region.x);
     try std.testing.expectEqual(@as(u16, 4), result.findings[0].region.width);
@@ -728,22 +685,16 @@ test "behavior: auditContrast groups contiguous same-style cells" {
     try std.testing.expectEqual(@as(u16, 4), result.findings[1].region.width);
 }
 
-// ============================================================
-// HARNESS-BASED TESTS
-// ============================================================
-
 const TestHarness = testing_mod.TestHarness;
 const Event = @import("event.zig").Event;
-const KeyCode = @import("event.zig").KeyCode;
-const Key = @import("event.zig").Key;
 const Action = @import("action.zig").Action;
+
+const TestFrame = @import("frame.zig").Frame(64);
 
 const FocusTestState = struct {
     focus: u8 = 0,
     num_items: u8 = 3,
 };
-
-const FocusTestFrame = @import("frame.zig").Frame(64);
 
 fn focusTestUpdate(state: *FocusTestState, ev: Event) Action {
     switch (ev) {
@@ -753,17 +704,17 @@ fn focusTestUpdate(state: *FocusTestState, ev: Event) Action {
                     state.focus = (state.focus + 1) % state.num_items;
                 },
                 .char => |c| {
-                    if (c == 'q') return Action{ .quit = {} };
+                    if (c == 'q') return .{ .quit = {} };
                 },
                 else => {},
             }
         },
         else => {},
     }
-    return Action{ .none = {} };
+    return .{ .none = {} };
 }
 
-fn focusTestView(state: *FocusTestState, frame: *FocusTestFrame) void {
+fn focusTestView(state: *FocusTestState, frame: *TestFrame) void {
     const normal = Style.init().fg(Color.fromRgb(200, 200, 200));
     const focused = Style.init().fg(Color.fromRgb(255, 255, 0)).bold();
 
@@ -790,7 +741,6 @@ test "behavior: auditKeyboardNav detects tab stops" {
     defer result.deinit();
 
     try std.testing.expectEqual(AuditCategory.keyboard_navigation, result.category);
-    // Should find tab stops (3 items cycling) + possible cycle detection
     try std.testing.expect(result.passCount() > 0);
 }
 
@@ -814,19 +764,17 @@ test "behavior: auditFocusVisibility detects style changes" {
     try std.testing.expectEqual(@as(usize, 0), result.failCount());
 }
 
-// Test state with no tab handling
 const NoTabState = struct {
     value: u8 = 0,
 };
-const NoTabFrame = @import("frame.zig").Frame(64);
 
 fn noTabUpdate(state: *NoTabState, ev: Event) Action {
     _ = state;
     _ = ev;
-    return Action{ .none = {} };
+    return .{ .none = {} };
 }
 
-fn noTabView(state: *NoTabState, frame: *NoTabFrame) void {
+fn noTabView(state: *NoTabState, frame: *TestFrame) void {
     _ = state;
     frame.buffer.setString(0, 0, "Static content", Style.empty);
 }
@@ -867,10 +815,6 @@ test "behavior: auditFocusVisibility fails when no focus stops" {
 
     try std.testing.expect(result.failCount() > 0);
 }
-
-// ============================================================
-// REGRESSION TESTS
-// ============================================================
 
 test "regression: empty buffer contrast audit returns zero findings" {
     const alloc = std.testing.allocator;
