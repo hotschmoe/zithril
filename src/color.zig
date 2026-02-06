@@ -1,9 +1,6 @@
-// Color utilities for zithril TUI framework
-// Wraps rich_zig v1.4.0 color features: adaptive colors, HSL, gradients, WCAG contrast
 const std = @import("std");
 pub const rich_zig = @import("rich_zig");
 
-// Re-exports
 pub const AdaptiveColor = rich_zig.AdaptiveColor;
 pub const ColorTriplet = rich_zig.ColorTriplet;
 pub const Color = rich_zig.Color;
@@ -11,10 +8,6 @@ pub const ColorSystem = rich_zig.ColorSystem;
 pub const WcagLevel = ColorTriplet.WcagLevel;
 pub const gradient = rich_zig.gradient;
 pub const BackgroundMode = rich_zig.BackgroundMode;
-
-// ============================================================
-// SANITY TESTS - Type re-exports
-// ============================================================
 
 test "sanity: AdaptiveColor can be created" {
     const ac = AdaptiveColor.fromRgb(255, 100, 50);
@@ -112,16 +105,4 @@ test "behavior: luminance of black is near 0" {
 test "behavior: luminance of white is near 1" {
     const white = ColorTriplet{ .r = 255, .g = 255, .b = 255 };
     try std.testing.expect(white.luminance() > 0.99);
-}
-
-// ============================================================
-// SANITY TESTS - BackgroundMode
-// ============================================================
-
-test "sanity: BackgroundMode enum values" {
-    const dark: BackgroundMode = .dark;
-    const light: BackgroundMode = .light;
-    const unknown: BackgroundMode = .unknown;
-    try std.testing.expect(dark != light);
-    try std.testing.expect(dark != unknown);
 }

@@ -214,6 +214,15 @@ fn renderGradientPanel(_: *const State, frame: *FrameType, area: zithril.Rect) v
     }, lines.get(4));
 }
 
+fn wcagLevelStr(level: zithril.WcagLevel) []const u8 {
+    return switch (level) {
+        .fail => "FAIL",
+        .aa_large => "AA-lg",
+        .aa => "AA",
+        .aaa => "AAA",
+    };
+}
+
 fn renderWcagPanel(_: *const State, frame: *FrameType, area: zithril.Rect) void {
     const lines = panelLines(frame, area, "WCAG Contrast", zithril.Color.fromRgb(0, 200, 100)) orelse return;
 
@@ -238,13 +247,7 @@ fn renderWcagPanel(_: *const State, frame: *FrameType, area: zithril.Rect) void 
 
     const gw_ratio = gray.contrastRatio(white);
     const gw_level = gray.wcagLevel(white);
-    const level_str = switch (gw_level) {
-        .fail => "FAIL",
-        .aa_large => "AA-lg",
-        .aa => "AA",
-        .aaa => "AAA",
-    };
-    const s1 = std.fmt.bufPrint(&buf1, "Gry/Wht: {d:.1}:1 {s}", .{ gw_ratio, level_str }) catch "?";
+    const s1 = std.fmt.bufPrint(&buf1, "Gry/Wht: {d:.1}:1 {s}", .{ gw_ratio, wcagLevelStr(gw_level) }) catch "?";
     frame.render(zithril.Text{
         .content = s1,
         .style = zithril.Style.init().fg(if (gw_level == .fail) zithril.Color.red else zithril.Color.yellow),
@@ -252,13 +255,7 @@ fn renderWcagPanel(_: *const State, frame: *FrameType, area: zithril.Rect) void 
 
     const gb_ratio = gray.contrastRatio(black);
     const gb_level = gray.wcagLevel(black);
-    const gb_str = switch (gb_level) {
-        .fail => "FAIL",
-        .aa_large => "AA-lg",
-        .aa => "AA",
-        .aaa => "AAA",
-    };
-    const s2 = std.fmt.bufPrint(&buf2, "Gry/Blk: {d:.1}:1 {s}", .{ gb_ratio, gb_str }) catch "?";
+    const s2 = std.fmt.bufPrint(&buf2, "Gry/Blk: {d:.1}:1 {s}", .{ gb_ratio, wcagLevelStr(gb_level) }) catch "?";
     frame.render(zithril.Text{
         .content = s2,
         .style = zithril.Style.init().fg(.cyan),

@@ -1364,13 +1364,13 @@ pub fn Output(comptime buffer_size: usize) type {
         /// Begin synchronized output (DEC Mode 2026).
         /// Terminal buffers all output until endSyncOutput is called.
         pub fn beginSyncOutput(self: *Self) void {
-            self.writeRaw("\x1b[?2026h");
+            self.writeRaw(Backend.SYNC_OUTPUT_BEGIN);
         }
 
         /// End synchronized output (DEC Mode 2026).
         /// Terminal renders all buffered output atomically.
         pub fn endSyncOutput(self: *Self) void {
-            self.writeRaw("\x1b[?2026l");
+            self.writeRaw(Backend.SYNC_OUTPUT_END);
         }
 
         /// Flush buffered output to the terminal.
