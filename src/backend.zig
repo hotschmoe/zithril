@@ -742,9 +742,11 @@ pub const Backend = struct {
         raw.lflag.ISIG = false;
         raw.lflag.IEXTEN = false;
 
-        // Set minimum chars for non-canonical read
+        // Non-blocking read: VMIN=0, VTIME=0 means read() returns immediately
+        // with whatever is available (including 0 bytes). Timeout handling is
+        // done by poll() in the event loop for precise tick timing.
         raw.cc[@intFromEnum(std.posix.V.MIN)] = 0;
-        raw.cc[@intFromEnum(std.posix.V.TIME)] = 1;
+        raw.cc[@intFromEnum(std.posix.V.TIME)] = 0;
 
         std.posix.tcsetattr(self.handle, .FLUSH, raw) catch {
             return Error.TerminalSetFailed;
