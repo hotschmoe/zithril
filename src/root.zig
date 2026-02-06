@@ -121,7 +121,6 @@ pub const AnsiText = ansi_mod.Text;
 pub const AnsiSpan = ansi_mod.Span;
 pub const fromAnsi = ansi_mod.fromAnsi;
 pub const stripAnsi = ansi_mod.stripAnsi;
-pub const stripToOwned = ansi_mod.stripToOwned;
 pub const parseAnsiToSegments = ansi_mod.parseAnsiToSegments;
 pub const freeAnsiSegments = ansi_mod.freeSegments;
 
@@ -482,42 +481,6 @@ test "terminal type re-export" {
     try std.testing.expect(caps.color_support == .extended);
     try std.testing.expect(caps.unicode);
     try std.testing.expect(caps.mouse);
-}
-
-test "segment re-export" {
-    // Test Segment type from rich_zig
-    const seg = Segment.plain("Hello");
-    try std.testing.expectEqualStrings("Hello", seg.text);
-    try std.testing.expectEqual(@as(usize, 5), seg.cellLength());
-}
-
-test "control code re-export" {
-    // Test ControlCode type from rich_zig
-    var buf: [32]u8 = undefined;
-    var stream = std.io.fixedBufferStream(&buf);
-
-    const ctrl = ControlCode{ .cursor_move_to = .{ .x = 10, .y = 5 } };
-    try ctrl.toEscapeSequence(stream.writer());
-    try std.testing.expectEqualStrings("\x1b[5;10H", stream.getWritten());
-}
-
-test "color system re-export" {
-    // Test ColorSystem from rich_zig
-    try std.testing.expect(ColorSystem.truecolor.supports(.standard));
-    try std.testing.expect(ColorSystem.truecolor.supports(.eight_bit));
-    try std.testing.expect(!ColorSystem.standard.supports(.truecolor));
-}
-
-test "style ansi rendering re-export" {
-    var buf: [128]u8 = undefined;
-    var stream = std.io.fixedBufferStream(&buf);
-
-    const style = Style.init().bold().fg(.red);
-    try style.renderAnsi(.truecolor, stream.writer());
-
-    const written = stream.getWritten();
-    try std.testing.expect(written.len > 0);
-    try std.testing.expect(written[0] == 0x1b);
 }
 
 test "frame re-export" {

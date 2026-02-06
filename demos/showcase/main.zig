@@ -11,6 +11,31 @@ const State = struct {
     }
 };
 
+const five_rows = [_]zithril.Constraint{
+    zithril.Constraint.len(1),
+    zithril.Constraint.len(1),
+    zithril.Constraint.len(1),
+    zithril.Constraint.len(1),
+    zithril.Constraint.len(1),
+};
+
+fn panelLines(
+    frame: *FrameType,
+    area: zithril.Rect,
+    title: ?[]const u8,
+    border_color: zithril.Color,
+) ?zithril.BoundedRects {
+    const block = zithril.Block{
+        .title = title,
+        .border = .rounded,
+        .border_style = zithril.Style.init().fg(border_color),
+    };
+    frame.render(block, area);
+    const inner = block.inner(area);
+    if (inner.height < 2 or inner.width < 4) return null;
+    return zithril.layout(inner, .vertical, &five_rows);
+}
+
 fn update(state: *State, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
@@ -36,14 +61,12 @@ fn view(state: *State, frame: *FrameType) void {
         zithril.Constraint.len(1),
     });
 
-    // Header: BigText "SHOWCASE"
     frame.render(zithril.BigText{
         .text = "SHOWCASE",
         .style = zithril.Style.init().fg(.cyan).bold(),
         .pixel_size = .half,
     }, rows.get(0));
 
-    // Main content: 2 rows of 3 panels each
     const mid = rows.get(1);
     const panel_rows = zithril.layout(mid, .vertical, &.{
         zithril.Constraint.flexible(1),
@@ -69,7 +92,6 @@ fn view(state: *State, frame: *FrameType) void {
     renderNewStylesPanel(state, frame, bot_cols.get(1));
     renderMeasurementPanel(state, frame, bot_cols.get(2));
 
-    // Status bar
     var status_buf: [80]u8 = undefined;
     const status = std.fmt.bufPrint(&status_buf, " q:quit | Phase: {d}/4 | Tick: {d}", .{ state.phase() + 1, state.tick_count }) catch " q:quit";
     frame.render(zithril.Text{
@@ -79,23 +101,8 @@ fn view(state: *State, frame: *FrameType) void {
 }
 
 fn renderThemePanel(state: *const State, frame: *FrameType, area: zithril.Rect) void {
-    const block = zithril.Block{
-        .title = "Theme",
-        .border = .rounded,
-        .border_style = zithril.Style.init().fg(.cyan),
-    };
-    frame.render(block, area);
-    const inner = block.inner(area);
-    if (inner.height < 2 or inner.width < 4) return;
-
+    const lines = panelLines(frame, area, "Theme", .cyan) orelse return;
     const p = state.phase();
-    const lines = zithril.layout(inner, .vertical, &.{
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-    });
 
     if (p == 0 or p == 2) {
         frame.render(zithril.Text{ .content = "[INFO] System ready", .style = zithril.Style.init().fg(.cyan) }, lines.get(0));
@@ -113,24 +120,9 @@ fn renderThemePanel(state: *const State, frame: *FrameType, area: zithril.Rect) 
 }
 
 fn renderAnsiPanel(state: *const State, frame: *FrameType, area: zithril.Rect) void {
-    const block = zithril.Block{
-        .title = "ANSI Parser",
-        .border = .rounded,
-        .border_style = zithril.Style.init().fg(.green),
-    };
-    frame.render(block, area);
-    const inner = block.inner(area);
-    if (inner.height < 2 or inner.width < 4) return;
-
-    const lines = zithril.layout(inner, .vertical, &.{
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-    });
-
+    const lines = panelLines(frame, area, "ANSI Parser", .green) orelse return;
     const p = state.phase();
+
     if (p == 0 or p == 1) {
         frame.render(zithril.Text{ .content = "Raw: \\x1b[1mBold\\x1b[0m", .style = zithril.Style.init().dim() }, lines.get(0));
         frame.render(zithril.Text{ .content = "Parsed: Bold", .style = zithril.Style.init().bold() }, lines.get(1));
@@ -147,24 +139,9 @@ fn renderAnsiPanel(state: *const State, frame: *FrameType, area: zithril.Rect) v
 }
 
 fn renderHighlighterPanel(state: *const State, frame: *FrameType, area: zithril.Rect) void {
-    const block = zithril.Block{
-        .title = "Highlighter",
-        .border = .rounded,
-        .border_style = zithril.Style.init().fg(.yellow),
-    };
-    frame.render(block, area);
-    const inner = block.inner(area);
-    if (inner.height < 2 or inner.width < 4) return;
-
-    const lines = zithril.layout(inner, .vertical, &.{
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-    });
-
+    const lines = panelLines(frame, area, "Highlighter", .yellow) orelse return;
     const p = state.phase();
+
     if (p == 0 or p == 3) {
         frame.render(zithril.Text{ .content = "Numbers:", .style = zithril.Style.init().bold() }, lines.get(0));
         frame.render(zithril.Text{ .content = "  42", .style = zithril.Style.init().fg(.cyan).bold() }, lines.get(1));
@@ -181,24 +158,9 @@ fn renderHighlighterPanel(state: *const State, frame: *FrameType, area: zithril.
 }
 
 fn renderPrettyPanel(state: *const State, frame: *FrameType, area: zithril.Rect) void {
-    const block = zithril.Block{
-        .title = "Pretty Print",
-        .border = .rounded,
-        .border_style = zithril.Style.init().fg(.magenta),
-    };
-    frame.render(block, area);
-    const inner = block.inner(area);
-    if (inner.height < 2 or inner.width < 4) return;
-
-    const lines = zithril.layout(inner, .vertical, &.{
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-    });
-
+    const lines = panelLines(frame, area, "Pretty Print", .magenta) orelse return;
     const p = state.phase();
+
     if (p == 0 or p == 1) {
         frame.render(zithril.Text{ .content = "struct {", .style = zithril.Style.init().fg(.white) }, lines.get(0));
         frame.render(zithril.Text{ .content = "  .name = \"zithril\"", .style = zithril.Style.init().fg(.yellow) }, lines.get(1));
@@ -215,24 +177,9 @@ fn renderPrettyPanel(state: *const State, frame: *FrameType, area: zithril.Rect)
 }
 
 fn renderNewStylesPanel(state: *const State, frame: *FrameType, area: zithril.Rect) void {
-    const block = zithril.Block{
-        .title = "New Styles",
-        .border = .rounded,
-        .border_style = zithril.Style.init().fg(.red),
-    };
-    frame.render(block, area);
-    const inner = block.inner(area);
-    if (inner.height < 2 or inner.width < 4) return;
-
-    const lines = zithril.layout(inner, .vertical, &.{
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-    });
-
+    const lines = panelLines(frame, area, "New Styles", .red) orelse return;
     const p = state.phase();
+
     if (p == 0 or p == 2) {
         frame.render(zithril.Text{ .content = "Double Underline", .style = zithril.Style.init().underline2().fg(.cyan) }, lines.get(0));
         frame.render(zithril.Text{ .content = "Frame (SGR 51)", .style = zithril.Style.init().frame().fg(.green) }, lines.get(1));
@@ -249,24 +196,9 @@ fn renderNewStylesPanel(state: *const State, frame: *FrameType, area: zithril.Re
 }
 
 fn renderMeasurementPanel(state: *const State, frame: *FrameType, area: zithril.Rect) void {
-    const block = zithril.Block{
-        .title = "Measurement",
-        .border = .rounded,
-        .border_style = zithril.Style.init().fg(.blue),
-    };
-    frame.render(block, area);
-    const inner = block.inner(area);
-    if (inner.height < 2 or inner.width < 4) return;
-
-    const lines = zithril.layout(inner, .vertical, &.{
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-        zithril.Constraint.len(1),
-    });
-
+    const lines = panelLines(frame, area, "Measurement", .blue) orelse return;
     const p = state.phase();
+
     if (p == 0 or p == 3) {
         frame.render(zithril.Text{ .content = "\"Hello\" ->", .style = zithril.Style.init().bold() }, lines.get(0));
         frame.render(zithril.Text{ .content = "  min: 5, max: 5", .style = zithril.Style.init().fg(.cyan) }, lines.get(1));

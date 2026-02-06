@@ -1,35 +1,11 @@
-// ANSI escape sequence parsing for zithril TUI framework
-// Wraps rich_zig's ANSI parsing with zithril-style conveniences
-
 const std = @import("std");
 pub const rich_zig = @import("rich_zig");
 
-/// Styled text parsed from ANSI escape sequences.
-/// Wraps rich_zig.Text -- call deinit() when done.
 pub const Text = rich_zig.Text;
-
-/// A span of styled text within a Text object.
-/// Fields: .start, .end (byte offsets into plain text), .style (rich_zig.Style).
 pub const Span = rich_zig.Span;
-
-/// Parse ANSI-escaped text into a styled Text object.
-/// Converts SGR escape sequences into Style spans.
-/// Caller owns the returned Text and must call .deinit() to free.
 pub const fromAnsi = rich_zig.fromAnsi;
-
-/// Strip all ANSI escape sequences from text, returning plain bytes.
-/// Caller owns the returned slice and must free with the same allocator.
 pub const stripAnsi = rich_zig.stripAnsi;
-
-/// Re-export rich_zig's Segment for use in parseAnsiToSegments results.
 pub const Segment = rich_zig.Segment;
-
-/// Strip ANSI escape sequences and return an owned copy of the plain text.
-/// Equivalent to stripAnsi -- provided for naming consistency with
-/// other zithril APIs that distinguish borrowed vs owned returns.
-pub fn stripToOwned(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-    return stripAnsi(allocator, input);
-}
 
 /// Parse ANSI-escaped text into an array of styled Segments.
 /// Each segment holds a slice of the plain text and its associated style.
@@ -81,33 +57,18 @@ pub fn parseAnsiToSegments(allocator: std.mem.Allocator, input: []const u8) ![]S
 }
 
 /// Free a segment slice returned by parseAnsiToSegments.
-/// This frees both the segment array and the underlying plain text buffer
-/// that segment text slices point into.
+/// Frees the underlying plain text buffer and the segment array.
+/// Segments are built left-to-right from a contiguous buffer, so the
+/// first segment's pointer is the allocation start and the last
+/// segment's end is the allocation end.
 pub fn freeSegments(allocator: std.mem.Allocator, segments: []Segment) void {
-    // All segment .text slices point into the same plain buffer.
-    // Find the earliest pointer to free the backing allocation.
     if (segments.len > 0) {
-        // The first segment's text points to the start (or near start) of the buffer.
-        // We need the original allocation start. Since fromAnsi returns a contiguous
-        // plain buffer and we walk it left-to-right, the first segment's text pointer
-        // is either the start or after a gap. We stored a reference to the full buffer
-        // via the first segment -- but actually we need to recover the original pointer.
-        // The safest approach: find the minimum pointer.
-        var min_ptr: [*]const u8 = segments[0].text.ptr;
-        for (segments) |seg| {
-            if (@intFromPtr(seg.text.ptr) < @intFromPtr(min_ptr)) {
-                min_ptr = seg.text.ptr;
-            }
-        }
-        // Find max end to get full length
-        var max_end: usize = 0;
-        for (segments) |seg| {
-            const end = @intFromPtr(seg.text.ptr) + seg.text.len;
-            if (end > max_end) max_end = end;
-        }
-        const total_len = max_end - @intFromPtr(min_ptr);
-        if (total_len > 0) {
-            allocator.free(min_ptr[0..total_len]);
+        const first = segments[0];
+        const last = segments[segments.len - 1];
+        const buf_start = first.text.ptr;
+        const buf_len = (@intFromPtr(last.text.ptr) + last.text.len) - @intFromPtr(buf_start);
+        if (buf_len > 0) {
+            allocator.free(buf_start[0..buf_len]);
         }
     }
     allocator.free(segments);
@@ -151,25 +112,7 @@ test "sanity: fromAnsi with empty input" {
 }
 
 // ============================================================
-// BEHAVIOR TESTS - stripToOwned convenience
-// ============================================================
-
-test "behavior: stripToOwned removes escape codes" {
-    const allocator = std.testing.allocator;
-    const result = try stripToOwned(allocator, "\x1b[31;1mRed Bold\x1b[0m");
-    defer allocator.free(result);
-    try std.testing.expectEqualStrings("Red Bold", result);
-}
-
-test "behavior: stripToOwned with plain text" {
-    const allocator = std.testing.allocator;
-    const result = try stripToOwned(allocator, "No escapes here");
-    defer allocator.free(result);
-    try std.testing.expectEqualStrings("No escapes here", result);
-}
-
-// ============================================================
-// INTEGRATION TESTS - richer ANSI sequences
+// BEHAVIOR TESTS - richer ANSI sequences
 // ============================================================
 
 test "integration: fromAnsi colored text produces spans" {

@@ -1,51 +1,38 @@
-// Theme system for zithril TUI framework
-// Maps named styles for consistent theming across an application
-
 const std = @import("std");
 const style_mod = @import("style.zig");
 const Style = style_mod.Style;
 const Color = style_mod.Color;
 
-/// A named style registry for consistent theming.
-///
-/// Stores a mapping of string names to zithril Styles, allowing
-/// applications to define a theme once and reference styles by name
-/// throughout the UI.
+/// Named style registry for consistent theming across an application.
 pub const Theme = struct {
     map: std.StringHashMap(Style),
 
-    /// Create a new empty theme.
     pub fn init(allocator: std.mem.Allocator) Theme {
         return .{ .map = std.StringHashMap(Style).init(allocator) };
     }
 
-    /// Release all resources.
     pub fn deinit(self: *Theme) void {
         self.map.deinit();
     }
 
-    /// Define a named style. Overwrites any existing style with the same name.
+    /// Overwrites any existing style with the same name.
     pub fn define(self: *Theme, name: []const u8, style: Style) !void {
         try self.map.put(name, style);
     }
 
-    /// Look up a style by name.
     pub fn get(self: *const Theme, name: []const u8) ?Style {
         return self.map.get(name);
     }
 
-    /// Check whether a named style is defined.
     pub fn contains(self: *const Theme, name: []const u8) bool {
         return self.map.contains(name);
     }
 
-    /// Return the number of defined styles.
     pub fn count(self: *const Theme) usize {
         return self.map.count();
     }
 
-    /// Merge another theme into this one. Styles from `other` overwrite
-    /// existing styles with the same name.
+    /// Styles from `other` overwrite existing styles with the same name.
     pub fn merge(self: *Theme, other: *const Theme) !void {
         var it = other.map.iterator();
         while (it.next()) |entry| {
@@ -53,7 +40,6 @@ pub const Theme = struct {
         }
     }
 
-    /// Create a default theme with common semantic styles.
     pub fn defaultTheme(allocator: std.mem.Allocator) !Theme {
         var theme = Theme.init(allocator);
         errdefer theme.deinit();

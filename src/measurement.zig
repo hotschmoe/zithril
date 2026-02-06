@@ -1,26 +1,12 @@
-// Measurement protocol wrapper for zithril TUI framework
-// Wraps rich_zig's Measurement type and adds zithril-specific conveniences
-
 const std = @import("std");
 const rich_zig = @import("rich_zig");
 const layout_mod = @import("layout.zig");
 
 pub const Constraint = layout_mod.Constraint;
 
-/// Measurement represents the minimum and maximum widths a renderable can occupy.
-/// This is a direct re-export of rich_zig's Measurement type, which layout
-/// containers use for smarter sizing decisions.
 pub const Measurement = rich_zig.Measurement;
 
 /// Convert a zithril layout Constraint to a Measurement given available space.
-///
-/// Mapping:
-///   length(n)      -> exact: {n, n}
-///   min(n)         -> at least n, up to available: {n, available}
-///   max(n)         -> zero to n (capped at available): {0, min(n, available)}
-///   flex(weight)   -> fills available: {0, available}
-///   ratio(a, b)    -> exact fraction: {result, result}
-///   percentage(p)  -> exact percentage: {result, result}
 pub fn fromConstraint(constraint: Constraint, available: u16) Measurement {
     return switch (constraint) {
         .length => |n| Measurement.init(n, n),

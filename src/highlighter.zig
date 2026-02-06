@@ -1,22 +1,10 @@
-// Highlighter wrapper for zithril TUI framework
-// Re-exports and extends rich_zig's pattern-based highlighter
-
 const std = @import("std");
 pub const rich_zig = @import("rich_zig");
 
-/// Re-export rich_zig's Highlighter for pattern-based text highlighting.
 pub const Highlighter = rich_zig.Highlighter;
-
-/// Re-export HighlightRule for defining custom match rules.
 pub const HighlightRule = Highlighter.HighlightRule;
-
-/// Re-export Match result type.
 pub const Match = Highlighter.Match;
-
-/// Re-export rich_zig's Text type used by the highlighter.
 pub const Text = rich_zig.Text;
-
-/// Re-export rich_zig's Span type for inspecting highlight results.
 pub const Span = rich_zig.Span;
 
 /// Create the built-in repr highlighter that recognizes common patterns:

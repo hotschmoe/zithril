@@ -1,6 +1,3 @@
-// Pretty printer wrapper for zithril TUI framework
-// Wraps rich_zig's comptime pretty printer for use with zithril Buffers
-
 const std = @import("std");
 const rich_zig = @import("rich_zig");
 
@@ -13,12 +10,9 @@ pub const Rect = geometry.Rect;
 pub const Style = style_mod.Style;
 pub const Segment = style_mod.Segment;
 
-// Re-export rich_zig pretty types
 pub const PrettyTheme = rich_zig.PrettyTheme;
 pub const PrettyOptions = rich_zig.PrettyOptions;
 pub const Pretty = rich_zig.Pretty;
-
-// Re-export convenience functions
 pub const pretty = rich_zig.pretty.pretty;
 pub const prettyWithOptions = rich_zig.pretty.prettyWithOptions;
 
