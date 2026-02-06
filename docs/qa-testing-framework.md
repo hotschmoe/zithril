@@ -709,18 +709,18 @@ Phase 2: Snapshot Diffs                 [DONE - v0.15.0]
   |-- Diff output formatting
   |
   v
-Phase 3: Scenario DSL
-  |-- Parser for .scenario format
+Phase 3: Scenario DSL                  [DONE - v0.16.0]
+  |-- Parser for .scenario format (ScenarioParser)
   |-- ScenarioRunner wiring to TestHarness
-  |-- Recorder-to-scenario export
-  |-- zig build test integration
+  |-- All directive types (key, mouse, assertions, repeat, type)
+  |-- zig build test integration (inline tests)
   |
   v
-Phase 4: QA Analysis
-  |-- Contrast audit (uses existing color.zig)
-  |-- Keyboard navigation audit
-  |-- Focus visibility audit
-  |-- Mouse target audit
+Phase 4: QA Analysis                   [DONE - v0.16.0]
+  |-- Contrast audit (auditContrast, uses color.zig WCAG)
+  |-- Keyboard navigation audit (auditKeyboardNav)
+  |-- Focus visibility audit (auditFocusVisibility)
+  |-- AuditReport aggregation and summary
   |-- Report format and output
 ```
 
@@ -745,6 +745,8 @@ Phase 3 (scenario-driven audits).
 ### zithril modules involved
 
 - `src/testing.zig` - TestRecorder, TestPlayer, MockBackend, Snapshot, TestHarness, helpers
+- `src/scenario.zig` - ScenarioParser, ScenarioRunner, Directive, ScenarioResult
+- `src/audit.zig` - auditContrast, auditKeyboardNav, auditFocusVisibility, AuditReport
 - `src/app.zig` - App struct, update/view loop, Config
 - `src/buffer.zig` - Cell grid, diff, setString
 - `src/event.zig` - Event, Key, Mouse, KeyCode, Modifiers

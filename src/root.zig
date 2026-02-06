@@ -172,6 +172,25 @@ pub const expectCell = testing.expectCell;
 pub const expectCellStyle = testing.expectCellStyle;
 pub const expectString = testing.expectString;
 
+// Scenario DSL
+pub const scenario = @import("scenario.zig");
+pub const ScenarioParser = scenario.ScenarioParser;
+pub const ScenarioRunner = scenario.ScenarioRunner;
+pub const ScenarioResult = scenario.ScenarioResult;
+pub const ScenarioDirective = scenario.Directive;
+
+// Audit utilities (QA analysis)
+pub const audit = @import("audit.zig");
+pub const AuditResult = audit.AuditResult;
+pub const AuditReport = audit.AuditReport;
+pub const AuditCategory = audit.AuditCategory;
+pub const Severity = audit.Severity;
+pub const AuditFinding = audit.Finding;
+pub const auditContrast = audit.auditContrast;
+pub const auditKeyboardNav = audit.auditKeyboardNav;
+pub const auditFocusVisibility = audit.auditFocusVisibility;
+pub const KeyboardAuditConfig = audit.KeyboardAuditConfig;
+
 // Widgets
 pub const widgets = @import("widgets.zig");
 pub const Block = widgets.Block;
