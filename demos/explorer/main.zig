@@ -13,12 +13,12 @@ const FileEntry = struct {
 
 // Flat file entries indexed by ID. Directories have IDs 0-2, files 10-12.
 const file_entries = std.StaticStringMap(FileEntry).initComptime(.{
-    .{ "src/", .{ .name = "src/", .content = "Directory: src/\nContains Zig source files for the project." } },
-    .{ "main.zig", .{ .name = "main.zig", .is_code = true, .content = "const std = @import(\"std\");\n\npub fn main() !void {\n    const stdout = std.io.getStdOut().writer();\n    try stdout.print(\"Hello, {s}!\\n\", .{\"World\"});\n}" } },
-    .{ "lib.zig", .{ .name = "lib.zig", .is_code = true, .content = "const std = @import(\"std\");\n\npub fn add(a: i32, b: i32) i32 {\n    return a + b;\n}" } },
-    .{ "docs/", .{ .name = "docs/", .content = "Directory: docs/\nContains project documentation and guides." } },
-    .{ "README.md", .{ .name = "README.md", .content = "# Project Documentation\n\nWelcome to the file explorer demo!\n\n## Controls\n- j/k: navigate\n- Tab: cycle focus\n- Enter: expand/collapse\n- m: context menu\n- q: quit" } },
-    .{ "build.zig", .{ .name = "build.zig", .is_code = true, .content = "const std = @import(\"std\");\n\npub fn build(b: *std.Build) void {\n    const target = b.standardTargetOptions(.{});\n    _ = target;\n}" } },
+    .{ "src/", FileEntry{ .name = "src/", .content = "Directory: src/\nContains Zig source files for the project." } },
+    .{ "main.zig", FileEntry{ .name = "main.zig", .is_code = true, .content = "const std = @import(\"std\");\n\npub fn main() !void {\n    const stdout = std.io.getStdOut().writer();\n    try stdout.print(\"Hello, {s}!\\n\", .{\"World\"});\n}" } },
+    .{ "lib.zig", FileEntry{ .name = "lib.zig", .is_code = true, .content = "const std = @import(\"std\");\n\npub fn add(a: i32, b: i32) i32 {\n    return a + b;\n}" } },
+    .{ "docs/", FileEntry{ .name = "docs/", .content = "Directory: docs/\nContains project documentation and guides." } },
+    .{ "README.md", FileEntry{ .name = "README.md", .content = "# Project Documentation\n\nWelcome to the file explorer demo!\n\n## Controls\n- j/k: navigate\n- Tab: cycle focus\n- Enter: expand/collapse\n- m: context menu\n- q: quit" } },
+    .{ "build.zig", FileEntry{ .name = "build.zig", .is_code = true, .content = "const std = @import(\"std\");\n\npub fn build(b: *std.Build) void {\n    const target = b.standardTargetOptions(.{});\n    _ = target;\n}" } },
 });
 
 // Visible tree order depends on expansion state
@@ -73,10 +73,22 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
         .key => |key| {
             if (state.show_menu) {
                 switch (key.code) {
-                    .escape => { state.show_menu = false; return .none; },
-                    .char => |c| if (c == 'j' or c == 'k') { menuNav(state, c == 'j'); return .none; },
-                    .down => { menuNav(state, true); return .none; },
-                    .up => { menuNav(state, false); return .none; },
+                    .escape => {
+                        state.show_menu = false;
+                        return .none;
+                    },
+                    .char => |c| if (c == 'j' or c == 'k') {
+                        menuNav(state, c == 'j');
+                        return .none;
+                    },
+                    .down => {
+                        menuNav(state, true);
+                        return .none;
+                    },
+                    .up => {
+                        menuNav(state, false);
+                        return .none;
+                    },
                     else => {},
                 }
             }
@@ -85,19 +97,32 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
                 .char => |c| {
                     if (c == 'q') return .quit;
                     if (c == 'c' and key.modifiers.ctrl) return .quit;
-                    if (c >= '1' and c <= '3') { state.active_tab = c - '1'; return .none; }
-                    if (c == 'm') { state.show_menu = !state.show_menu; return .none; }
+                    if (c >= '1' and c <= '3') {
+                        state.active_tab = c - '1';
+                        return .none;
+                    }
+                    if (c == 'm') {
+                        state.show_menu = !state.show_menu;
+                        return .none;
+                    }
 
                     switch (state.focus) {
                         .tree => {
                             if (c == 'j') state.moveTree(1);
                             if (c == 'k') state.moveTree(-1);
                         },
-                        .search => state.getSearchState().handleKey(key),
+                        .search => _ = state.getSearchState().handleKey(key),
                         .preview => {},
                     }
                 },
-                .tab => { state.focus = switch (state.focus) { .tree => .search, .search => .preview, .preview => .tree }; return .none; },
+                .tab => {
+                    state.focus = switch (state.focus) {
+                        .tree => .search,
+                        .search => .preview,
+                        .preview => .tree,
+                    };
+                    return .none;
+                },
                 .enter => {
                     if (state.focus == .tree) {
                         const key_name = state.selectedKey();
@@ -107,7 +132,9 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
                 },
                 .down => if (state.focus == .tree) state.moveTree(1),
                 .up => if (state.focus == .tree) state.moveTree(-1),
-                else => if (state.focus == .search) state.getSearchState().handleKey(key),
+                else => if (state.focus == .search) {
+                    _ = state.getSearchState().handleKey(key);
+                },
             }
         },
         else => {},
@@ -130,22 +157,22 @@ fn focusBorderStyle(focused: bool) zithril.Style {
 
 fn view(state: *State, frame: *FrameType) void {
     const area = frame.size();
-    const main = zithril.layout(area, .vertical, &.{
+    const rows = zithril.layout(area, .vertical, &.{
         zithril.Constraint.len(3),
         zithril.Constraint.flexible(1),
         zithril.Constraint.len(3),
         zithril.Constraint.len(3),
     });
-    const content = zithril.layout(main.get(1), .horizontal, &.{
-        zithril.Constraint.ratio(1, 3),
-        zithril.Constraint.ratio(2, 3),
+    const content = zithril.layout(rows.get(1), .horizontal, &.{
+        zithril.Constraint.fractional(1, 3),
+        zithril.Constraint.fractional(2, 3),
     });
 
-    renderTabs(state, frame, main.get(0));
+    renderTabs(state, frame, rows.get(0));
     renderTree(state, frame, content.get(0));
     renderPreview(state, frame, content.get(1));
-    renderSearch(state, frame, main.get(2));
-    renderStatus(state, frame, main.get(3));
+    renderSearch(state, frame, rows.get(2));
+    renderStatus(state, frame, rows.get(3));
 
     if (state.show_menu) renderMenu(state, frame);
 }
@@ -190,7 +217,9 @@ fn renderTree(state: *State, frame: *FrameType, area: zithril.Rect) void {
         .highlight_style = zithril.Style.init().bg(.blue).fg(.white).bold(),
         .indent = 2,
         .render_fn = &struct {
-            fn f(data: []const u8) []const u8 { return data; }
+            fn f(data: []const u8) []const u8 {
+                return data;
+            }
         }.f,
         .symbols = .{},
     }, block.inner(area));
@@ -209,8 +238,8 @@ fn renderPreview(state: *State, frame: *FrameType, area: zithril.Rect) void {
                 .language = .zig,
                 .theme = zithril.CodeEditorTheme.default,
                 .show_line_numbers = true,
-                .current_line = null,
-                .scroll_offset = 0,
+                .current_line = 0,
+                .scroll_y = 0,
                 .style = zithril.Style.empty,
             }, inner);
         } else {
