@@ -8,7 +8,6 @@ const ladder = @import("ladder.zig");
 const levels = @import("levels.zig");
 const widgets = @import("widgets.zig");
 
-/// Component types available for placement
 pub const ComponentType = enum {
     wire_horizontal,
     wire_vertical,
@@ -21,7 +20,6 @@ pub const ComponentType = enum {
     empty,
 };
 
-/// A single cell in the ladder diagram
 pub const Cell = union(enum) {
     empty,
     wire_h,
@@ -36,7 +34,6 @@ pub const Cell = union(enum) {
     rail_right,
 };
 
-/// Position in the diagram grid
 pub const Position = struct {
     x: usize,
     y: usize,
@@ -313,8 +310,8 @@ pub const GameState = struct {
         return levels.get(self.level_index);
     }
 
-    pub fn pushUndo(self: *GameState) void {
-        if (self.diagram.width > MAX_SNAPSHOT_DIM or self.diagram.height > MAX_SNAPSHOT_DIM) return;
+    fn captureSnapshot(self: *const GameState) ?DiagramSnapshot {
+        if (self.diagram.width > MAX_SNAPSHOT_DIM or self.diagram.height > MAX_SNAPSHOT_DIM) return null;
 
         var snapshot = DiagramSnapshot.BLANK;
         snapshot.width = self.diagram.width;
@@ -326,17 +323,20 @@ pub const GameState = struct {
                 snapshot.cells[y][x] = self.diagram.get(x, y);
             }
         }
+        return snapshot;
+    }
+
+    pub fn pushUndo(self: *GameState) void {
+        const snapshot = self.captureSnapshot() orelse return;
 
         // Truncate any redo history beyond current position
         self.undo_count = self.undo_pos;
 
-        // Push snapshot
         if (self.undo_count < MAX_UNDO) {
             self.undo_stack[self.undo_count] = snapshot;
             self.undo_count += 1;
             self.undo_pos = self.undo_count;
         } else {
-            // Shift stack left to make room
             for (0..MAX_UNDO - 1) |i| {
                 self.undo_stack[i] = self.undo_stack[i + 1];
             }
@@ -373,19 +373,7 @@ pub const GameState = struct {
     }
 
     fn pushCurrentAsRedo(self: *GameState) void {
-        if (self.diagram.width > MAX_SNAPSHOT_DIM or self.diagram.height > MAX_SNAPSHOT_DIM) return;
-
-        var snapshot = DiagramSnapshot.BLANK;
-        snapshot.width = self.diagram.width;
-        snapshot.height = self.diagram.height;
-        snapshot.valid = true;
-
-        for (0..self.diagram.height) |y| {
-            for (0..self.diagram.width) |x| {
-                snapshot.cells[y][x] = self.diagram.get(x, y);
-            }
-        }
-
+        const snapshot = self.captureSnapshot() orelse return;
         if (self.undo_count < MAX_UNDO) {
             self.undo_stack[self.undo_count] = snapshot;
             self.undo_count += 1;

@@ -7,7 +7,6 @@ const zithril = @import("zithril");
 
 const game = @import("game.zig");
 const levels = @import("levels.zig");
-const ladder = @import("ladder.zig");
 
 const LadderCell = game.Cell;
 const Diagram = game.Diagram;
@@ -15,7 +14,6 @@ const Position = game.Position;
 const ComponentType = game.ComponentType;
 const Mode = game.Mode;
 const Level = levels.Level;
-const GameState = game.GameState;
 
 const Buffer = zithril.Buffer;
 const Rect = zithril.Rect;
@@ -53,56 +51,39 @@ const BufWriter = struct {
 // -- Color Theme --
 // A cohesive palette using 256-color for broad terminal support.
 const C = struct {
-    // Rails and structure
-    const rail = Style.init().fg(Color.from256(33)).bold(); // bright blue
-    const rail_dim = Style.init().fg(Color.from256(24)); // dark blue
-    const wire = Style.init().fg(Color.from256(252)); // light gray
-    const wire_powered = Style.init().fg(Color.from256(46)).bold(); // bright green
-    const junction = Style.init().fg(Color.from256(214)).bold(); // orange
+    const rail = Style.init().fg(Color.from256(33)).bold();
+    const wire = Style.init().fg(Color.from256(252));
+    const junction = Style.init().fg(Color.from256(214)).bold();
 
-    // Components
-    const contact_no = Style.init().fg(Color.from256(82)); // green
-    const contact_nc = Style.init().fg(Color.from256(220)).bold(); // yellow
-    const coil = Style.init().fg(Color.from256(196)); // red
-    const coil_latch = Style.init().fg(Color.from256(135)); // magenta
-    const coil_unlatch = Style.init().fg(Color.from256(44)); // cyan
+    const contact_no = Style.init().fg(Color.from256(82));
+    const contact_nc = Style.init().fg(Color.from256(220)).bold();
+    const coil = Style.init().fg(Color.from256(196));
+    const coil_latch = Style.init().fg(Color.from256(135));
+    const coil_unlatch = Style.init().fg(Color.from256(44));
 
-    // UI elements
-    const cursor = Style.init().fg(Color.from256(0)).bg(Color.from256(51)).bold(); // black on cyan
-    const cursor_insert = Style.init().fg(Color.from256(0)).bg(Color.from256(118)); // black on bright green
-    const powered_bg = Style.init().bg(Color.from256(22)); // dark green background
+    const cursor = Style.init().fg(Color.from256(0)).bg(Color.from256(51)).bold();
 
-    // Status
-    const pass = Style.init().fg(Color.from256(46)).bold(); // bright green
-    const fail = Style.init().fg(Color.from256(196)).bold(); // bright red
-    const untested = Style.init().fg(Color.from256(240)); // dim gray
+    const pass = Style.init().fg(Color.from256(46)).bold();
+    const fail = Style.init().fg(Color.from256(196)).bold();
+    const untested = Style.init().fg(Color.from256(240));
 
-    // Text
-    const header = Style.init().fg(Color.from256(51)).bold(); // bright cyan
-    const header_accent = Style.init().fg(Color.from256(214)).bold(); // orange
-    const title = Style.init().fg(Color.from256(255)).bold(); // white bold
-    const hint = Style.init().fg(Color.from256(245)); // gray
-    const dim = Style.init().fg(Color.from256(238)); // dark gray
-    const highlight = Style.init().fg(Color.from256(226)).bold(); // bright yellow
-    const story = Style.init().fg(Color.from256(183)); // light purple
+    const header = Style.init().fg(Color.from256(51)).bold();
+    const header_accent = Style.init().fg(Color.from256(214)).bold();
+    const title = Style.init().fg(Color.from256(255)).bold();
+    const hint = Style.init().fg(Color.from256(245));
+    const dim = Style.init().fg(Color.from256(238));
+    const highlight = Style.init().fg(Color.from256(226)).bold();
+    const story = Style.init().fg(Color.from256(183));
 
-    // Overlays
-    const overlay_bg = Style.init().bg(Color.from256(235)); // dark gray
-    const overlay_border = Style.init().fg(Color.from256(51)).bold(); // cyan
-    const overlay_title = Style.init().fg(Color.from256(226)).bold(); // yellow
+    const overlay_bg = Style.init().bg(Color.from256(235));
+    const overlay_border = Style.init().fg(Color.from256(51)).bold();
 
-    // Buttons
-    const btn = Style.init().fg(Color.from256(255)).bg(Color.from256(238)); // white on gray
-    const btn_hover = Style.init().fg(Color.from256(0)).bg(Color.from256(51)).bold(); // black on cyan
+    const diff_beginner = Style.init().fg(Color.from256(82));
+    const diff_intermediate = Style.init().fg(Color.from256(220));
+    const diff_advanced = Style.init().fg(Color.from256(208));
+    const diff_expert = Style.init().fg(Color.from256(196));
 
-    // Difficulty
-    const diff_beginner = Style.init().fg(Color.from256(82)); // green
-    const diff_intermediate = Style.init().fg(Color.from256(220)); // yellow
-    const diff_advanced = Style.init().fg(Color.from256(208)); // orange
-    const diff_expert = Style.init().fg(Color.from256(196)); // red
-
-    // Toast
-    const toast_bg = Style.init().fg(Color.from256(255)).bg(Color.from256(24)); // white on dark blue
+    const toast_bg = Style.init().fg(Color.from256(255)).bg(Color.from256(24));
 };
 
 /// Draw a centered overlay box. Returns the inner rect, or null if area is too small.
@@ -269,50 +250,28 @@ pub const DiagramWidget = struct {
                 break :blk .{ .str = str_buf[0..width], .style = C.rail };
             },
             .contact_no => |idx| blk: {
-                @memset(str_buf[0..width], '-');
-                str_buf[0] = '-';
-                str_buf[1] = '[';
-                str_buf[2] = self.getInputLabel(idx);
-                str_buf[3] = ']';
-                str_buf[4] = '-';
+                str_buf = .{ '-', '[', self.getInputLabel(idx), ']', '-' };
                 break :blk .{ .str = str_buf[0..width], .style = C.contact_no };
             },
-            .contact_nc => |idx| blk: {
-                @memset(str_buf[0..width], '-');
-                str_buf[0] = '-';
-                str_buf[1] = '[';
-                str_buf[2] = '/';
-                str_buf[3] = ']';
-                str_buf[4] = '-';
-                _ = self.getInputLabel(idx);
+            .contact_nc => blk: {
+                str_buf = .{ '-', '[', '/', ']', '-' };
                 break :blk .{ .str = str_buf[0..width], .style = C.contact_nc };
             },
-            .coil => |idx| blk: {
-                @memset(str_buf[0..width], '-');
-                str_buf[0] = '-';
-                str_buf[1] = '(';
-                str_buf[2] = self.getOutputLabel(idx);
-                str_buf[3] = ')';
-                str_buf[4] = '-';
-                break :blk .{ .str = str_buf[0..width], .style = C.coil };
-            },
-            .coil_latch => |idx| blk: {
-                @memset(str_buf[0..width], '-');
-                str_buf[0] = '-';
-                str_buf[1] = '(';
-                str_buf[2] = self.getOutputLabel(idx);
-                str_buf[3] = ')';
-                str_buf[4] = '-';
-                break :blk .{ .str = str_buf[0..width], .style = C.coil_latch };
-            },
-            .coil_unlatch => |idx| blk: {
-                @memset(str_buf[0..width], '-');
-                str_buf[0] = '-';
-                str_buf[1] = '(';
-                str_buf[2] = self.getOutputLabel(idx);
-                str_buf[3] = ')';
-                str_buf[4] = '-';
-                break :blk .{ .str = str_buf[0..width], .style = C.coil_unlatch };
+            .coil, .coil_latch, .coil_unlatch => blk: {
+                const idx = switch (cell) {
+                    .coil => |i| i,
+                    .coil_latch => |i| i,
+                    .coil_unlatch => |i| i,
+                    else => unreachable,
+                };
+                const style = switch (cell) {
+                    .coil => C.coil,
+                    .coil_latch => C.coil_latch,
+                    .coil_unlatch => C.coil_unlatch,
+                    else => unreachable,
+                };
+                str_buf = .{ '-', '(', self.getOutputLabel(idx), ')', '-' };
+                break :blk .{ .str = str_buf[0..width], .style = style };
             },
         };
 
@@ -752,11 +711,7 @@ pub const ToastWidget = struct {
         const box_x = area.x + (area.width -| box_w) / 2;
         const box_y = if (area.height > 2) area.y + area.height - 2 else area.y;
 
-        // Fade effect based on timer
-        const style = if (self.timer > self.max_timer / 2)
-            C.toast_bg
-        else
-            C.toast_bg; // Could add dimming here with more style support
+        const style = C.toast_bg;
 
         // Draw background
         for (0..box_w) |dx| {
