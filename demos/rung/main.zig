@@ -20,6 +20,9 @@ pub fn main() !void {
         .state = &state,
         .update = game.update,
         .view = game.view,
+        .mouse_capture = true,
+        .tick_rate_ms = 100,
+        .kitty_keyboard = true,
     });
 
     try app.run(allocator);

@@ -95,6 +95,55 @@ pub const Mode = enum {
     solved,
 };
 
+// Hit ID ranges for mouse interaction
+// 0-511: diagram cells (y * 32 + x)
+// 1000-1008: palette items
+// 2000-2099: truth table rows
+// 3000-3099: buttons
+pub const HIT_DIAGRAM_BASE: u32 = 0;
+pub const HIT_PALETTE_BASE: u32 = 1000;
+pub const HIT_TRUTH_TABLE_BASE: u32 = 2000;
+pub const HIT_BTN_BASE: u32 = 3000;
+
+pub const HIT_BTN_SIMULATE: u32 = HIT_BTN_BASE + 0;
+pub const HIT_BTN_RESET: u32 = HIT_BTN_BASE + 1;
+pub const HIT_BTN_HELP: u32 = HIT_BTN_BASE + 2;
+pub const HIT_BTN_LEVELS: u32 = HIT_BTN_BASE + 3;
+pub const HIT_BTN_UNDO: u32 = HIT_BTN_BASE + 4;
+pub const HIT_BTN_REDO: u32 = HIT_BTN_BASE + 5;
+pub const HIT_BTN_NEXT: u32 = HIT_BTN_BASE + 6;
+pub const HIT_BTN_PREV: u32 = HIT_BTN_BASE + 7;
+pub const HIT_BTN_DESCRIPTION: u32 = HIT_BTN_BASE + 8;
+
+const MAX_UNDO = 32;
+const MAX_SNAPSHOT_DIM = 16;
+const TOAST_DURATION_MS: u32 = 2000;
+
+const DiagramSnapshot = struct {
+    cells: [MAX_SNAPSHOT_DIM][MAX_SNAPSHOT_DIM]Cell,
+    width: usize,
+    height: usize,
+    valid: bool,
+
+    const BLANK: DiagramSnapshot = .{
+        .cells = [_][MAX_SNAPSHOT_DIM]Cell{[_]Cell{.empty} ** MAX_SNAPSHOT_DIM} ** MAX_SNAPSHOT_DIM,
+        .width = 0,
+        .height = 0,
+        .valid = false,
+    };
+};
+
+/// Palette item indices (offset from HIT_PALETTE_BASE)
+const PALETTE_WIRE_H: u32 = 0;
+const PALETTE_WIRE_V: u32 = 1;
+const PALETTE_CONTACT_NO: u32 = 2;
+const PALETTE_CONTACT_NC: u32 = 3;
+const PALETTE_COIL: u32 = 4;
+const PALETTE_COIL_LATCH: u32 = 5;
+const PALETTE_COIL_UNLATCH: u32 = 6;
+const PALETTE_JUNCTION: u32 = 7;
+const PALETTE_EMPTY: u32 = 8;
+
 /// Main game state
 pub const GameState = struct {
     allocator: Allocator,
@@ -127,8 +176,33 @@ pub const GameState = struct {
     show_help: bool,
     show_level_select: bool,
 
+    // Mouse interaction
+    hit_tester: zithril.HitTester(u32, 64),
+    hover_state: zithril.HoverState,
+    drag_state: zithril.DragState,
+    scroll_accum: zithril.ScrollAccumulator,
+
+    // Animation
+    power_anim: zithril.Animation,
+    victory_anim: zithril.Animation,
+    mode_anim: zithril.Animation,
+
+    // Undo/redo (simple snapshot stack)
+    undo_stack: [MAX_UNDO]DiagramSnapshot,
+    undo_count: usize,
+    undo_pos: usize,
+
+    // Enhanced UI
+    show_description: bool,
+    toast_message: [64]u8,
+    toast_len: usize,
+    toast_timer: u32,
+    moves_count: usize,
+
+    // Power flow visualization
+    powered_cells: [MAX_SNAPSHOT_DIM][MAX_SNAPSHOT_DIM]bool,
+
     pub fn init(allocator: Allocator) !GameState {
-        // Start with level 0
         const level = levels.get(0);
 
         var diagram = try Diagram.init(allocator, level.width, level.height);
@@ -149,6 +223,27 @@ pub const GameState = struct {
             .sim_row = 0,
             .show_help = false,
             .show_level_select = false,
+
+            .hit_tester = zithril.HitTester(u32, 64).init(),
+            .hover_state = zithril.HoverState{},
+            .drag_state = zithril.DragState{},
+            .scroll_accum = zithril.ScrollAccumulator{},
+
+            .power_anim = zithril.Animation.init(500),
+            .victory_anim = zithril.Animation.initWithEasing(1000, .elastic_out),
+            .mode_anim = zithril.Animation.init(200),
+
+            .undo_stack = [_]DiagramSnapshot{DiagramSnapshot.BLANK} ** MAX_UNDO,
+            .undo_count = 0,
+            .undo_pos = 0,
+
+            .show_description = false,
+            .toast_message = [_]u8{0} ** 64,
+            .toast_len = 0,
+            .toast_timer = 0,
+            .moves_count = 0,
+
+            .powered_cells = [_][MAX_SNAPSHOT_DIM]bool{[_]bool{false} ** MAX_SNAPSHOT_DIM} ** MAX_SNAPSHOT_DIM,
         };
     }
 
@@ -163,29 +258,39 @@ pub const GameState = struct {
         const level = levels.get(index);
         self.level_index = index;
 
-        // Resize diagram if needed
         self.diagram.deinit();
         self.diagram = try Diagram.init(self.allocator, level.width, level.height);
         level.setup(&self.diagram);
 
-        // Reset results
         self.allocator.free(self.results);
         self.results = try self.allocator.alloc(bool, level.truth_table.len);
         @memset(self.results, false);
 
-        // Reset state
         self.cursor = .{ .x = 1, .y = 0 };
         self.mode = .editing;
         self.sim_row = 0;
         self.selected_index = 0;
         self.show_help = false;
         self.show_level_select = false;
+        self.show_description = false;
+        self.moves_count = 0;
+        self.undo_count = 0;
+        self.undo_pos = 0;
+        self.toast_len = 0;
+        self.toast_timer = 0;
+        self.powered_cells = [_][MAX_SNAPSHOT_DIM]bool{[_]bool{false} ** MAX_SNAPSHOT_DIM} ** MAX_SNAPSHOT_DIM;
+
+        self.power_anim.reset();
+        self.victory_anim.reset();
+        self.mode_anim.reset();
+        self.hover_state.reset();
+        self.drag_state.reset();
+        self.scroll_accum.reset();
     }
 
     pub fn runSimulation(self: *GameState) void {
         const level = levels.get(self.level_index);
 
-        // Test each row of the truth table
         var all_pass = true;
         for (level.truth_table, 0..) |row, i| {
             const actual = ladder.simulate(&self.diagram, row.inputs);
@@ -194,10 +299,202 @@ pub const GameState = struct {
         }
 
         self.mode = if (all_pass) .solved else .simulating;
+        self.power_anim.reset();
+
+        if (all_pass) {
+            self.victory_anim.reset();
+            self.showToast("SOLVED!");
+        } else {
+            self.showToast("Simulation complete");
+        }
     }
 
     pub fn currentLevel(self: *const GameState) levels.Level {
         return levels.get(self.level_index);
+    }
+
+    pub fn pushUndo(self: *GameState) void {
+        if (self.diagram.width > MAX_SNAPSHOT_DIM or self.diagram.height > MAX_SNAPSHOT_DIM) return;
+
+        var snapshot = DiagramSnapshot.BLANK;
+        snapshot.width = self.diagram.width;
+        snapshot.height = self.diagram.height;
+        snapshot.valid = true;
+
+        for (0..self.diagram.height) |y| {
+            for (0..self.diagram.width) |x| {
+                snapshot.cells[y][x] = self.diagram.get(x, y);
+            }
+        }
+
+        // Truncate any redo history beyond current position
+        self.undo_count = self.undo_pos;
+
+        // Push snapshot
+        if (self.undo_count < MAX_UNDO) {
+            self.undo_stack[self.undo_count] = snapshot;
+            self.undo_count += 1;
+            self.undo_pos = self.undo_count;
+        } else {
+            // Shift stack left to make room
+            for (0..MAX_UNDO - 1) |i| {
+                self.undo_stack[i] = self.undo_stack[i + 1];
+            }
+            self.undo_stack[MAX_UNDO - 1] = snapshot;
+            self.undo_pos = MAX_UNDO;
+        }
+    }
+
+    pub fn undo(self: *GameState) void {
+        if (self.undo_pos == 0) return;
+
+        // Save current state for redo if we're at the tip
+        if (self.undo_pos == self.undo_count) {
+            self.pushCurrentAsRedo();
+        }
+
+        self.undo_pos -= 1;
+        self.restoreSnapshot(self.undo_pos);
+        self.mode = .editing;
+        self.showToast("Undo");
+    }
+
+    pub fn redo(self: *GameState) void {
+        if (self.undo_pos >= self.undo_count) return;
+
+        self.undo_pos += 1;
+        if (self.undo_pos < self.undo_count) {
+            self.restoreSnapshot(self.undo_pos);
+        } else if (self.undo_count > 0) {
+            self.restoreSnapshot(self.undo_count - 1);
+        }
+        self.mode = .editing;
+        self.showToast("Redo");
+    }
+
+    fn pushCurrentAsRedo(self: *GameState) void {
+        if (self.diagram.width > MAX_SNAPSHOT_DIM or self.diagram.height > MAX_SNAPSHOT_DIM) return;
+
+        var snapshot = DiagramSnapshot.BLANK;
+        snapshot.width = self.diagram.width;
+        snapshot.height = self.diagram.height;
+        snapshot.valid = true;
+
+        for (0..self.diagram.height) |y| {
+            for (0..self.diagram.width) |x| {
+                snapshot.cells[y][x] = self.diagram.get(x, y);
+            }
+        }
+
+        if (self.undo_count < MAX_UNDO) {
+            self.undo_stack[self.undo_count] = snapshot;
+            self.undo_count += 1;
+        }
+    }
+
+    fn restoreSnapshot(self: *GameState, index: usize) void {
+        if (index >= MAX_UNDO) return;
+        const snapshot = self.undo_stack[index];
+        if (!snapshot.valid) return;
+
+        for (0..snapshot.height) |y| {
+            for (0..snapshot.width) |x| {
+                self.diagram.set(x, y, snapshot.cells[y][x]);
+            }
+        }
+    }
+
+    pub fn showToast(self: *GameState, msg: []const u8) void {
+        const len = @min(msg.len, self.toast_message.len);
+        @memcpy(self.toast_message[0..len], msg[0..len]);
+        self.toast_len = len;
+        self.toast_timer = TOAST_DURATION_MS;
+    }
+
+    pub fn selectPaletteItem(self: *GameState, idx: u32) void {
+        self.selected_component = switch (idx) {
+            PALETTE_WIRE_H => .wire_horizontal,
+            PALETTE_WIRE_V => .wire_vertical,
+            PALETTE_CONTACT_NO => .contact_no,
+            PALETTE_CONTACT_NC => .contact_nc,
+            PALETTE_COIL => .coil,
+            PALETTE_COIL_LATCH => .coil_latch,
+            PALETTE_COIL_UNLATCH => .coil_unlatch,
+            PALETTE_JUNCTION => .junction,
+            PALETTE_EMPTY => .empty,
+            else => return,
+        };
+        self.mode_anim.reset();
+    }
+
+    pub fn handleClick(self: *GameState, id: u32) void {
+        if (id < HIT_PALETTE_BASE) {
+            // Diagram cell
+            const pos_x = id % 32;
+            const pos_y = id / 32;
+            if (pos_x < self.diagram.width and pos_y < self.diagram.height) {
+                self.cursor = .{ .x = pos_x, .y = pos_y };
+                placeComponent(self);
+            }
+        } else if (id >= HIT_PALETTE_BASE and id < HIT_TRUTH_TABLE_BASE) {
+            self.selectPaletteItem(id - HIT_PALETTE_BASE);
+        } else if (id >= HIT_TRUTH_TABLE_BASE and id < HIT_BTN_BASE) {
+            self.sim_row = id - HIT_TRUTH_TABLE_BASE;
+        } else {
+            self.handleButtonClick(id);
+        }
+    }
+
+    fn handleButtonClick(self: *GameState, id: u32) void {
+        switch (id) {
+            HIT_BTN_SIMULATE => self.runSimulation(),
+            HIT_BTN_RESET => {
+                self.loadLevel(self.level_index) catch {};
+                self.showToast("Level reset");
+            },
+            HIT_BTN_HELP => self.show_help = !self.show_help,
+            HIT_BTN_LEVELS => self.show_level_select = !self.show_level_select,
+            HIT_BTN_UNDO => self.undo(),
+            HIT_BTN_REDO => self.redo(),
+            HIT_BTN_NEXT => {
+                if (self.level_index + 1 < levels.count()) {
+                    self.loadLevel(self.level_index + 1) catch {};
+                }
+            },
+            HIT_BTN_PREV => {
+                if (self.level_index > 0) {
+                    self.loadLevel(self.level_index - 1) catch {};
+                }
+            },
+            HIT_BTN_DESCRIPTION => self.show_description = !self.show_description,
+            else => {},
+        }
+    }
+
+    pub fn handleDragEnd(self: *GameState, mouse: zithril.Mouse) void {
+        if (self.drag_state.hasMoved()) {
+            // Place component at drag end position
+            if (self.hit_tester.hitTest(mouse)) |id| {
+                if (id < HIT_PALETTE_BASE) {
+                    const pos_x = id % 32;
+                    const pos_y = id / 32;
+                    if (pos_x < self.diagram.width and pos_y < self.diagram.height) {
+                        self.cursor = .{ .x = pos_x, .y = pos_y };
+                        placeComponent(self);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn handleScroll(self: *GameState, delta: i32) void {
+        if (delta < 0) {
+            // Scroll up = previous component
+            self.selected_component = cycleComponentReverse(self.selected_component);
+        } else {
+            self.selected_component = cycleComponent(self.selected_component);
+        }
+        self.mode_anim.reset();
     }
 };
 
@@ -205,9 +502,7 @@ pub const GameState = struct {
 pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
-            // Handle overlay-specific input first
             if (self.show_help) {
-                // Any key closes help
                 self.show_help = false;
                 return .none;
             }
@@ -222,7 +517,6 @@ pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
                                 self.show_level_select = false;
                             }
                         } else if (c == '0') {
-                            // 0 = level 10
                             if (levels.count() >= 10) {
                                 self.loadLevel(9) catch {};
                                 self.show_level_select = false;
@@ -237,53 +531,66 @@ pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
                 return .none;
             }
 
-            // Normal game input
+            // Ctrl+key combinations
+            if (key.modifiers.ctrl) {
+                switch (key.code) {
+                    .char => |c| {
+                        switch (c) {
+                            'z', 'Z' => self.undo(),
+                            'y', 'Y' => self.redo(),
+                            'r', 'R' => {
+                                self.loadLevel(self.level_index) catch {};
+                                self.showToast("Level reset");
+                            },
+                            else => {},
+                        }
+                    },
+                    else => {},
+                }
+                return .none;
+            }
+
             switch (key.code) {
                 .char => |c| {
                     switch (c) {
                         'q', 'Q' => return .quit,
                         'r', 'R' => {
-                            // Reset level
                             self.loadLevel(self.level_index) catch {};
                         },
                         'n', 'N' => {
-                            // Next level (only if solved or allow skipping)
                             if (self.mode == .solved or self.level_index + 1 < levels.count()) {
                                 self.loadLevel(self.level_index + 1) catch {};
                             }
                         },
                         'p', 'P' => {
-                            // Previous level
                             if (self.level_index > 0) {
                                 self.loadLevel(self.level_index - 1) catch {};
                             }
                         },
                         ' ' => {
-                            // Space: place component at cursor
                             placeComponent(self);
                         },
                         '?' => {
-                            // Toggle help overlay
                             self.show_help = true;
                         },
                         'l', 'L' => {
-                            // Toggle level select
                             self.show_level_select = true;
                         },
+                        'd', 'D' => {
+                            self.show_description = !self.show_description;
+                        },
                         '0'...'9' => {
-                            // Set selected index for contacts/coils
                             self.selected_index = @intCast(c - '0');
                         },
                         else => {},
                     }
                 },
                 .enter => {
-                    // Run simulation
                     self.runSimulation();
                 },
                 .tab => {
-                    // Cycle component
                     self.selected_component = cycleComponent(self.selected_component);
+                    self.mode_anim.reset();
                 },
                 .left => {
                     if (self.cursor.x > 1) self.cursor.x -= 1;
@@ -298,11 +605,48 @@ pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
                     if (self.cursor.y < self.diagram.height - 1) self.cursor.y += 1;
                 },
                 .escape => {
-                    // Close any overlay or exit edit mode
                     self.show_help = false;
                     self.show_level_select = false;
+                    self.show_description = false;
                 },
                 else => {},
+            }
+        },
+        .mouse => |mouse| {
+            _ = self.hover_state.update(zithril.Rect.init(0, 0, 0, 0), mouse);
+
+            switch (mouse.kind) {
+                .down => {
+                    if (self.hit_tester.hitTest(mouse)) |id| {
+                        self.handleClick(id);
+                    }
+                    _ = self.drag_state.handleMouse(mouse);
+                },
+                .up => {
+                    if (self.drag_state.active) {
+                        self.handleDragEnd(mouse);
+                    }
+                    _ = self.drag_state.handleMouse(mouse);
+                },
+                .drag => {
+                    _ = self.drag_state.handleMouse(mouse);
+                },
+                .scroll_up, .scroll_down => {
+                    if (self.scroll_accum.handleMouse(mouse)) |delta| {
+                        self.handleScroll(delta);
+                    }
+                },
+                .move => {},
+            }
+        },
+        .tick => {
+            _ = self.power_anim.update(100);
+            _ = self.victory_anim.update(100);
+            _ = self.mode_anim.update(100);
+
+            if (self.toast_timer > 0) {
+                self.toast_timer -|= 100;
+                if (self.toast_timer == 0) self.toast_len = 0;
             }
         },
         else => {},
@@ -325,12 +669,42 @@ fn cycleComponent(current: ComponentType) ComponentType {
     };
 }
 
+fn cycleComponentReverse(current: ComponentType) ComponentType {
+    return switch (current) {
+        .wire_horizontal => .empty,
+        .wire_vertical => .wire_horizontal,
+        .contact_no => .wire_vertical,
+        .contact_nc => .contact_no,
+        .coil => .contact_nc,
+        .coil_latch => .coil,
+        .coil_unlatch => .coil_latch,
+        .junction => .coil_unlatch,
+        .empty => .junction,
+    };
+}
+
+fn componentName(comp: ComponentType) []const u8 {
+    return switch (comp) {
+        .wire_horizontal => "Wire (H)",
+        .wire_vertical => "Wire (V)",
+        .contact_no => "Contact NO",
+        .contact_nc => "Contact NC",
+        .coil => "Coil",
+        .coil_latch => "Coil Latch",
+        .coil_unlatch => "Coil Unlatch",
+        .junction => "Junction",
+        .empty => "Erase",
+    };
+}
+
 fn placeComponent(state: *GameState) void {
     const x = state.cursor.x;
     const y = state.cursor.y;
 
-    // Don't allow editing rails (first and last columns)
     if (x == 0 or x == state.diagram.width - 1) return;
+
+    state.pushUndo();
+    state.moves_count += 1;
 
     const idx = state.selected_index;
     const cell: Cell = switch (state.selected_component) {
@@ -346,7 +720,9 @@ fn placeComponent(state: *GameState) void {
     };
 
     state.diagram.set(x, y, cell);
-    state.mode = .editing; // Clear simulation results on edit
+    state.mode = .editing;
+    state.mode_anim.reset();
+    state.showToast(componentName(state.selected_component));
 }
 
 /// Frame type alias for convenience
@@ -356,6 +732,8 @@ pub const FrameType = zithril.Frame(zithril.App(GameState).DefaultMaxWidgets);
 pub fn view(self: *GameState, frame: *FrameType) void {
     const area = frame.size();
     const level = self.currentLevel();
+
+    self.hit_tester.clear();
 
     // Main layout: header, content, footer
     const main_chunks = frame.layout(area, .vertical, &.{
@@ -416,6 +794,21 @@ pub fn view(self: *GameState, frame: *FrameType) void {
         frame.render(widgets.LevelSelectOverlay{
             .current_level = self.level_index,
             .total_levels = levels.count(),
+        }, area);
+    }
+
+    if (self.show_description) {
+        frame.render(widgets.DescriptionOverlay{
+            .level = level,
+        }, area);
+    }
+
+    // Toast message (always on top)
+    if (self.toast_len > 0) {
+        frame.render(widgets.ToastWidget{
+            .message = self.toast_message[0..self.toast_len],
+            .timer = self.toast_timer,
+            .max_timer = TOAST_DURATION_MS,
         }, area);
     }
 }

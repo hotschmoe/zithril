@@ -4,6 +4,7 @@
 //! - A truth table the player must satisfy
 //! - Initial diagram setup (rails, any pre-placed components)
 //! - Hints and description
+//! - Difficulty, par moves, story, and available components
 
 const game = @import("game.zig");
 const ladder = @import("ladder.zig");
@@ -31,6 +32,8 @@ pub const TruthRow = struct {
     }
 };
 
+pub const Difficulty = enum { beginner, intermediate, advanced, expert };
+
 /// Level definition
 pub const Level = struct {
     name: []const u8,
@@ -50,6 +53,12 @@ pub const Level = struct {
 
     // Setup function to initialize the diagram
     setup: *const fn (*Diagram) void,
+
+    // Metadata
+    difficulty: Difficulty,
+    par_moves: usize,
+    story_text: []const u8,
+    available_components: []const game.ComponentType,
 };
 
 /// Standard level setup: place power rails on left and right edges.
@@ -59,6 +68,48 @@ fn setupRails(diagram: *Diagram) void {
         diagram.set(diagram.width - 1, y, .rail_right);
     }
 }
+
+// Component sets by complexity tier
+const basic_components = &[_]game.ComponentType{
+    .wire_horizontal,
+    .contact_no,
+    .coil,
+    .empty,
+};
+
+const gate_components = &[_]game.ComponentType{
+    .wire_horizontal,
+    .wire_vertical,
+    .contact_no,
+    .contact_nc,
+    .coil,
+    .junction,
+    .empty,
+};
+
+const latch_components = &[_]game.ComponentType{
+    .wire_horizontal,
+    .wire_vertical,
+    .contact_no,
+    .contact_nc,
+    .coil,
+    .coil_latch,
+    .coil_unlatch,
+    .junction,
+    .empty,
+};
+
+const all_components = &[_]game.ComponentType{
+    .wire_horizontal,
+    .wire_vertical,
+    .contact_no,
+    .contact_nc,
+    .coil,
+    .coil_latch,
+    .coil_unlatch,
+    .junction,
+    .empty,
+};
 
 // Level definitions
 
@@ -77,6 +128,10 @@ const levels = [_]Level{
             TruthRow.init(&.{true}, &.{true}),
         },
         .setup = setupRails,
+        .difficulty = .beginner,
+        .par_moves = 2,
+        .story_text = "A warehouse door opens when the proximity sensor detects a forklift.",
+        .available_components = basic_components,
     },
 
     // Level 2: NOT Gate
@@ -93,6 +148,16 @@ const levels = [_]Level{
             TruthRow.init(&.{true}, &.{false}),
         },
         .setup = setupRails,
+        .difficulty = .beginner,
+        .par_moves = 2,
+        .story_text = "An alarm sounds whenever the safety guard is removed from the machine.",
+        .available_components = &[_]game.ComponentType{
+            .wire_horizontal,
+            .contact_no,
+            .contact_nc,
+            .coil,
+            .empty,
+        },
     },
 
     // Level 3: AND Gate
@@ -111,6 +176,10 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, true }, &.{true}),
         },
         .setup = setupRails,
+        .difficulty = .beginner,
+        .par_moves = 3,
+        .story_text = "A press only activates when both the operator's hands are on the safety buttons.",
+        .available_components = basic_components,
     },
 
     // Level 4: OR Gate
@@ -129,6 +198,10 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, true }, &.{true}),
         },
         .setup = setupRails,
+        .difficulty = .intermediate,
+        .par_moves = 6,
+        .story_text = "A factory conveyor activates when sensor A detects a package or sensor B detects one.",
+        .available_components = gate_components,
     },
 
     // Level 5: NAND Gate
@@ -147,6 +220,10 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, true }, &.{false}),
         },
         .setup = setupRails,
+        .difficulty = .intermediate,
+        .par_moves = 6,
+        .story_text = "An emergency vent stays open unless both pressure sensors confirm normal levels.",
+        .available_components = gate_components,
     },
 
     // Level 6: NOR Gate
@@ -165,6 +242,10 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, true }, &.{false}),
         },
         .setup = setupRails,
+        .difficulty = .intermediate,
+        .par_moves = 3,
+        .story_text = "A clean room blower runs only when neither door is open.",
+        .available_components = gate_components,
     },
 
     // Level 7: XOR Gate
@@ -183,6 +264,10 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, true }, &.{false}),
         },
         .setup = setupRails,
+        .difficulty = .advanced,
+        .par_moves = 10,
+        .story_text = "A mixing valve opens when exactly one of two ingredient tanks is selected.",
+        .available_components = gate_components,
     },
 
     // Level 8: Latching Circuit
@@ -200,6 +285,10 @@ const levels = [_]Level{
             TruthRow.init(&.{ false, true }, &.{false}),
         },
         .setup = setupRails,
+        .difficulty = .advanced,
+        .par_moves = 4,
+        .story_text = "A conveyor belt starts with a push button and stays running until the stop button is pressed.",
+        .available_components = latch_components,
     },
 
     // Level 9: Priority Circuit
@@ -218,6 +307,10 @@ const levels = [_]Level{
             TruthRow.init(&.{ true, true }, &.{ true, false }), // A has priority
         },
         .setup = setupRails,
+        .difficulty = .advanced,
+        .par_moves = 5,
+        .story_text = "Two pumps share a power bus. The primary pump always takes precedence over the backup.",
+        .available_components = gate_components,
     },
 
     // Level 10: Start/Stop Motor Control
@@ -236,6 +329,124 @@ const levels = [_]Level{
             TruthRow.init(&.{ false, false }, &.{false}), // Initial state
         },
         .setup = setupRails,
+        .difficulty = .advanced,
+        .par_moves = 6,
+        .story_text = "A grinding motor starts with a momentary button and seals in until the emergency stop is hit.",
+        .available_components = latch_components,
+    },
+
+    // Level 11: XNOR Gate
+    .{
+        .name = "XNOR Gate",
+        .description = "Output Y is ON when both inputs match (both ON or both OFF).",
+        .hint = "XNOR = (A AND B) OR (NOT A AND NOT B)",
+        .width = 14,
+        .height = 3,
+        .input_names = &.{ "A", "B" },
+        .output_names = &.{"Y"},
+        .truth_table = &.{
+            TruthRow.init(&.{ false, false }, &.{true}),
+            TruthRow.init(&.{ false, true }, &.{false}),
+            TruthRow.init(&.{ true, false }, &.{false}),
+            TruthRow.init(&.{ true, true }, &.{true}),
+        },
+        .setup = setupRails,
+        .difficulty = .advanced,
+        .par_moves = 10,
+        .story_text = "Two safety sensors must agree before enabling the press.",
+        .available_components = gate_components,
+    },
+
+    // Level 12: 2-bit Decoder
+    .{
+        .name = "2-bit Decoder",
+        .description = "Route power to one of four outputs based on two input bits.",
+        .hint = "Each output needs a unique combination of NO/NC contacts for A and B.",
+        .width = 14,
+        .height = 4,
+        .input_names = &.{ "A", "B" },
+        .output_names = &.{ "Y0", "Y1", "Y2", "Y3" },
+        .truth_table = &.{
+            TruthRow.init(&.{ false, false }, &.{ true, false, false, false }),
+            TruthRow.init(&.{ false, true }, &.{ false, true, false, false }),
+            TruthRow.init(&.{ true, false }, &.{ false, false, true, false }),
+            TruthRow.init(&.{ true, true }, &.{ false, false, false, true }),
+        },
+        .setup = setupRails,
+        .difficulty = .expert,
+        .par_moves = 12,
+        .story_text = "A conveyor sorting system routes packages to four bins based on two barcode bits.",
+        .available_components = gate_components,
+    },
+
+    // Level 13: Majority Vote
+    .{
+        .name = "Majority Vote",
+        .description = "Output ON when 2 or more of 3 inputs are ON.",
+        .hint = "Three parallel paths: (A AND B), (A AND C), (B AND C).",
+        .width = 14,
+        .height = 4,
+        .input_names = &.{ "A", "B", "C" },
+        .output_names = &.{"Y"},
+        .truth_table = &.{
+            TruthRow.init(&.{ false, false, false }, &.{false}),
+            TruthRow.init(&.{ false, false, true }, &.{false}),
+            TruthRow.init(&.{ false, true, false }, &.{false}),
+            TruthRow.init(&.{ false, true, true }, &.{true}),
+            TruthRow.init(&.{ true, false, false }, &.{false}),
+            TruthRow.init(&.{ true, false, true }, &.{true}),
+            TruthRow.init(&.{ true, true, false }, &.{true}),
+            TruthRow.init(&.{ true, true, true }, &.{true}),
+        },
+        .setup = setupRails,
+        .difficulty = .expert,
+        .par_moves = 12,
+        .story_text = "A reactor safety system requires agreement from at least 2 of 3 sensors.",
+        .available_components = gate_components,
+    },
+
+    // Level 14: Cascade Latch
+    .{
+        .name = "Cascade Latch",
+        .description = "SET1 latches Y1, which enables SET2 to latch Y2.",
+        .hint = "Y1 latches from SET1. Y2 requires Y1 latched AND SET2. RESET clears both.",
+        .width = 14,
+        .height = 3,
+        .input_names = &.{ "SET1", "SET2", "RESET" },
+        .output_names = &.{ "Y1", "Y2" },
+        .truth_table = &.{
+            TruthRow.init(&.{ true, false, false }, &.{ true, false }),
+            TruthRow.init(&.{ false, true, false }, &.{ false, false }),
+            TruthRow.init(&.{ true, true, false }, &.{ true, true }),
+            TruthRow.init(&.{ false, false, true }, &.{ false, false }),
+        },
+        .setup = setupRails,
+        .difficulty = .expert,
+        .par_moves = 8,
+        .story_text = "A two-stage startup sequence: hydraulics first, then main drive.",
+        .available_components = all_components,
+    },
+
+    // Level 15: Traffic Light
+    .{
+        .name = "Traffic Light",
+        .description = "Green when GO is on and STOP is off. Red when STOP is on. Yellow when both on.",
+        .hint = "GREEN: GO AND NOT STOP. RED: STOP AND NOT GO. YELLOW: GO AND STOP.",
+        .width = 14,
+        .height = 4,
+        .input_names = &.{ "GO", "STOP" },
+        .output_names = &.{ "GREEN", "YELLOW", "RED" },
+        .truth_table = &.{
+            TruthRow.init(&.{ false, false }, &.{ false, false, false }),
+            TruthRow.init(&.{ true, false }, &.{ true, false, false }),
+            TruthRow.init(&.{ false, true }, &.{ false, false, true }),
+            TruthRow.init(&.{ true, true }, &.{ false, true, false }),
+        },
+        .setup = setupRails,
+        .difficulty = .expert,
+        .par_moves = 9,
+        .story_text = "Control a traffic signal at a factory gate crossing.",
+        .available_components = gate_components,
     },
 };
 

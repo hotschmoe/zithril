@@ -1,6 +1,8 @@
 //! Ladder logic simulation engine.
 //!
-//! Simulates power flow through a ladder diagram given input states.
+//! Simulates power flow through a ladder diagram using BFS flood-fill
+//! propagation. Supports parallel branches via junction cells that
+//! split power flow vertically between rungs.
 
 const std = @import("std");
 const game = @import("game.zig");
@@ -11,96 +13,190 @@ const Diagram = game.Diagram;
 /// Maximum number of inputs/outputs supported
 pub const MAX_IO = 8;
 
+pub const SimResult = struct {
+    outputs: [MAX_IO]bool,
+    powered: [MAX_ROWS][MAX_COLS]bool,
+
+    pub const MAX_ROWS = 16;
+    pub const MAX_COLS = 16;
+
+    pub fn init() SimResult {
+        return .{
+            .outputs = [_]bool{false} ** MAX_IO,
+            .powered = [_][MAX_COLS]bool{[_]bool{false} ** MAX_COLS} ** MAX_ROWS,
+        };
+    }
+};
+
+const Direction = enum { left, right, up, down };
+
+const QueueEntry = struct {
+    x: usize,
+    y: usize,
+    from: Direction,
+};
+
 /// Simulate the ladder diagram with given inputs.
 /// Returns the resulting output states.
 pub fn simulate(diagram: *const Diagram, inputs: [MAX_IO]bool) [MAX_IO]bool {
-    var outputs: [MAX_IO]bool = [_]bool{false} ** MAX_IO;
-    var latches: [MAX_IO]bool = [_]bool{false} ** MAX_IO;
+    const result = simulateWithPower(diagram, inputs);
+    return result.outputs;
+}
 
-    // Process each rung (row)
+/// Simulate with full power-flow tracking.
+/// Uses BFS flood-fill from left rail cells.
+pub fn simulateWithPower(diagram: *const Diagram, inputs: [MAX_IO]bool) SimResult {
+    var result = SimResult.init();
+    var latches_set: [MAX_IO]bool = [_]bool{false} ** MAX_IO;
+    var latches_clear: [MAX_IO]bool = [_]bool{false} ** MAX_IO;
+
+    // BFS queue - static buffer, no allocator needed
+    const MAX_QUEUE = SimResult.MAX_ROWS * SimResult.MAX_COLS * 4;
+    var queue: [MAX_QUEUE]QueueEntry = undefined;
+    var head: usize = 0;
+    var tail: usize = 0;
+
+    // Track visited (cell + direction) to avoid infinite loops
+    // 4 directions per cell
+    var visited: [SimResult.MAX_ROWS][SimResult.MAX_COLS][4]bool =
+        [_][SimResult.MAX_COLS][4]bool{[_][4]bool{[_]bool{false} ** 4} ** SimResult.MAX_COLS} ** SimResult.MAX_ROWS;
+
+    // Seed: all left rail cells inject power flowing right
     for (0..diagram.height) |y| {
-        const power = evaluateRung(diagram, y, inputs, &latches);
-
-        // Find and set any coils on this rung
-        for (0..diagram.width) |x| {
-            switch (diagram.get(x, y)) {
-                .coil => |idx| {
-                    if (idx < MAX_IO) outputs[idx] = power;
-                },
-                .coil_latch => |idx| {
-                    if (idx < MAX_IO and power) latches[idx] = true;
-                },
-                .coil_unlatch => |idx| {
-                    if (idx < MAX_IO and power) latches[idx] = false;
-                },
-                else => {},
-            }
+        if (y >= SimResult.MAX_ROWS) break;
+        const cell = diagram.get(0, y);
+        if (cell == .rail_left) {
+            result.powered[y][0] = true;
+            enqueue(&queue, &tail, MAX_QUEUE, .{ .x = 1, .y = y, .from = .left });
         }
     }
 
-    // Apply latches to outputs
-    for (0..MAX_IO) |i| {
-        if (latches[i]) outputs[i] = true;
-    }
+    // BFS propagation
+    while (head != tail) {
+        const entry = queue[head];
+        head = (head + 1) % MAX_QUEUE;
 
-    return outputs;
-}
+        const x = entry.x;
+        const y = entry.y;
 
-/// Evaluate if power reaches the right rail on a given rung.
-/// Uses a simple left-to-right scan with continuity tracking.
-fn evaluateRung(
-    diagram: *const Diagram,
-    y: usize,
-    inputs: [MAX_IO]bool,
-    latches: *const [MAX_IO]bool,
-) bool {
-    _ = latches; // TODO: use for latch state
+        if (x >= diagram.width or y >= diagram.height) continue;
+        if (x >= SimResult.MAX_COLS or y >= SimResult.MAX_ROWS) continue;
 
-    // Start with power from left rail
-    var has_power = true;
-
-    // Scan left to right
-    for (1..diagram.width - 1) |x| {
-        if (!has_power) break;
+        const dir_idx = @intFromEnum(entry.from);
+        if (visited[y][x][dir_idx]) continue;
+        visited[y][x][dir_idx] = true;
 
         const cell = diagram.get(x, y);
-        has_power = evaluateCell(cell, inputs);
+
+        // Check if this cell conducts given the entry direction
+        if (!cellConducts(cell, entry.from, inputs)) continue;
+
+        result.powered[y][x] = true;
+
+        // Process coil outputs
+        switch (cell) {
+            .coil => |idx| {
+                if (idx < MAX_IO) result.outputs[idx] = true;
+            },
+            .coil_latch => |idx| {
+                if (idx < MAX_IO) latches_set[idx] = true;
+            },
+            .coil_unlatch => |idx| {
+                if (idx < MAX_IO) latches_clear[idx] = true;
+            },
+            else => {},
+        }
+
+        // Propagate to neighbors based on cell type
+        const exits = cellExits(cell, entry.from);
+
+        if (exits.right and x + 1 < diagram.width and x + 1 < SimResult.MAX_COLS) {
+            enqueue(&queue, &tail, MAX_QUEUE, .{ .x = x + 1, .y = y, .from = .left });
+        }
+        if (exits.left and x > 0) {
+            enqueue(&queue, &tail, MAX_QUEUE, .{ .x = x - 1, .y = y, .from = .right });
+        }
+        if (exits.down and y + 1 < diagram.height and y + 1 < SimResult.MAX_ROWS) {
+            enqueue(&queue, &tail, MAX_QUEUE, .{ .x = x, .y = y + 1, .from = .up });
+        }
+        if (exits.up and y > 0) {
+            enqueue(&queue, &tail, MAX_QUEUE, .{ .x = x, .y = y - 1, .from = .down });
+        }
     }
 
-    return has_power;
+    // Apply latches: set wins over clear when both active
+    for (0..MAX_IO) |i| {
+        if (latches_set[i]) result.outputs[i] = true;
+        if (latches_clear[i] and !latches_set[i]) result.outputs[i] = false;
+    }
+
+    return result;
 }
 
-/// Evaluate if a single cell conducts power.
-fn evaluateCell(cell: Cell, inputs: [MAX_IO]bool) bool {
+const Exits = struct {
+    left: bool = false,
+    right: bool = false,
+    up: bool = false,
+    down: bool = false,
+};
+
+/// Determine if a cell conducts power arriving from a given direction.
+fn cellConducts(cell: Cell, from: Direction, inputs: [MAX_IO]bool) bool {
     return switch (cell) {
-        .empty => false, // Break in circuit
-        .wire_h, .wire_v, .junction => true, // Conductors
-        .contact_no => |idx| if (idx < MAX_IO) inputs[idx] else false,
-        .contact_nc => |idx| if (idx < MAX_IO) !inputs[idx] else true,
-        .coil, .coil_latch, .coil_unlatch => true, // Coils conduct
-        .rail_left, .rail_right => true, // Rails conduct
+        .empty => false,
+        .wire_h => from == .left or from == .right,
+        .wire_v => from == .up or from == .down,
+        .junction => true,
+        .contact_no => |idx| if (from == .left) (if (idx < MAX_IO) inputs[idx] else false) else false,
+        .contact_nc => |idx| if (from == .left) (if (idx < MAX_IO) !inputs[idx] else true) else false,
+        .coil, .coil_latch, .coil_unlatch => from == .left,
+        .rail_left => true,
+        .rail_right => from == .left,
     };
+}
+
+/// Determine which directions power exits a cell, given it entered from `from`.
+fn cellExits(cell: Cell, from: Direction) Exits {
+    return switch (cell) {
+        .empty => .{},
+        .wire_h => switch (from) {
+            .left => .{ .right = true },
+            .right => .{ .left = true },
+            else => .{},
+        },
+        .wire_v => switch (from) {
+            .up => .{ .down = true },
+            .down => .{ .up = true },
+            else => .{},
+        },
+        .junction => .{ .left = true, .right = true, .up = true, .down = true },
+        .contact_no, .contact_nc => .{ .right = true },
+        .coil, .coil_latch, .coil_unlatch => .{ .right = true },
+        .rail_left => .{ .right = true },
+        .rail_right => .{},
+    };
+}
+
+fn enqueue(queue: []QueueEntry, tail: *usize, max: usize, entry: QueueEntry) void {
+    queue[tail.*] = entry;
+    tail.* = (tail.* + 1) % max;
 }
 
 /// Check if a diagram is valid (has proper structure).
 pub fn validate(diagram: *const Diagram) ValidationResult {
     var result = ValidationResult{};
 
-    // Check each rung
     for (0..diagram.height) |y| {
-        // Left rail should be present or empty
         const left = diagram.get(0, y);
         if (left != .rail_left and left != .empty) {
             result.errors += 1;
         }
 
-        // Right rail should be present or empty
         const right = diagram.get(diagram.width - 1, y);
         if (right != .rail_right and right != .empty) {
             result.errors += 1;
         }
 
-        // Check for at least one coil on populated rungs
         var has_content = false;
         var has_coil = false;
         for (1..diagram.width - 1) |x| {
@@ -113,7 +209,7 @@ pub fn validate(diagram: *const Diagram) ValidationResult {
         }
 
         if (has_content and !has_coil) {
-            result.warnings += 1; // Rung with no output
+            result.warnings += 1;
         }
     }
 
@@ -130,19 +226,19 @@ pub const ValidationResult = struct {
 };
 
 // Tests
-test "simple wire conducts" {
-    // TODO: Add proper test when Diagram can be created in tests
-}
 
 test "NO contact logic" {
     const inputs_off = [_]bool{false} ** MAX_IO;
     const inputs_on = [_]bool{true} ** MAX_IO;
 
-    // NO contact with input OFF = no conduction
-    try std.testing.expect(!evaluateCell(.{ .contact_no = 0 }, inputs_off));
+    // NO contact with input OFF = no conduction (entering from left)
+    try std.testing.expect(!cellConducts(.{ .contact_no = 0 }, .left, inputs_off));
 
     // NO contact with input ON = conduction
-    try std.testing.expect(evaluateCell(.{ .contact_no = 0 }, inputs_on));
+    try std.testing.expect(cellConducts(.{ .contact_no = 0 }, .left, inputs_on));
+
+    // NO contact entered from wrong direction = no conduction
+    try std.testing.expect(!cellConducts(.{ .contact_no = 0 }, .right, inputs_on));
 }
 
 test "NC contact logic" {
@@ -150,8 +246,196 @@ test "NC contact logic" {
     const inputs_on = [_]bool{true} ** MAX_IO;
 
     // NC contact with input OFF = conduction
-    try std.testing.expect(evaluateCell(.{ .contact_nc = 0 }, inputs_off));
+    try std.testing.expect(cellConducts(.{ .contact_nc = 0 }, .left, inputs_off));
 
     // NC contact with input ON = no conduction
-    try std.testing.expect(!evaluateCell(.{ .contact_nc = 0 }, inputs_on));
+    try std.testing.expect(!cellConducts(.{ .contact_nc = 0 }, .left, inputs_on));
+}
+
+test "wire direction constraints" {
+    const inputs = [_]bool{false} ** MAX_IO;
+
+    // wire_h conducts left/right only
+    try std.testing.expect(cellConducts(.wire_h, .left, inputs));
+    try std.testing.expect(cellConducts(.wire_h, .right, inputs));
+    try std.testing.expect(!cellConducts(.wire_h, .up, inputs));
+    try std.testing.expect(!cellConducts(.wire_h, .down, inputs));
+
+    // wire_v conducts up/down only
+    try std.testing.expect(!cellConducts(.wire_v, .left, inputs));
+    try std.testing.expect(!cellConducts(.wire_v, .right, inputs));
+    try std.testing.expect(cellConducts(.wire_v, .up, inputs));
+    try std.testing.expect(cellConducts(.wire_v, .down, inputs));
+
+    // junction conducts in all directions
+    try std.testing.expect(cellConducts(.junction, .left, inputs));
+    try std.testing.expect(cellConducts(.junction, .right, inputs));
+    try std.testing.expect(cellConducts(.junction, .up, inputs));
+    try std.testing.expect(cellConducts(.junction, .down, inputs));
+}
+
+test "simple series circuit" {
+    // [rail_left] [contact_no:0] [wire_h] [coil:0] [rail_right]
+    var cells: [1][5]Cell = undefined;
+    cells[0] = .{ .rail_left, .{ .contact_no = 0 }, .wire_h, .{ .coil = 0 }, .rail_right };
+
+    var rows: [1][]Cell = .{&cells[0]};
+    const diagram = Diagram{
+        .cells = &rows,
+        .width = 5,
+        .height = 1,
+        .allocator = undefined,
+    };
+
+    // Input OFF -> output OFF
+    var inputs = [_]bool{false} ** MAX_IO;
+    var result = simulateWithPower(&diagram, inputs);
+    try std.testing.expect(!result.outputs[0]);
+    try std.testing.expect(!result.powered[0][1]); // contact not powered
+
+    // Input ON -> output ON
+    inputs[0] = true;
+    result = simulateWithPower(&diagram, inputs);
+    try std.testing.expect(result.outputs[0]);
+    try std.testing.expect(result.powered[0][1]); // contact powered
+    try std.testing.expect(result.powered[0][3]); // coil powered
+}
+
+test "OR gate parallel branches" {
+    // Row 0: [rail_left] [contact_no:0] [wire_h] [coil:0] [rail_right]
+    // Row 1: [rail_left] [junction]     [wire_h] [junction] [rail_right]  (junction connecting rows)
+    // Row 2: [rail_left] [contact_no:1] [wire_h] [coil:0]  [rail_right]
+    //
+    // Actually, for a proper OR, we need junctions linking the branches.
+    // Better layout (5 wide, 3 tall):
+    // Row 0: [rail_left] [contact_no:0] [wire_h]       [coil:0]  [rail_right]
+    // Row 1: [rail_left] [junction]     [empty]         [junction] [rail_right]
+    // Row 2: [rail_left] [contact_no:1] [wire_h]        [coil:0]  [rail_right]
+
+    var cells: [3][5]Cell = undefined;
+    cells[0] = .{ .rail_left, .{ .contact_no = 0 }, .wire_h, .{ .coil = 0 }, .rail_right };
+    cells[1] = .{ .rail_left, .wire_h, .empty, .wire_h, .rail_right };
+    cells[2] = .{ .rail_left, .{ .contact_no = 1 }, .wire_h, .{ .coil = 0 }, .rail_right };
+
+    var rows: [3][]Cell = .{ &cells[0], &cells[1], &cells[2] };
+    const diagram = Diagram{
+        .cells = &rows,
+        .width = 5,
+        .height = 3,
+        .allocator = undefined,
+    };
+
+    // Both OFF -> output OFF
+    var inputs = [_]bool{false} ** MAX_IO;
+    var result = simulate(&diagram, inputs);
+    try std.testing.expect(!result[0]);
+
+    // A ON -> output ON
+    inputs[0] = true;
+    inputs[1] = false;
+    result = simulate(&diagram, inputs);
+    try std.testing.expect(result[0]);
+
+    // B ON -> output ON
+    inputs[0] = false;
+    inputs[1] = true;
+    result = simulate(&diagram, inputs);
+    try std.testing.expect(result[0]);
+
+    // Both ON -> output ON
+    inputs[0] = true;
+    inputs[1] = true;
+    result = simulate(&diagram, inputs);
+    try std.testing.expect(result[0]);
+}
+
+test "junction splits power vertically" {
+    // Test that junction propagates power to adjacent rows
+    // Row 0: [rail_left] [junction] [coil:0] [rail_right]
+    // Row 1: [rail_left] [junction] [coil:1] [rail_right]
+
+    var cells: [2][4]Cell = undefined;
+    cells[0] = .{ .rail_left, .junction, .{ .coil = 0 }, .rail_right };
+    cells[1] = .{ .rail_left, .junction, .{ .coil = 1 }, .rail_right };
+
+    // Junction at (1,0) should power junction at (1,1) via vertical propagation
+    // and both coils should be energized
+
+    var rows: [2][]Cell = .{ &cells[0], &cells[1] };
+    const diagram = Diagram{
+        .cells = &rows,
+        .width = 4,
+        .height = 2,
+        .allocator = undefined,
+    };
+
+    const inputs = [_]bool{false} ** MAX_IO;
+    const result = simulateWithPower(&diagram, inputs);
+    try std.testing.expect(result.outputs[0]);
+    try std.testing.expect(result.outputs[1]);
+    try std.testing.expect(result.powered[0][1]); // junction row 0
+    try std.testing.expect(result.powered[1][1]); // junction row 1
+}
+
+test "multi-rung output OR aggregation" {
+    // Two independent rungs driving the same coil index
+    // Row 0: [rail_left] [contact_no:0] [coil:0] [rail_right]
+    // Row 1: [rail_left] [contact_no:1] [coil:0] [rail_right]
+
+    var cells: [2][4]Cell = undefined;
+    cells[0] = .{ .rail_left, .{ .contact_no = 0 }, .{ .coil = 0 }, .rail_right };
+    cells[1] = .{ .rail_left, .{ .contact_no = 1 }, .{ .coil = 0 }, .rail_right };
+
+    var rows: [2][]Cell = .{ &cells[0], &cells[1] };
+    const diagram = Diagram{
+        .cells = &rows,
+        .width = 4,
+        .height = 2,
+        .allocator = undefined,
+    };
+
+    // Neither input -> OFF
+    var inputs = [_]bool{false} ** MAX_IO;
+    try std.testing.expect(!simulate(&diagram, inputs)[0]);
+
+    // Input 0 only -> ON (OR)
+    inputs[0] = true;
+    try std.testing.expect(simulate(&diagram, inputs)[0]);
+
+    // Input 1 only -> ON (OR)
+    inputs[0] = false;
+    inputs[1] = true;
+    try std.testing.expect(simulate(&diagram, inputs)[0]);
+}
+
+test "latch set and clear" {
+    // Row 0: [rail_left] [contact_no:0] [coil_latch:0] [rail_right]
+    // Row 1: [rail_left] [contact_no:1] [coil_unlatch:0] [rail_right]
+
+    var cells: [2][4]Cell = undefined;
+    cells[0] = .{ .rail_left, .{ .contact_no = 0 }, .{ .coil_latch = 0 }, .rail_right };
+    cells[1] = .{ .rail_left, .{ .contact_no = 1 }, .{ .coil_unlatch = 0 }, .rail_right };
+
+    var rows: [2][]Cell = .{ &cells[0], &cells[1] };
+    const diagram = Diagram{
+        .cells = &rows,
+        .width = 4,
+        .height = 2,
+        .allocator = undefined,
+    };
+
+    // SET active -> output ON
+    var inputs = [_]bool{false} ** MAX_IO;
+    inputs[0] = true;
+    try std.testing.expect(simulate(&diagram, inputs)[0]);
+
+    // CLEAR active -> output OFF
+    inputs[0] = false;
+    inputs[1] = true;
+    try std.testing.expect(!simulate(&diagram, inputs)[0]);
+
+    // Both active -> SET wins
+    inputs[0] = true;
+    inputs[1] = true;
+    try std.testing.expect(simulate(&diagram, inputs)[0]);
 }
