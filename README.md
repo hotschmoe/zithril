@@ -151,6 +151,7 @@ fn view(state: *State, frame: *zithril.Frame) void {
 | `.max(n)` | At most `n` cells |
 | `.flex(n)` | Proportional share (like CSS flex-grow) |
 | `.ratio(a, b)` | Fraction `a/b` of available space |
+| `.percentage(n)` | `n`% of available space (0-100) |
 
 ### Widgets
 
@@ -217,84 +218,90 @@ const Command = enum {
 };
 ```
 
-## Built-in Widgets
+## Built-in Widgets (22)
 
-### Text & Paragraph
+### Core Display
+
+| Widget | Purpose |
+|--------|---------|
+| `Block` | Borders (none/plain/rounded/double/thick) and titles |
+| `Text` | Single-line styled text with alignment |
+| `Paragraph` | Multi-line text with wrapping (none/char/word) |
+| `Clear` | Fill area with style (for popups/overlays) |
+| `BigText` | Large decorative text using 8x8 bitmap font |
+
+### Navigation & Input
+
+| Widget | Purpose |
+|--------|---------|
+| `List` | Navigable item list with selection highlight |
+| `Table` | Rows/columns with headers and selection |
+| `Tabs` | Horizontal tab bar with highlight |
+| `Tree` | Hierarchical expand/collapse with selection |
+| `Menu` | Nested dropdown menu with keyboard nav |
+| `TextInput` | Single-line text input with cursor and selection |
+| `Calendar` | Monthly calendar with date picking |
+
+### Data Visualization
+
+| Widget | Purpose |
+|--------|---------|
+| `Gauge` | Progress bar with label |
+| `LineGauge` | Compact single-line progress indicator |
+| `Sparkline` | Inline trend graph using Unicode blocks |
+| `BarChart` | Grouped vertical/horizontal bar charts |
+| `Chart` | XY line and scatter plots with axes |
+| `Canvas` | Arbitrary shape drawing (circles, lines, rectangles) |
+
+### Containers & Utilities
+
+| Widget | Purpose |
+|--------|---------|
+| `Scrollbar` | Vertical/horizontal scroll indicator |
+| `ScrollView` | Virtual scrolling container |
+| `ScrollableList` | List with built-in scrolling |
+| `CodeEditor` | Syntax-highlighted code viewer |
+
+### Widget Examples
 
 ```zig
-// Simple text
-frame.render(zithril.Text{
-    .content = "Hello, world!",
-    .style = .{ .fg = .green },
-}, area);
-
-// Multi-line with wrapping
-frame.render(zithril.Paragraph{
-    .text = long_text,
-    .wrap = .word,
-    .alignment = .center,
-}, area);
-```
-
-### Block (borders & titles)
-
-```zig
+// Block with border
 frame.render(zithril.Block{
     .title = " My Panel ",
     .title_alignment = .center,
-    .border = .rounded,  // .none, .plain, .rounded, .double, .thick
-    .border_style = .{ .fg = .blue },
+    .border = .rounded,
+    .border_style = zithril.Style.init().fg(.blue),
 }, area);
-```
 
-### List
-
-```zig
+// Navigable list
 frame.render(zithril.List{
     .items = &.{ "Item 1", "Item 2", "Item 3" },
     .selected = state.selected,
-    .highlight_style = .{ .bg = .blue, .bold = true },
-    .highlight_symbol = "▶ ",
+    .highlight_style = zithril.Style.init().bg(.blue).bold(),
+    .highlight_symbol = "> ",
 }, area);
-```
 
-### Table
-
-```zig
-frame.render(zithril.Table{
-    .header = &.{ "Name", "Status", "Progress" },
-    .rows = state.rows,
-    .widths = &.{ .flex(1), .length(10), .length(20) },
-    .selected = state.selected_row,
-}, area);
-```
-
-### Gauge (progress bar)
-
-```zig
+// Progress gauge
 frame.render(zithril.Gauge{
     .ratio = 0.65,
     .label = "65%",
-    .style = .{ .fg = .green },
+    .gauge_style = zithril.Style.init().bg(.green),
 }, area);
-```
 
-### Tabs
-
-```zig
-frame.render(zithril.Tabs{
-    .titles = &.{ "Overview", "Logs", "Settings" },
-    .selected = state.active_tab,
+// Sparkline trend
+frame.render(zithril.Sparkline{
+    .data = &.{ 10.0, 25.0, 40.0, 30.0, 55.0, 80.0 },
+    .style = zithril.Style.init().fg(.cyan),
 }, area);
-```
 
-### Scrollbar
-
-```zig
-frame.render(zithril.Scrollbar{
-    .total = state.items.len,
-    .position = state.scroll_offset,
-    .viewport = area.height,
+// Bar chart
+frame.render(zithril.BarChart{
+    .groups = &.{
+        .{ .label = "Q1", .bars = &.{
+            .{ .value = 80.0, .label = "Sales", .style = zithril.Style.init().fg(.green) },
+        }},
+    },
+    .bar_width = 3,
 }, area);
 ```
 
@@ -458,21 +465,38 @@ var app = zithril.App(State).init(.{
 });
 ```
 
-## Examples
+## Examples & Demos
 
-See the `/examples` directory:
+### Examples (`/examples`)
 
-- **counter** — Minimal example
-- **list** — Navigable list with selection
-- **tabs** — Multi-tab interface
-- **async** — Commands and async operations
-- **ralph** — Full agent orchestrator TUI (the reference app)
-
-Run an example:
+| Example | What it demonstrates |
+|---------|---------------------|
+| **counter** | Minimal app: state, update, view, Block + Text |
+| **list** | Navigable list with j/k and selection highlight |
+| **tabs** | Multi-tab interface with per-tab content |
+| **ralph** | Full reference app: agent list, detail panel, logs, gauges, focus management |
 
 ```bash
 zig build run-example-counter
 zig build run-example-ralph
+```
+
+### Demos (`/demos`)
+
+Larger applications that stress-test the framework:
+
+| Demo | What it showcases |
+|------|-------------------|
+| **rung** | Ladder logic puzzle game -- grid editing, simulation, 10 levels |
+| **dashboard** | System monitoring -- Sparkline, BarChart, Gauge, LineGauge, BigText, Table |
+| **explorer** | File browser -- Tree, Menu, TextInput, CodeEditor, Tabs, focus management |
+| **dataviz** | Visualization gallery -- Chart, Canvas, Calendar, BigText, 5 pages |
+
+```bash
+zig build run-rung
+zig build run-dashboard
+zig build run-explorer
+zig build run-dataviz
 ```
 
 ## Architecture
@@ -528,16 +552,25 @@ zig build run-example-ralph
 ## Roadmap
 
 - [x] Core rendering loop
-- [x] Basic widgets (Block, Text, List, Table, Gauge)
-- [x] Constraint-based layout
+- [x] Basic widgets (Block, Text, List, Table, Gauge, Tabs, Scrollbar)
+- [x] Constraint-based layout (length, min, max, flex, ratio, percentage)
+- [x] Flex alignment modes (start, end, center, space_between, space_around, space_evenly)
+- [x] Padding, Margin, Spacing types
 - [x] Keyboard input
-- [ ] Mouse support
-- [ ] Scrollable containers
-- [ ] Text input widget
-- [ ] Command/async pattern
-- [ ] Animation helpers
-- [ ] Sixel/Kitty image support
-- [ ] Recording/playback for tests
+- [x] Mouse support (parsing, hit testing, hover, drag, scroll)
+- [x] Scrollable containers (ScrollView, ScrollableList)
+- [x] Text input widget (TextInput with cursor and selection)
+- [x] Command/async pattern (Command, CommandResult)
+- [x] Animation helpers (easing, keyframes, interpolation)
+- [x] Graphics protocol detection (Sixel, Kitty, iTerm2)
+- [x] Testing utilities (recorder, player, mock backend, snapshots)
+- [x] Data visualization (Sparkline, BarChart, Chart, Canvas, LineGauge)
+- [x] Navigation widgets (Tree, Menu, Calendar)
+- [x] Specialty widgets (BigText, CodeEditor)
+- [ ] Mouse event wiring to app event loop
+- [ ] Async command dispatch in runtime
+- [ ] Image rendering via graphics protocols
+- [ ] Theming system
 
 ## Contributing to rich_zig
 
