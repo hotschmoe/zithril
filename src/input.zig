@@ -145,40 +145,36 @@ pub const Input = struct {
     fn parseCsiParams(self: *Self, bytes: []const u8) ?Event {
         _ = self;
 
+        const SubParam = enum { none, skip, action };
+
         var i: usize = 0;
         var param1: u16 = 0;
         var param2: u16 = 0;
-        var kitty_action: u16 = 0;
+        var action_sub: u16 = 0;
         var param_index: u8 = 0;
-        var skip_sub: bool = false;
-        var in_action_sub: bool = false;
+        var sub_param: SubParam = .none;
 
         while (i < bytes.len) : (i += 1) {
             const c = bytes[i];
             if (c >= '0' and c <= '9') {
                 const digit = c - '0';
-                if (in_action_sub) {
-                    kitty_action = kitty_action * 10 + digit;
-                } else if (!skip_sub) {
-                    switch (param_index) {
+                switch (sub_param) {
+                    .action => action_sub = action_sub * 10 + digit,
+                    .skip => {},
+                    .none => switch (param_index) {
                         0 => param1 = param1 * 10 + digit,
                         1 => param2 = param2 * 10 + digit,
                         else => {},
-                    }
+                    },
                 }
             } else if (c == ';') {
                 param_index += 1;
-                skip_sub = false;
-                in_action_sub = false;
+                sub_param = .none;
             } else if (c == ':') {
-                if (param_index == 1) {
-                    in_action_sub = true;
-                } else {
-                    skip_sub = true;
-                }
+                sub_param = if (param_index == 1) .action else .skip;
             } else {
                 if (c == 'u') {
-                    return parseKittyKey(param1, param2, kitty_action);
+                    return parseKittyKey(param1, param2, action_sub);
                 }
                 return parseCsiFinal(c, param1, param2);
             }

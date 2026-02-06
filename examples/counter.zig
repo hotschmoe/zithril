@@ -22,8 +22,12 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
                     if (c == 'q' and !key.modifiers.any()) return .quit;
                     if (c == 'c' and key.modifiers.ctrl) return .quit;
                 },
-                .up => if (!key.modifiers.any()) { state.count +|= 1; },
-                .down => if (!key.modifiers.any()) { state.count -|= 1; },
+                .up => if (!key.modifiers.any()) {
+                    state.count +|= 1;
+                },
+                .down => if (!key.modifiers.any()) {
+                    state.count -|= 1;
+                },
                 else => {},
             }
         },

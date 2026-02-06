@@ -256,11 +256,8 @@ fn renderRegions(state: *State, frame: *FrameType, area: zithril.Rect) void {
         else
             zithril.Style.init().fg(color);
 
-        const label = region_labels[i];
-        const title: []const u8 = if (hovered) label else label;
-
         const region_block = zithril.Block{
-            .title = title,
+            .title = region_labels[i],
             .border = if (hovered) .double else .rounded,
             .border_style = border_style,
         };
@@ -275,11 +272,9 @@ fn renderRegions(state: *State, frame: *FrameType, area: zithril.Rect) void {
             const clear = zithril.Clear{ .style = fill_style };
             frame.render(clear, region_inner);
 
-            // Show hover status centered
-            const status: []const u8 = if (hovered) "[HOVER]" else "";
-            if (status.len > 0) {
+            if (hovered) {
                 const status_text = zithril.Text{
-                    .content = status,
+                    .content = "[HOVER]",
                     .style = zithril.Style.init().fg(.white).bold(),
                     .alignment = .center,
                 };
