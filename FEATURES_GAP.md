@@ -6,18 +6,21 @@ Comparison of zithril (Zig TUI framework) against [ratatui](https://ratatui.rs/)
 
 ## Executive Summary
 
-zithril has strong parity with ratatui's core functionality. The main gaps are in **data visualization widgets** (charts, sparklines, canvas) and **layout flexibility** (margins, padding, Flex alignment modes). The third-party ecosystem is the largest gap but is expected for a newer project.
+**All previously identified gaps have been closed.** zithril now has full parity with ratatui's built-in widget set and exceeds it in several areas (animation, mouse utilities, built-in TextInput/ScrollView). The remaining gap is the third-party ecosystem, which is expected for a newer project in a smaller language ecosystem.
 
 | Category | zithril | ratatui | Gap |
 |----------|---------|---------|-----|
-| Core Widgets | 11 | 14+ | Minor |
-| Data Visualization | 1 (Gauge) | 5 | **Major** |
-| Layout Constraints | 5 | 6 | Minor |
-| Layout Flex/Alignment | None | 7 modes | **Moderate** |
+| Core Widgets | 22 | 14+ | **zithril leads** |
+| Data Visualization | 6 (Gauge, LineGauge, Sparkline, BarChart, Chart, Canvas) | 5 | **zithril leads** |
+| Layout Constraints | 6 | 6 | Parity |
+| Layout Flex/Alignment | 7 modes | 7 modes | Parity |
+| Spacing (Padding/Margin) | Full | Full | Parity |
 | Styling | Full | Full | Parity |
 | Events | Full | Full | Parity |
+| Animation | Built-in | None | **zithril leads** |
+| Mouse Utilities | Built-in | None | **zithril leads** |
 | Graphics Protocols | 3 | 3 | Parity |
-| Third-Party Ecosystem | None | 20+ widgets | **Major** |
+| Third-Party Ecosystem | None | 20+ widgets | **ratatui leads** |
 
 ---
 
@@ -49,26 +52,25 @@ Note: ratatui has these as third-party crates (`tui-textarea`, `tui-scrollview`)
 
 ### Widgets ratatui Has That zithril Lacks
 
-| Widget | Priority | Description | Effort |
-|--------|----------|-------------|--------|
-| **BarChart** | High | Grouped bar charts for data visualization | Medium |
-| **Chart** | High | Line graphs and scatter plots with axes | High |
-| **Sparkline** | High | Compact inline data visualization | Low |
-| **Canvas** | Medium | Arbitrary shape drawing (lines, circles, maps) | High |
-| **LineGauge** | Low | Thin-line progress indicator | Low |
-| **Calendar** | Low | Monthly calendar widget | Medium |
+**None.** All previously missing widgets have been implemented:
 
-### Missing Canvas Shapes (if Canvas implemented)
+| Widget | Status | Notes |
+|--------|--------|-------|
+| **BarChart** | Implemented | Vertical + horizontal, grouped bars |
+| **Chart** | Implemented | Line + scatter datasets, axes, labels |
+| **Sparkline** | Implemented | Unicode block bars, L-to-R and R-to-L |
+| **Canvas** | Implemented | Circle, Line, Rectangle, Points shapes |
+| **LineGauge** | Implemented | Three line styles (normal/thick/thin) |
+| **Calendar** | Implemented | Month view, date selection, event markers |
 
-| Shape | Description |
-|-------|-------------|
-| Circle | Center, radius, color |
-| Line | Two-point line |
-| Rectangle | Basic rectangle |
-| Points | Scatter plot points |
-| Map | World map with resolution control |
-| Label | Text on canvas |
-| Custom shapes | User-defined via Shape trait |
+### Additional Widgets zithril Has (beyond ratatui built-ins)
+
+| Widget | Description |
+|--------|-------------|
+| Tree | Hierarchical expand/collapse navigation |
+| Menu | Nested dropdown with keyboard navigation |
+| BigText | Large 8x8 bitmap font rendering |
+| CodeEditor | Syntax highlighting for 10 languages |
 
 ---
 
@@ -83,9 +85,9 @@ Note: ratatui has these as third-party crates (`tui-textarea`, `tui-scrollview`)
 | Maximum | `max(n)` | `Max(n)` |
 | Ratio | `ratio(a, b)` | `Ratio(a, b)` |
 | Flex/Fill | `flex(n)` | `Fill(n)` |
-| Percentage | -- | `Percentage(n)` |
+| Percentage | `percentage(n)` | `Percentage(n)` |
 
-**Gap**: zithril lacks `Percentage` constraint. Can be approximated with `ratio(n, 100)` but less convenient.
+**Gap**: None. Full parity.
 
 ### Flex Alignment (Excess Space Distribution)
 
@@ -93,26 +95,26 @@ ratatui's `Flex` enum controls how excess space is distributed:
 
 | Mode | Description | zithril |
 |------|-------------|---------|
-| Start | Content at start, space at end | -- |
-| End | Content at end, space at start | -- |
-| Center | Content centered, space on sides | -- |
-| SpaceBetween | Space between items, none at edges | -- |
-| SpaceAround | Equal space around each item | -- |
-| SpaceEvenly | Equal gaps including edges | -- |
-| Legacy | Excess in final element | Default behavior |
+| Start | Content at start, space at end | `.start` |
+| End | Content at end, space at start | `.end_` |
+| Center | Content centered, space on sides | `.center` |
+| SpaceBetween | Space between items, none at edges | `.space_between` |
+| SpaceAround | Equal space around each item | `.space_around` |
+| SpaceEvenly | Equal gaps including edges | `.space_evenly` |
+| Legacy | Excess in final element | `.legacy` (default) |
 
-**Gap**: zithril only supports Legacy-style distribution. Adding Flex alignment would improve layout flexibility.
+**Gap**: None. Full parity.
 
 ### Margins and Padding
 
 | Feature | zithril | ratatui |
 |---------|---------|---------|
 | Rect.inner(margin) | Yes | Yes |
-| Block padding | Via style | `Padding` struct |
-| Asymmetric margins | Manual Rect math | `Margin` struct |
-| Inter-element spacing | -- | `Spacing` |
+| Block padding | `Padding` struct | `Padding` struct |
+| Asymmetric margins | `Margin` struct | `Margin` struct |
+| Inter-element spacing | `Spacing` struct | `Spacing` |
 
-**Gap**: No built-in `Padding`, `Margin`, or `Spacing` types. Users must calculate manually.
+**Gap**: None. Full parity.
 
 ---
 
@@ -129,11 +131,11 @@ ratatui's `Flex` enum controls how excess space is distributed:
 | Blink | Yes | Yes |
 | Reverse | Yes | Yes |
 | Strikethrough | Yes | Yes |
-| Hidden | -- | Yes |
+| Hidden | Yes | Yes |
 | Rapid Blink | -- | Yes |
 | Crossed Out | Yes (via strikethrough) | Yes |
 
-**Gap**: Minor. Missing `Hidden` and `RapidBlink` (rarely used).
+**Gap**: Minimal. Only `RapidBlink` missing (rarely used, poorly supported by terminals).
 
 ### Colors
 
@@ -279,68 +281,65 @@ ratatui has a large ecosystem of third-party widgets. These would need to be imp
 
 ---
 
-## 9. Prioritized Recommendations
+## 9. Completed Recommendations
 
-### P0 - High Impact, Reasonable Effort
+All previously prioritized features have been implemented:
 
-| Feature | Bead ID | Description |
-|---------|---------|-------------|
-| Sparkline widget | `bd-2ke` | Compact data visualization, low effort |
-| Percentage constraint | `bd-d42` | Convenience for common layouts |
-| Flex alignment modes | `bd-mlx` | Start, Center, End, SpaceBetween, SpaceAround, SpaceEvenly |
+| Priority | Feature | Status |
+|----------|---------|--------|
+| P0 | Sparkline widget | Done |
+| P0 | Percentage constraint | Done |
+| P0 | Flex alignment modes | Done |
+| P1 | BarChart widget | Done |
+| P1 | Chart widget (axes, line, scatter) | Done |
+| P1 | Padding/Margin types | Done |
+| P2 | LineGauge widget | Done |
+| P2 | Canvas widget (circle, line, rect, points) | Done |
+| P2 | Tree widget | Done |
+| P2 | Menu widget | Done |
+| P3 | Calendar widget | Done |
+| P3 | Hidden text attribute | Done |
+| P3 | BigText widget | Done |
+| P4 | CodeEditor widget | Done |
 
-### P1 - High Impact, Higher Effort
+### Future Priorities
 
-| Feature | Bead ID | Description |
-|---------|---------|-------------|
-| BarChart widget | `bd-2zv` | Data visualization for dashboards |
-| Chart widget | `bd-24d` | Line graphs with axes (epic) |
-| - Axis rendering | `bd-128` | X/Y axes, ticks, labels, auto-scaling |
-| - Line dataset | `bd-1qm` | Connect data points with lines |
-| - Scatter dataset | `bd-ad4` | Individual point markers |
-| Padding/Margin types | `bd-ms6` | Layout convenience structs |
-
-### P2 - Medium Impact
-
-| Feature | Bead ID | Description |
-|---------|---------|-------------|
-| LineGauge widget | `bd-2it` | Thin progress variant |
-| Canvas widget | `bd-2us` | Arbitrary drawing (epic) |
-| - Circle shape | `bd-2os` | Bresenham circle algorithm |
-| - Line shape | `bd-2nk` | Bresenham line algorithm |
-| - Rectangle shape | `bd-1zo` | Fill or outline mode |
-| - Points shape | `bd-1jl` | Scatter plot points |
-| - Shape trait | `bd-lsj` | Custom shape extensibility |
-| Tree widget | `bd-197` | Hierarchical data display |
-| Menu widget | `bd-oaf` | Nested navigation |
-
-### P3 - Low Priority
-
-| Feature | Bead ID | Description |
-|---------|---------|-------------|
-| Calendar widget | `bd-5s1` | Monthly calendar display |
-| Hidden text attribute | `bd-207` | Invisible text rendering |
-| BigText widget | `bd-tbm` | Decorative large text |
-| CodeEditor widget | `bd-446` | Syntax highlighting (P4 backlog) |
+| Priority | Feature | Description |
+|----------|---------|-------------|
+| P0 | Mouse event loop integration | Wire mouse events from backend into App event loop |
+| P0 | Async command dispatch | Execute commands from action return values |
+| P1 | Image rendering | Render images via Sixel/Kitty/iTerm2 protocols |
+| P1 | Theming system | Dynamic theme loading and switching |
+| P2 | Popup/overlay system | Z-ordering for modal dialogs |
+| P3 | Clipboard integration | System clipboard read/write |
 
 ---
 
 ## 11. Summary
 
-**Strengths of zithril vs ratatui**:
-- Built-in TextInput and ScrollView (ratatui needs third-party)
-- Built-in animation system
-- Built-in mouse interaction utilities
+**All previously identified gaps have been addressed.** zithril now has:
+
+**Advantages over ratatui**:
+- 22 built-in widgets (vs ratatui's 14 built-in + third-party)
+- Built-in TextInput, ScrollView, Tree, Menu, Calendar, CodeEditor, BigText
+- Built-in animation system (easing, keyframes, interpolation)
+- Built-in mouse interaction utilities (hit testing, hover, drag, scroll)
 - Native Zig with zero hidden allocations
 - Comptime-sized layouts
 
-**Gaps to address**:
-1. Data visualization widgets (Sparkline, BarChart, Chart)
-2. Layout Flex alignment modes
-3. Convenience types (Percentage, Padding, Margin)
-4. Canvas for arbitrary drawing
+**Parity with ratatui**:
+- All data visualization widgets (Sparkline, BarChart, Chart, Canvas, LineGauge, Gauge)
+- Full layout system (6 constraint types, 7 flex modes, Padding/Margin/Spacing)
+- Complete styling (colors, text attributes)
+- Cross-platform backend (POSIX + Windows)
+- Graphics protocol support (Sixel, Kitty, iTerm2)
+- Testing utilities (mock backend, snapshots)
 
-The core architecture is solid. Focus on data visualization widgets for the highest impact.
+**Remaining gaps**:
+- Third-party ecosystem (ratatui has 20+ community widgets)
+- RapidBlink text attribute (minimal impact)
+
+The framework is mature and feature-complete for building production TUI applications.
 
 ---
 

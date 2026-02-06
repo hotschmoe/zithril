@@ -1,231 +1,175 @@
-// Style types for zithril TUI framework
-// Re-exports and extends rich_zig's Style with zithril-specific conveniences
-
 const std = @import("std");
 pub const rich_zig = @import("rich_zig");
 
-/// Re-export rich_zig's Color for convenience.
 pub const Color = rich_zig.Color;
-
-/// Re-export rich_zig's StyleAttribute for convenience.
 pub const StyleAttribute = rich_zig.StyleAttribute;
 
-/// Style represents visual attributes for text cells.
-///
-/// Wraps rich_zig.Style with zithril-specific conveniences.
-/// Supports:
-/// - Foreground and background colors (via Color)
-/// - Text attributes: bold, italic, underline, dim, blink, reverse, strikethrough
-/// - Method chaining for building styles
-/// - Merging styles via patch() (called combine() in rich_zig)
-///
-/// Example:
-/// ```
-/// const highlight = Style.init().bold().fg(.yellow).bg(.blue);
-/// const merged = base_style.patch(highlight);
-/// ```
+/// Visual attributes for text cells. Wraps rich_zig.Style with method chaining.
 pub const Style = struct {
     inner: rich_zig.Style,
 
-    /// Empty style with all defaults.
     pub const empty: Style = .{ .inner = rich_zig.Style.empty };
 
-    /// Initialize an empty style.
     pub fn init() Style {
         return empty;
     }
 
-    /// Set foreground color.
     pub fn fg(self: Style, c: Color) Style {
         return .{ .inner = self.inner.fg(c) };
     }
 
-    /// Set foreground color (alias for fg).
-    pub fn foreground(self: Style, c: Color) Style {
-        return self.fg(c);
-    }
-
-    /// Set background color.
     pub fn bg(self: Style, c: Color) Style {
         return .{ .inner = self.inner.bg(c) };
     }
 
-    /// Set background color (alias for bg).
-    pub fn background(self: Style, c: Color) Style {
-        return self.bg(c);
-    }
-
-    /// Enable bold.
     pub fn bold(self: Style) Style {
         return .{ .inner = self.inner.bold() };
     }
 
-    /// Disable bold.
     pub fn notBold(self: Style) Style {
         return .{ .inner = self.inner.notBold() };
     }
 
-    /// Enable italic.
     pub fn italic(self: Style) Style {
         return .{ .inner = self.inner.italic() };
     }
 
-    /// Disable italic.
     pub fn notItalic(self: Style) Style {
         return .{ .inner = self.inner.notItalic() };
     }
 
-    /// Enable underline.
     pub fn underline(self: Style) Style {
         return .{ .inner = self.inner.underline() };
     }
 
-    /// Disable underline.
     pub fn notUnderline(self: Style) Style {
         return .{ .inner = self.inner.notUnderline() };
     }
 
-    /// Enable dim.
     pub fn dim(self: Style) Style {
         return .{ .inner = self.inner.dim() };
     }
 
-    /// Disable dim.
     pub fn notDim(self: Style) Style {
         return .{ .inner = self.inner.notDim() };
     }
 
-    /// Enable blink.
     pub fn blink(self: Style) Style {
         return .{ .inner = self.inner.blink() };
     }
 
-    /// Disable blink.
     pub fn notBlink(self: Style) Style {
         return .{ .inner = self.inner.notBlink() };
     }
 
-    /// Enable reverse video.
     pub fn reverse(self: Style) Style {
         return .{ .inner = self.inner.reverse() };
     }
 
-    /// Disable reverse video.
     pub fn notReverse(self: Style) Style {
         return .{ .inner = self.inner.notReverse() };
     }
 
-    /// Enable strikethrough.
     pub fn strikethrough(self: Style) Style {
         return .{ .inner = self.inner.strikethrough() };
     }
 
-    /// Disable strikethrough.
     pub fn notStrikethrough(self: Style) Style {
         return .{ .inner = self.inner.notStrike() };
     }
 
-    /// Enable strikethrough (alias).
-    pub fn strike(self: Style) Style {
-        return self.strikethrough();
-    }
-
-    /// Enable hidden/invisible text (ANSI SGR 8).
-    /// Hidden text takes up space but is not visible.
-    /// Terminal support varies; some terminals render as visible or blank.
+    /// SGR 8 -- hidden text takes up space but is not visible.
     pub fn hidden(self: Style) Style {
         return .{ .inner = self.inner.conceal() };
     }
 
-    /// Disable hidden/invisible text.
     pub fn notHidden(self: Style) Style {
         return .{ .inner = self.inner.notConceal() };
     }
 
-    /// Enable hidden/invisible text (alias for hidden).
-    pub fn conceal(self: Style) Style {
-        return self.hidden();
+    /// SGR 21 -- double underline.
+    pub fn underline2(self: Style) Style {
+        return .{ .inner = self.inner.underline2() };
     }
 
-    /// Disable hidden/invisible text (alias for notHidden).
-    pub fn notConceal(self: Style) Style {
-        return self.notHidden();
+    pub fn notUnderline2(self: Style) Style {
+        return .{ .inner = self.inner.notUnderline2() };
     }
 
-    /// Merge another style on top of this one.
+    /// SGR 51.
+    pub fn frame(self: Style) Style {
+        return .{ .inner = self.inner.frame() };
+    }
+
+    pub fn notFrame(self: Style) Style {
+        return .{ .inner = self.inner.notFrame() };
+    }
+
+    /// SGR 52.
+    pub fn encircle(self: Style) Style {
+        return .{ .inner = self.inner.encircle() };
+    }
+
+    pub fn notEncircle(self: Style) Style {
+        return .{ .inner = self.inner.notEncircle() };
+    }
+
+    /// SGR 53.
+    pub fn overline(self: Style) Style {
+        return .{ .inner = self.inner.overline() };
+    }
+
+    pub fn notOverline(self: Style) Style {
+        return .{ .inner = self.inner.notOverline() };
+    }
+
     /// Non-default values in `other` override values in `self`.
     pub fn patch(self: Style, other: Style) Style {
         return .{ .inner = self.inner.combine(other.inner) };
     }
 
-    /// Merge another style on top of this one (alias for patch).
-    pub fn combine(self: Style, other: Style) Style {
-        return self.patch(other);
-    }
-
-    /// Check if style has a specific attribute enabled.
     pub fn hasAttribute(self: Style, attr: StyleAttribute) bool {
         return self.inner.hasAttribute(attr);
     }
 
-    /// Check if this style has no attributes or colors set.
     pub fn isEmpty(self: Style) bool {
         return self.inner.isEmpty();
     }
 
-    /// Check equality with another style.
     pub fn eql(self: Style, other: Style) bool {
         return self.inner.eql(other.inner);
     }
 
-    /// Access the underlying rich_zig style for advanced operations.
     pub fn toRichStyle(self: Style) rich_zig.Style {
         return self.inner;
     }
 
-    /// Create from a rich_zig style.
     pub fn fromRichStyle(rich_style: rich_zig.Style) Style {
         return .{ .inner = rich_style };
     }
 
-    /// Render this style as ANSI escape codes to a writer.
-    /// Uses rich_zig's ANSI rendering for proper color and attribute output.
     pub fn renderAnsi(self: Style, color_system: ColorSystem, writer: anytype) !void {
         try self.inner.renderAnsi(color_system, writer);
     }
 
-    /// Write the ANSI reset sequence to restore default styling.
     pub fn renderReset(writer: anytype) !void {
         try rich_zig.Style.renderReset(writer);
     }
 
-    /// Get the foreground color if set.
     pub fn getForeground(self: Style) ?Color {
         return self.inner.color;
     }
 
-    /// Get the background color if set.
     pub fn getBackground(self: Style) ?Color {
         return self.inner.bgcolor;
     }
 };
 
-/// Re-export rich_zig's ColorSystem for color capability detection.
 pub const ColorSystem = rich_zig.ColorSystem;
-
-/// Re-export rich_zig's ColorType for color type identification.
 pub const ColorType = rich_zig.ColorType;
-
-/// Re-export rich_zig's ColorTriplet for RGB values.
 pub const ColorTriplet = rich_zig.ColorTriplet;
-
-/// Re-export rich_zig's Segment for styled text spans.
 pub const Segment = rich_zig.Segment;
-
-/// Re-export rich_zig's ControlCode for terminal control sequences.
 pub const ControlCode = rich_zig.ControlCode;
-
-/// Re-export rich_zig's ControlType for control code classification.
 pub const ControlType = rich_zig.ControlType;
 
 // ============================================================
@@ -320,10 +264,9 @@ test "behavior: Style.notHidden disables conceal attribute" {
     try std.testing.expect(!style.hasAttribute(.conceal));
 }
 
-test "behavior: Style.hidden and Style.conceal are equivalent" {
-    const hidden_style = Style.init().hidden();
-    const conceal_style = Style.init().conceal();
-    try std.testing.expect(hidden_style.eql(conceal_style));
+test "behavior: Style.hidden maps to conceal attribute" {
+    const style = Style.init().hidden();
+    try std.testing.expect(style.hasAttribute(.conceal));
 }
 
 test "behavior: Style.patch merges hidden attribute" {
@@ -350,6 +293,90 @@ test "behavior: Style.hidden renders correct ANSI code" {
 test "behavior: Style disable attributes" {
     const style = Style.init().bold().notBold();
     try std.testing.expect(!style.hasAttribute(.bold));
+}
+
+test "behavior: Style.underline2 enables double underline" {
+    const style = Style.init().underline2();
+    try std.testing.expect(style.hasAttribute(.underline2));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notUnderline2 disables double underline" {
+    const style = Style.init().underline2().notUnderline2();
+    try std.testing.expect(!style.hasAttribute(.underline2));
+}
+
+test "behavior: Style.underline2 renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().underline2();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[21m", stream.getWritten());
+}
+
+test "behavior: Style.frame enables frame attribute" {
+    const style = Style.init().frame();
+    try std.testing.expect(style.hasAttribute(.frame));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notFrame disables frame attribute" {
+    const style = Style.init().frame().notFrame();
+    try std.testing.expect(!style.hasAttribute(.frame));
+}
+
+test "behavior: Style.frame renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().frame();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[51m", stream.getWritten());
+}
+
+test "behavior: Style.encircle enables encircle attribute" {
+    const style = Style.init().encircle();
+    try std.testing.expect(style.hasAttribute(.encircle));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notEncircle disables encircle attribute" {
+    const style = Style.init().encircle().notEncircle();
+    try std.testing.expect(!style.hasAttribute(.encircle));
+}
+
+test "behavior: Style.encircle renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().encircle();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[52m", stream.getWritten());
+}
+
+test "behavior: Style.overline enables overline attribute" {
+    const style = Style.init().overline();
+    try std.testing.expect(style.hasAttribute(.overline));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notOverline disables overline attribute" {
+    const style = Style.init().overline().notOverline();
+    try std.testing.expect(!style.hasAttribute(.overline));
+}
+
+test "behavior: Style.overline renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().overline();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[53m", stream.getWritten());
 }
 
 // ============================================================

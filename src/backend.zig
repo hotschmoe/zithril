@@ -125,6 +125,29 @@ pub const TerminalType = enum {
             else => true,
         };
     }
+
+    /// Returns whether this terminal supports synchronized output (DEC Mode 2026).
+    pub fn supportsSyncOutput(self: TerminalType) bool {
+        return switch (self) {
+            .kitty,
+            .wezterm,
+            .alacritty,
+            .iterm2,
+            .windows_terminal,
+            .gnome_terminal,
+            .konsole,
+            => true,
+            .xterm,
+            .rxvt,
+            .screen,
+            .tmux,
+            .linux_console,
+            .cmd_exe,
+            .conemu,
+            .unknown,
+            => false,
+        };
+    }
 };
 
 /// Color support levels detected from terminal capabilities.
@@ -179,6 +202,7 @@ pub const TerminalCapabilities = struct {
     sgr_mouse: bool,
     bracketed_paste: bool,
     alternate_screen: bool,
+    sync_output: bool,
 
     /// Create capabilities from detected terminal type.
     pub fn fromTerminalType(term_type: TerminalType, color: ColorSupport) TerminalCapabilities {
@@ -190,6 +214,7 @@ pub const TerminalCapabilities = struct {
             .sgr_mouse = term_type.supportsSgrMouse(),
             .bracketed_paste = term_type.supportsBracketedPaste(),
             .alternate_screen = term_type.supportsAlternateScreen(),
+            .sync_output = term_type.supportsSyncOutput(),
         };
     }
 };
@@ -827,6 +852,9 @@ pub const Backend = struct {
 
     pub const ENABLE_BRACKETED_PASTE = "\x1b[?2004h";
     pub const DISABLE_BRACKETED_PASTE = "\x1b[?2004l";
+
+    pub const SYNC_OUTPUT_BEGIN = "\x1b[?2026h";
+    pub const SYNC_OUTPUT_END = "\x1b[?2026l";
 };
 
 // ============================================================
@@ -1287,10 +1315,12 @@ pub fn Output(comptime buffer_size: usize) type {
         }
 
         /// Set the text style using rich_zig ANSI rendering.
+        /// Resets before applying a new style to prevent attribute bleeding
+        /// (e.g., a previous cell's background color persisting into the next cell).
         pub fn setStyle(self: *Self, style: Style) void {
-            // Skip if same as last style
             if (self.last_style) |last| {
                 if (last.eql(style)) return;
+                self.writeRaw("\x1b[0m");
             }
 
             style.renderAnsi(self.color_system, self.writer()) catch {};
@@ -1329,6 +1359,18 @@ pub fn Output(comptime buffer_size: usize) type {
         /// Execute a control code.
         pub fn writeControl(self: *Self, control: ControlCode) void {
             control.toEscapeSequence(self.writer()) catch {};
+        }
+
+        /// Begin synchronized output (DEC Mode 2026).
+        /// Terminal buffers all output until endSyncOutput is called.
+        pub fn beginSyncOutput(self: *Self) void {
+            self.writeRaw(Backend.SYNC_OUTPUT_BEGIN);
+        }
+
+        /// End synchronized output (DEC Mode 2026).
+        /// Terminal renders all buffered output atomically.
+        pub fn endSyncOutput(self: *Self) void {
+            self.writeRaw(Backend.SYNC_OUTPUT_END);
         }
 
         /// Flush buffered output to the terminal.
@@ -1857,4 +1899,44 @@ test "regression: Output writer interface works with fmt" {
     const w = out.writer();
     try std.fmt.format(w, "Value: {d}", .{42});
     try std.testing.expectEqualStrings("Value: 42", out.buffer[0..out.pos]);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Synchronized output (DEC Mode 2026)
+// ============================================================
+
+test "behavior: sync output escape sequences are correct" {
+    try std.testing.expectEqualStrings("\x1b[?2026h", Backend.SYNC_OUTPUT_BEGIN);
+    try std.testing.expectEqualStrings("\x1b[?2026l", Backend.SYNC_OUTPUT_END);
+}
+
+test "sanity: TerminalType.supportsSyncOutput" {
+    try std.testing.expect(TerminalType.kitty.supportsSyncOutput());
+    try std.testing.expect(TerminalType.wezterm.supportsSyncOutput());
+    try std.testing.expect(TerminalType.alacritty.supportsSyncOutput());
+    try std.testing.expect(!TerminalType.cmd_exe.supportsSyncOutput());
+    try std.testing.expect(!TerminalType.linux_console.supportsSyncOutput());
+    try std.testing.expect(!TerminalType.unknown.supportsSyncOutput());
+}
+
+test "behavior: Output.beginSyncOutput writes correct sequence" {
+    const TestOutput = Output(256);
+    const handle = if (is_windows)
+        (windows.GetStdHandle(windows.STD_OUTPUT_HANDLE) catch unreachable)
+    else
+        std.posix.STDOUT_FILENO;
+    var out = TestOutput.initWithColorSystem(handle, .truecolor);
+    out.beginSyncOutput();
+    try std.testing.expectEqualStrings("\x1b[?2026h", out.buffer[0..out.pos]);
+}
+
+test "behavior: Output.endSyncOutput writes correct sequence" {
+    const TestOutput = Output(256);
+    const handle = if (is_windows)
+        (windows.GetStdHandle(windows.STD_OUTPUT_HANDLE) catch unreachable)
+    else
+        std.posix.STDOUT_FILENO;
+    var out = TestOutput.initWithColorSystem(handle, .truecolor);
+    out.endSyncOutput();
+    try std.testing.expectEqualStrings("\x1b[?2026l", out.buffer[0..out.pos]);
 }

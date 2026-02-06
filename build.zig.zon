@@ -1,12 +1,12 @@
 .{
     .name = .zithril,
-    .version = "0.7.2",
+    .version = "0.10.0",
     .fingerprint = 0xaf01d6c98876eadb, // Changing this has security and trust implications.
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .rich_zig = .{
-            .url = "git+https://github.com/hotschmoe/rich_zig#2a5a02620b6c1d904441a03321b3921a58cf7541",
-            .hash = "rich_zig-1.1.2-cZcAnLIXCwCEu81UIp4Y6AgoGwoqYra-Ub-CUV7FcuC3",
+            .url = "git+https://github.com/hotschmoe/rich_zig?ref=v1.4.1#cd37c050cc7ce0414b81fa61e1e14f702ee04563",
+            .hash = "rich_zig-1.4.1-cZcAnKdFDACT8IHmL0fvgpUUnI1rcaAP7IsB66Qh7zpY",
         },
     },
     .paths = .{

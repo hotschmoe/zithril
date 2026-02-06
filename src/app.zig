@@ -316,6 +316,11 @@ pub fn App(comptime State: type) type {
             // Use buffered output with rich_zig ANSI rendering
             var out = backend_mod.DefaultOutput.init(backend.handle);
 
+            // Begin synchronized output to prevent tearing
+            if (backend.capabilities.sync_output) {
+                out.beginSyncOutput();
+            }
+
             var last_x: ?u16 = null;
             var last_y: ?u16 = null;
 
@@ -346,6 +351,11 @@ pub fn App(comptime State: type) type {
 
             // Reset style at the end
             out.resetStyle();
+
+            // End synchronized output
+            if (backend.capabilities.sync_output) {
+                out.endSyncOutput();
+            }
 
             // Flush buffered output to terminal
             out.flush();

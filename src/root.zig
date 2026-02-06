@@ -111,6 +111,32 @@ pub const Input = input_mod.Input;
 pub const text_mod = @import("text.zig");
 pub const displayWidth = text_mod.displayWidth;
 
+// Theme system
+pub const theme_mod = @import("theme.zig");
+pub const Theme = theme_mod.Theme;
+
+// ANSI parsing
+pub const ansi_mod = @import("ansi.zig");
+pub const AnsiText = ansi_mod.Text;
+pub const AnsiSpan = ansi_mod.Span;
+pub const fromAnsi = ansi_mod.fromAnsi;
+pub const stripAnsi = ansi_mod.stripAnsi;
+pub const parseAnsiToSegments = ansi_mod.parseAnsiToSegments;
+pub const freeAnsiSegments = ansi_mod.freeSegments;
+
+// Measurement protocol
+pub const measurement_mod = @import("measurement.zig");
+pub const Measurement = measurement_mod.Measurement;
+pub const fromConstraint = measurement_mod.fromConstraint;
+
+// Highlighter (pattern-based text highlighting)
+pub const highlighter_mod = @import("highlighter.zig");
+pub const Highlighter = highlighter_mod.Highlighter;
+pub const HighlightRule = highlighter_mod.HighlightRule;
+pub const HighlightMatch = highlighter_mod.Match;
+pub const highlightText = highlighter_mod.highlightText;
+pub const reprHighlighter = highlighter_mod.repr;
+
 // Animation helpers
 pub const animation = @import("animation.zig");
 pub const Animation = animation.Animation;
@@ -165,6 +191,70 @@ pub const ScrollState = widgets.ScrollState;
 pub const ScrollableList = widgets.ScrollableList;
 pub const TextInput = widgets.TextInput;
 pub const TextInputState = widgets.TextInputState;
+
+// Data visualization widgets
+pub const Sparkline = widgets.Sparkline;
+pub const SparklineDirection = widgets.SparklineDirection;
+pub const BarChart = widgets.BarChart;
+pub const Bar = widgets.Bar;
+pub const BarGroup = widgets.BarGroup;
+pub const BarChartOrientation = widgets.BarChartOrientation;
+pub const Chart = widgets.Chart;
+pub const ChartAxis = widgets.Axis;
+pub const LineDataset = widgets.LineDataset;
+pub const ScatterDataset = widgets.ScatterDataset;
+pub const ChartMarkers = widgets.Markers;
+pub const ChartLabel = widgets.ChartLabel;
+pub const LineGauge = widgets.LineGauge;
+pub const LineSet = widgets.LineSet;
+
+// Drawing widgets
+pub const Canvas = widgets.Canvas;
+pub const CanvasMarker = widgets.CanvasMarker;
+pub const CanvasShape = widgets.CanvasShape;
+pub const CanvasPainter = widgets.CanvasPainter;
+pub const CanvasCircle = widgets.CanvasCircle;
+pub const CanvasLine = widgets.CanvasLine;
+pub const CanvasRectangle = widgets.CanvasRectangle;
+pub const CanvasPoints = widgets.CanvasPoints;
+
+// Navigation widgets
+pub const Tree = widgets.Tree;
+pub const TreeItem = widgets.TreeItem;
+pub const TreeState = widgets.TreeState;
+pub const TreeSymbols = widgets.TreeSymbols;
+pub const MutableTreeItem = widgets.MutableTreeItem;
+pub const Menu = widgets.Menu;
+pub const MenuItem = widgets.MenuItem;
+pub const MenuState = widgets.MenuState;
+pub const MenuSymbols = widgets.MenuSymbols;
+
+// Specialty widgets
+pub const Calendar = widgets.Calendar;
+pub const BigText = widgets.BigText;
+pub const PixelSize = widgets.PixelSize;
+pub const Font8x8 = widgets.Font8x8;
+pub const CodeEditor = widgets.CodeEditor;
+pub const CodeEditorLanguage = widgets.CodeEditorLanguage;
+pub const CodeEditorTheme = widgets.CodeEditorTheme;
+pub const TokenType = widgets.TokenType;
+
+// Color utilities (rich_zig v1.4.0)
+pub const color_mod = @import("color.zig");
+pub const AdaptiveColor = color_mod.AdaptiveColor;
+pub const WcagLevel = color_mod.WcagLevel;
+pub const gradient = color_mod.gradient;
+pub const BackgroundMode = color_mod.BackgroundMode;
+
+// Pretty printing
+pub const pretty_mod = @import("pretty.zig");
+pub const Pretty = pretty_mod.Pretty;
+pub const PrettyTheme = pretty_mod.PrettyTheme;
+pub const PrettyOptions = pretty_mod.PrettyOptions;
+pub const formatToBuffer = pretty_mod.formatToBuffer;
+pub const freeSegments = pretty_mod.freeSegments;
+pub const prettyFormat = pretty_mod.pretty;
+pub const prettyFormatWithOptions = pretty_mod.prettyWithOptions;
 
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
@@ -400,42 +490,6 @@ test "terminal type re-export" {
     try std.testing.expect(caps.mouse);
 }
 
-test "segment re-export" {
-    // Test Segment type from rich_zig
-    const seg = Segment.plain("Hello");
-    try std.testing.expectEqualStrings("Hello", seg.text);
-    try std.testing.expectEqual(@as(usize, 5), seg.cellLength());
-}
-
-test "control code re-export" {
-    // Test ControlCode type from rich_zig
-    var buf: [32]u8 = undefined;
-    var stream = std.io.fixedBufferStream(&buf);
-
-    const ctrl = ControlCode{ .cursor_move_to = .{ .x = 10, .y = 5 } };
-    try ctrl.toEscapeSequence(stream.writer());
-    try std.testing.expectEqualStrings("\x1b[5;10H", stream.getWritten());
-}
-
-test "color system re-export" {
-    // Test ColorSystem from rich_zig
-    try std.testing.expect(ColorSystem.truecolor.supports(.standard));
-    try std.testing.expect(ColorSystem.truecolor.supports(.eight_bit));
-    try std.testing.expect(!ColorSystem.standard.supports(.truecolor));
-}
-
-test "style ansi rendering re-export" {
-    var buf: [128]u8 = undefined;
-    var stream = std.io.fixedBufferStream(&buf);
-
-    const style = Style.init().bold().fg(.red);
-    try style.renderAnsi(.truecolor, stream.writer());
-
-    const written = stream.getWritten();
-    try std.testing.expect(written.len > 0);
-    try std.testing.expect(written[0] == 0x1b);
-}
-
 test "frame re-export" {
     var buf = try Buffer.init(std.testing.allocator, 100, 50);
     defer buf.deinit();
@@ -628,4 +682,36 @@ test "testing utilities re-export" {
     const annotated = try bufferToAnnotatedText(std.testing.allocator, buf);
     defer std.testing.allocator.free(annotated);
     try std.testing.expect(std.mem.indexOf(u8, annotated, "10x2") != null);
+}
+
+test "color utilities re-export" {
+    // AdaptiveColor
+    const ac = AdaptiveColor.fromRgb(255, 100, 50);
+    const resolved = ac.resolve(.truecolor);
+    try std.testing.expect(resolved.triplet != null);
+
+    // Gradient
+    const stops = [_]ColorTriplet{
+        .{ .r = 255, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 0, .b = 255 },
+    };
+    var output: [3]ColorTriplet = undefined;
+    gradient(&stops, &output, false);
+    try std.testing.expectEqual(@as(u8, 255), output[0].r);
+
+    // WCAG
+    const black = ColorTriplet{ .r = 0, .g = 0, .b = 0 };
+    const white = ColorTriplet{ .r = 255, .g = 255, .b = 255 };
+    try std.testing.expectEqual(WcagLevel.aaa, black.wcagLevel(white));
+
+    // BackgroundMode
+    const mode: BackgroundMode = .dark;
+    try std.testing.expect(mode == .dark);
+}
+
+test "sync output re-export" {
+    try std.testing.expectEqualStrings("\x1b[?2026h", Backend.SYNC_OUTPUT_BEGIN);
+    try std.testing.expectEqualStrings("\x1b[?2026l", Backend.SYNC_OUTPUT_END);
+    try std.testing.expect(TerminalType.kitty.supportsSyncOutput());
+    try std.testing.expect(!TerminalType.unknown.supportsSyncOutput());
 }

@@ -152,11 +152,16 @@ A Zig TUI framework for building terminal user interfaces. Immediate mode render
 ## Zig Toolchain
 
 ```bash
-zig build                    # Build library
+zig build                       # Build library
 zig build run-example-counter   # Run counter example
 zig build run-example-ralph     # Run reference app
-zig build test               # Run all tests
-zig fmt src/                 # Format before commits
+zig build run-rung              # Run ladder logic demo
+zig build run-dashboard         # Run system dashboard demo
+zig build run-explorer          # Run file explorer demo
+zig build run-dataviz           # Run data visualization gallery
+zig build run-showcase          # Run rich text feature showcase
+zig build test                  # Run all tests
+zig fmt src/                    # Format before commits
 ```
 
 ---
@@ -190,9 +195,13 @@ zig fmt src/                 # Format before commits
 |                  zithril                          |
 |  App        Event loop, terminal setup/teardown  |
 |  Frame      Layout methods, render dispatch      |
-|  Layout     Constraint solver                    |
+|  Layout     Constraint solver + Measurement      |
 |  Buffer     Cell grid with diff support          |
 |  Widgets    Block, List, Table, Gauge, Text...   |
+|  Theme      Named style registry                 |
+|  ANSI       Parse/strip escape sequences         |
+|  Highlight  Pattern-based text highlighting      |
+|  Pretty     Comptime Zig value formatter         |
 +--------------------------------------------------+
                       |
                       v
@@ -221,6 +230,7 @@ zig fmt src/                 # Format before commits
 | `.max(n)` | At most n cells |
 | `.flex(n)` | Proportional share (like CSS flex-grow) |
 | `.ratio(a, b)` | Fraction a/b of available space |
+| `.percentage(n)` | n% of available space (0-100) |
 
 ### Event
 
@@ -330,7 +340,7 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
 
 ---
 
-## Built-in Widgets
+## Built-in Widgets (22)
 
 | Widget | Purpose |
 |--------|---------|
@@ -340,8 +350,35 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
 | `List` | Navigable item list |
 | `Table` | Rows/columns with headers |
 | `Gauge` | Progress bar |
+| `LineGauge` | Compact single-line progress |
 | `Tabs` | Tab headers |
 | `Scrollbar` | Scroll indicator |
+| `Clear` | Fill area with style |
+| `ScrollView` | Virtual scrolling container |
+| `ScrollableList` | List + scrolling combined |
+| `TextInput` | Single-line text input with cursor |
+| `Sparkline` | Inline trend graph |
+| `BarChart` | Grouped vertical/horizontal bars |
+| `Chart` | XY line and scatter plots |
+| `Canvas` | Arbitrary shape drawing |
+| `Tree` | Hierarchical expand/collapse |
+| `Menu` | Nested dropdown menu |
+| `Calendar` | Monthly calendar picker |
+| `BigText` | Large 8x8 bitmap text |
+| `CodeEditor` | Syntax-highlighted code viewer |
+
+## Rich Text Modules (6)
+
+Wrappers around rich_zig v1.3.0 features:
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `Theme` | `src/theme.zig` | Named style registry (define once, look up by name) |
+| `ANSI` | `src/ansi.zig` | Parse/strip ANSI escape sequences, convert to Segments |
+| `Measurement` | `src/measurement.zig` | Min/max width measurement, constraint conversion |
+| `Highlighter` | `src/highlighter.zig` | Pattern-based text highlighting (numbers, bools, strings, URLs) |
+| `Pretty` | `src/pretty.zig` | Comptime pretty printer for Zig values |
+| `Style attrs` | `src/style.zig` | underline2 (SGR 21), frame (SGR 51), encircle (SGR 52), overline (SGR 53) |
 
 ---
 
@@ -455,14 +492,30 @@ When making commits, update `version` in `build.zig.zon`:
 ## Roadmap
 
 - [x] Core rendering loop
-- [x] Basic widgets (Block, Text, List, Table, Gauge)
-- [x] Constraint-based layout
+- [x] Basic widgets (Block, Text, List, Table, Gauge, Tabs, Scrollbar)
+- [x] Constraint-based layout (length, min, max, flex, ratio, percentage)
+- [x] Flex alignment modes (start, end, center, space_between, etc.)
+- [x] Padding, Margin, Spacing types
 - [x] Keyboard input
-- [ ] Mouse support
-- [ ] Scrollable containers
-- [ ] Text input widget
-- [ ] Command/async pattern
-- [ ] Animation helpers
+- [x] Mouse support (parsing, hit testing, hover, drag, scroll)
+- [x] Scrollable containers (ScrollView, ScrollableList)
+- [x] Text input widget (TextInput)
+- [x] Command/async pattern (types defined)
+- [x] Animation helpers (easing, keyframes, interpolation)
+- [x] Graphics protocol detection (Sixel, Kitty, iTerm2)
+- [x] Testing utilities (recorder, player, mock backend)
+- [x] Data visualization (Sparkline, BarChart, Chart, Canvas, LineGauge)
+- [x] Navigation widgets (Tree, Menu, Calendar)
+- [x] Specialty widgets (BigText, CodeEditor)
+- [x] Theming system (named style registry)
+- [x] ANSI parsing (fromAnsi, stripAnsi, parseAnsiToSegments)
+- [x] Pattern highlighting (repr, custom rules)
+- [x] Pretty printing (comptime Zig value formatter)
+- [x] Measurement protocol (constraint-to-measurement conversion)
+- [x] Extended style attributes (underline2, frame, encircle, overline)
+- [ ] Mouse event wiring to app event loop
+- [ ] Async command dispatch in runtime
+- [ ] Image rendering via graphics protocols
 
 
 <!-- br-agent-instructions-v1 -->
