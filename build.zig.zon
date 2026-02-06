@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .rich_zig = .{
-            .url = "git+https://github.com/hotschmoe/rich_zig?ref=v1.3.0#61e7fa6b7526dec738d900743d62541c3ec0db9c",
-            .hash = "rich_zig-1.3.0-cZcAnB4LDACw9k60iC5T1fm6PUPp01JYOkqgCk7ukeHu",
+            .url = "git+https://github.com/hotschmoe/rich_zig?ref=v1.4.1#cd37c050cc7ce0414b81fa61e1e14f702ee04563",
+            .hash = "rich_zig-1.4.1-cZcAnKdFDACT8IHmL0fvgpUUnI1rcaAP7IsB66Qh7zpY",
         },
     },
     .paths = .{
