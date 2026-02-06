@@ -166,6 +166,7 @@ pub const TestRecorder = testing.TestRecorder;
 pub const TestPlayer = testing.TestPlayer;
 pub const MockBackend = testing.MockBackend;
 pub const Snapshot = testing.Snapshot;
+pub const TestHarness = testing.TestHarness;
 pub const bufferToAnnotatedText = testing.bufferToAnnotatedText;
 pub const expectCell = testing.expectCell;
 pub const expectCellStyle = testing.expectCellStyle;
