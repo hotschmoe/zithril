@@ -2,6 +2,7 @@ const std = @import("std");
 const zithril = @import("zithril");
 
 const FrameType = zithril.Frame(zithril.App(State).DefaultMaxWidgets);
+const ColorTriplet = zithril.ColorTriplet;
 
 const State = struct {
     tick_count: u32 = 0,
@@ -71,34 +72,205 @@ fn view(state: *State, frame: *FrameType) void {
     const panel_rows = zithril.layout(mid, .vertical, &.{
         zithril.Constraint.flexible(1),
         zithril.Constraint.flexible(1),
-    });
-
-    const top_cols = zithril.layout(panel_rows.get(0), .horizontal, &.{
-        zithril.Constraint.flexible(1),
-        zithril.Constraint.flexible(1),
         zithril.Constraint.flexible(1),
     });
 
-    const bot_cols = zithril.layout(panel_rows.get(1), .horizontal, &.{
+    const row1_cols = zithril.layout(panel_rows.get(0), .horizontal, &.{
         zithril.Constraint.flexible(1),
         zithril.Constraint.flexible(1),
         zithril.Constraint.flexible(1),
     });
 
-    renderThemePanel(state, frame, top_cols.get(0));
-    renderAnsiPanel(state, frame, top_cols.get(1));
-    renderHighlighterPanel(state, frame, top_cols.get(2));
-    renderPrettyPanel(state, frame, bot_cols.get(0));
-    renderNewStylesPanel(state, frame, bot_cols.get(1));
-    renderMeasurementPanel(state, frame, bot_cols.get(2));
+    const row2_cols = zithril.layout(panel_rows.get(1), .horizontal, &.{
+        zithril.Constraint.flexible(1),
+        zithril.Constraint.flexible(1),
+        zithril.Constraint.flexible(1),
+    });
+
+    const row3_cols = zithril.layout(panel_rows.get(2), .horizontal, &.{
+        zithril.Constraint.flexible(1),
+        zithril.Constraint.flexible(1),
+        zithril.Constraint.flexible(1),
+    });
+
+    // Row 1: Original panels
+    renderThemePanel(state, frame, row1_cols.get(0));
+    renderNewStylesPanel(state, frame, row1_cols.get(1));
+    renderHighlighterPanel(state, frame, row1_cols.get(2));
+
+    // Row 2: v1.4.0 feature panels
+    renderAdaptivePanel(state, frame, row2_cols.get(0));
+    renderGradientPanel(state, frame, row2_cols.get(1));
+    renderWcagPanel(state, frame, row2_cols.get(2));
+
+    // Row 3: More panels
+    renderAnsiPanel(state, frame, row3_cols.get(0));
+    renderPrettyPanel(state, frame, row3_cols.get(1));
+    renderMeasurementPanel(state, frame, row3_cols.get(2));
 
     var status_buf: [80]u8 = undefined;
-    const status = std.fmt.bufPrint(&status_buf, " q:quit | Phase: {d}/4 | Tick: {d}", .{ state.phase() + 1, state.tick_count }) catch " q:quit";
+    const status = std.fmt.bufPrint(&status_buf, " q:quit | Phase: {d}/4 | Tick: {d} | Sync Output: active", .{ state.phase() + 1, state.tick_count }) catch " q:quit";
     frame.render(zithril.Text{
         .content = status,
         .style = zithril.Style.init().bg(.blue).fg(.white),
     }, rows.get(2));
 }
+
+// -- v1.4.0 Feature Panels --
+
+fn renderAdaptivePanel(_: *const State, frame: *FrameType, area: zithril.Rect) void {
+    const lines = panelLines(frame, area, "Adaptive Colors", zithril.Color.fromRgb(255, 165, 0)) orelse return;
+
+    const ac = zithril.AdaptiveColor.init(
+        zithril.Color.fromRgb(255, 100, 50),
+        zithril.Color.from256(208),
+        zithril.Color.red,
+    );
+
+    frame.render(zithril.Text{
+        .content = "AdaptiveColor: RGB(255,100,50)",
+        .style = zithril.Style.init().bold(),
+    }, lines.get(0));
+
+    const tc = ac.resolve(.truecolor);
+    frame.render(zithril.Text{
+        .content = "  truecolor -> RGB direct",
+        .style = zithril.Style.init().fg(tc),
+    }, lines.get(1));
+
+    const e8 = ac.resolve(.eight_bit);
+    frame.render(zithril.Text{
+        .content = "  256-color -> index 208",
+        .style = zithril.Style.init().fg(e8),
+    }, lines.get(2));
+
+    const std16 = ac.resolve(.standard);
+    frame.render(zithril.Text{
+        .content = "  16-color  -> red",
+        .style = zithril.Style.init().fg(std16),
+    }, lines.get(3));
+
+    frame.render(zithril.Text{
+        .content = "Auto-degrades per terminal",
+        .style = zithril.Style.init().dim(),
+    }, lines.get(4));
+}
+
+fn renderGradientPanel(_: *const State, frame: *FrameType, area: zithril.Rect) void {
+    const lines = panelLines(frame, area, "Color Gradients", zithril.Color.fromRgb(128, 0, 255)) orelse return;
+
+    // RGB gradient: red -> blue
+    const rgb_stops = [_]ColorTriplet{
+        .{ .r = 255, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 0, .b = 255 },
+    };
+    var rgb_out: [5]ColorTriplet = undefined;
+    zithril.gradient(&rgb_stops, &rgb_out, false);
+
+    // HSL gradient: red -> green (goes through yellow)
+    const hsl_stops = [_]ColorTriplet{
+        .{ .r = 255, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 255, .b = 0 },
+    };
+    var hsl_out: [5]ColorTriplet = undefined;
+    zithril.gradient(&hsl_stops, &hsl_out, true);
+
+    frame.render(zithril.Text{
+        .content = "RGB red->blue:",
+        .style = zithril.Style.init().bold(),
+    }, lines.get(0));
+
+    // Show RGB gradient as colored text
+    var rgb_buf: [40]u8 = undefined;
+    const rgb_text = std.fmt.bufPrint(&rgb_buf, " #{x:0>2}{x:0>2}{x:0>2} #{x:0>2}{x:0>2}{x:0>2} #{x:0>2}{x:0>2}{x:0>2}", .{
+        rgb_out[0].r, rgb_out[0].g, rgb_out[0].b,
+        rgb_out[2].r, rgb_out[2].g, rgb_out[2].b,
+        rgb_out[4].r, rgb_out[4].g, rgb_out[4].b,
+    }) catch " gradient";
+    frame.render(zithril.Text{
+        .content = rgb_text,
+        .style = zithril.Style.init().fg(zithril.Color.fromRgb(rgb_out[2].r, rgb_out[2].g, rgb_out[2].b)),
+    }, lines.get(1));
+
+    frame.render(zithril.Text{
+        .content = "HSL red->green:",
+        .style = zithril.Style.init().bold(),
+    }, lines.get(2));
+
+    var hsl_buf: [40]u8 = undefined;
+    const hsl_text = std.fmt.bufPrint(&hsl_buf, " #{x:0>2}{x:0>2}{x:0>2} #{x:0>2}{x:0>2}{x:0>2} #{x:0>2}{x:0>2}{x:0>2}", .{
+        hsl_out[0].r, hsl_out[0].g, hsl_out[0].b,
+        hsl_out[2].r, hsl_out[2].g, hsl_out[2].b,
+        hsl_out[4].r, hsl_out[4].g, hsl_out[4].b,
+    }) catch " gradient";
+    frame.render(zithril.Text{
+        .content = hsl_text,
+        .style = zithril.Style.init().fg(zithril.Color.fromRgb(hsl_out[2].r, hsl_out[2].g, hsl_out[2].b)),
+    }, lines.get(3));
+
+    frame.render(zithril.Text{
+        .content = "HSL avoids muddy midpoints",
+        .style = zithril.Style.init().dim(),
+    }, lines.get(4));
+}
+
+fn renderWcagPanel(_: *const State, frame: *FrameType, area: zithril.Rect) void {
+    const lines = panelLines(frame, area, "WCAG Contrast", zithril.Color.fromRgb(0, 200, 100)) orelse return;
+
+    const black = ColorTriplet{ .r = 0, .g = 0, .b = 0 };
+    const white = ColorTriplet{ .r = 255, .g = 255, .b = 255 };
+    const gray = ColorTriplet{ .r = 150, .g = 150, .b = 150 };
+
+    var buf0: [40]u8 = undefined;
+    var buf1: [40]u8 = undefined;
+    var buf2: [40]u8 = undefined;
+
+    const bw_ratio = black.contrastRatio(white);
+    const s0 = std.fmt.bufPrint(&buf0, "Blk/Wht: {d:.1}:1 AAA", .{bw_ratio}) catch "?";
+    frame.render(zithril.Text{
+        .content = "WCAG 2.1 Contrast Ratios:",
+        .style = zithril.Style.init().bold(),
+    }, lines.get(0));
+    frame.render(zithril.Text{
+        .content = s0,
+        .style = zithril.Style.init().fg(.green),
+    }, lines.get(1));
+
+    const gw_ratio = gray.contrastRatio(white);
+    const gw_level = gray.wcagLevel(white);
+    const level_str = switch (gw_level) {
+        .fail => "FAIL",
+        .aa_large => "AA-lg",
+        .aa => "AA",
+        .aaa => "AAA",
+    };
+    const s1 = std.fmt.bufPrint(&buf1, "Gry/Wht: {d:.1}:1 {s}", .{ gw_ratio, level_str }) catch "?";
+    frame.render(zithril.Text{
+        .content = s1,
+        .style = zithril.Style.init().fg(if (gw_level == .fail) zithril.Color.red else zithril.Color.yellow),
+    }, lines.get(2));
+
+    const gb_ratio = gray.contrastRatio(black);
+    const gb_level = gray.wcagLevel(black);
+    const gb_str = switch (gb_level) {
+        .fail => "FAIL",
+        .aa_large => "AA-lg",
+        .aa => "AA",
+        .aaa => "AAA",
+    };
+    const s2 = std.fmt.bufPrint(&buf2, "Gry/Blk: {d:.1}:1 {s}", .{ gb_ratio, gb_str }) catch "?";
+    frame.render(zithril.Text{
+        .content = s2,
+        .style = zithril.Style.init().fg(.cyan),
+    }, lines.get(3));
+
+    frame.render(zithril.Text{
+        .content = "4.5:1=AA, 7:1=AAA",
+        .style = zithril.Style.init().dim(),
+    }, lines.get(4));
+}
+
+// -- Original Panels --
 
 fn renderThemePanel(state: *const State, frame: *FrameType, area: zithril.Rect) void {
     const lines = panelLines(frame, area, "Theme", .cyan) orelse return;
@@ -164,7 +336,7 @@ fn renderPrettyPanel(state: *const State, frame: *FrameType, area: zithril.Rect)
     if (p == 0 or p == 1) {
         frame.render(zithril.Text{ .content = "struct {", .style = zithril.Style.init().fg(.white) }, lines.get(0));
         frame.render(zithril.Text{ .content = "  .name = \"zithril\"", .style = zithril.Style.init().fg(.yellow) }, lines.get(1));
-        frame.render(zithril.Text{ .content = "  .version = 9", .style = zithril.Style.init().fg(.cyan).bold() }, lines.get(2));
+        frame.render(zithril.Text{ .content = "  .version = 10", .style = zithril.Style.init().fg(.cyan).bold() }, lines.get(2));
         frame.render(zithril.Text{ .content = "  .stable = true", .style = zithril.Style.init().fg(.green).italic() }, lines.get(3));
         frame.render(zithril.Text{ .content = "}", .style = zithril.Style.init().fg(.white) }, lines.get(4));
     } else {

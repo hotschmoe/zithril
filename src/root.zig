@@ -239,6 +239,13 @@ pub const CodeEditorLanguage = widgets.CodeEditorLanguage;
 pub const CodeEditorTheme = widgets.CodeEditorTheme;
 pub const TokenType = widgets.TokenType;
 
+// Color utilities (rich_zig v1.4.0)
+pub const color_mod = @import("color.zig");
+pub const AdaptiveColor = color_mod.AdaptiveColor;
+pub const WcagLevel = color_mod.WcagLevel;
+pub const gradient = color_mod.gradient;
+pub const BackgroundMode = color_mod.BackgroundMode;
+
 // Pretty printing
 pub const pretty_mod = @import("pretty.zig");
 pub const Pretty = pretty_mod.Pretty;
@@ -675,4 +682,36 @@ test "testing utilities re-export" {
     const annotated = try bufferToAnnotatedText(std.testing.allocator, buf);
     defer std.testing.allocator.free(annotated);
     try std.testing.expect(std.mem.indexOf(u8, annotated, "10x2") != null);
+}
+
+test "color utilities re-export" {
+    // AdaptiveColor
+    const ac = AdaptiveColor.fromRgb(255, 100, 50);
+    const resolved = ac.resolve(.truecolor);
+    try std.testing.expect(resolved.triplet != null);
+
+    // Gradient
+    const stops = [_]ColorTriplet{
+        .{ .r = 255, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 0, .b = 255 },
+    };
+    var output: [3]ColorTriplet = undefined;
+    gradient(&stops, &output, false);
+    try std.testing.expectEqual(@as(u8, 255), output[0].r);
+
+    // WCAG
+    const black = ColorTriplet{ .r = 0, .g = 0, .b = 0 };
+    const white = ColorTriplet{ .r = 255, .g = 255, .b = 255 };
+    try std.testing.expectEqual(WcagLevel.aaa, black.wcagLevel(white));
+
+    // BackgroundMode
+    const mode: BackgroundMode = .dark;
+    try std.testing.expect(mode == .dark);
+}
+
+test "sync output re-export" {
+    try std.testing.expectEqualStrings("\x1b[?2026h", Backend.SYNC_OUTPUT_BEGIN);
+    try std.testing.expectEqualStrings("\x1b[?2026l", Backend.SYNC_OUTPUT_END);
+    try std.testing.expect(TerminalType.kitty.supportsSyncOutput());
+    try std.testing.expect(!TerminalType.unknown.supportsSyncOutput());
 }
