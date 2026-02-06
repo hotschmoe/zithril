@@ -8,11 +8,14 @@ const zithril = @import("zithril");
 const game = @import("game.zig");
 const levels = @import("levels.zig");
 
+const ladder = @import("ladder.zig");
+
 const LadderCell = game.Cell;
 const Diagram = game.Diagram;
 const Position = game.Position;
 const ComponentType = game.ComponentType;
 const Mode = game.Mode;
+const SimPhase = game.SimPhase;
 const Level = levels.Level;
 
 const Buffer = zithril.Buffer;
@@ -53,7 +56,8 @@ const BufWriter = struct {
 const C = struct {
     const rail = Style.init().fg(Color.from256(33)).bold();
     const wire = Style.init().fg(Color.from256(252));
-    const junction = Style.init().fg(Color.from256(214)).bold();
+    const wire_v = Style.init().fg(Color.from256(246)).bold();
+    const junction_style = Style.init().fg(Color.from256(214)).bg(Color.from256(236)).bold();
 
     const contact_no = Style.init().fg(Color.from256(82));
     const contact_nc = Style.init().fg(Color.from256(220)).bold();
@@ -63,15 +67,22 @@ const C = struct {
 
     const cursor = Style.init().fg(Color.from256(0)).bg(Color.from256(51)).bold();
 
+    const power_behind = Style.init().bg(Color.from256(22));
+    const power_front = Style.init().fg(Color.from256(226)).bg(Color.from256(28)).bold();
+    const power_blocked = Style.init().bg(Color.from256(52));
+
     const pass = Style.init().fg(Color.from256(46)).bold();
     const fail = Style.init().fg(Color.from256(196)).bold();
     const untested = Style.init().fg(Color.from256(240));
+    const active_row = Style.init().fg(Color.from256(255)).bg(Color.from256(17)).bold();
+    const mismatch = Style.init().fg(Color.from256(196)).bg(Color.from256(52)).bold();
 
     const header = Style.init().fg(Color.from256(51)).bold();
     const header_accent = Style.init().fg(Color.from256(214)).bold();
     const title = Style.init().fg(Color.from256(255)).bold();
     const hint = Style.init().fg(Color.from256(245));
     const dim = Style.init().fg(Color.from256(238));
+    const conn_hint = Style.init().fg(Color.from256(240));
     const highlight = Style.init().fg(Color.from256(226)).bold();
     const story = Style.init().fg(Color.from256(183));
 
@@ -172,6 +183,10 @@ pub const DiagramWidget = struct {
     editing: bool,
     input_names: []const []const u8,
     output_names: []const []const u8,
+    powered_cells: *const [16][16]bool,
+    sim_depth: *const [16][16]u8,
+    sim_visible_depth: u8,
+    sim_active: bool,
 
     pub fn render(self: DiagramWidget, area: Rect, buf: *Buffer) void {
         const block = zithril.Block{
@@ -199,22 +214,30 @@ pub const DiagramWidget = struct {
                 const cell = self.diagram.get(x, y);
                 const is_cursor = self.editing and x == self.cursor.x and y == self.cursor.y;
 
-                self.renderLadderCell(buf, screen_x, screen_y, cell, is_cursor, cell_width);
+                self.renderLadderCell(buf, screen_x, screen_y, cell, is_cursor, cell_width, x, y);
             }
+        }
+
+        // Connection hints: show arrows near cursor on junction/wire_v
+        if (self.editing) {
+            self.renderConnectionHints(buf, inner, cell_width);
         }
 
         // Description area below diagram
         const desc_y = inner.y + @as(u16, @intCast(self.diagram.height)) + 1;
         if (desc_y < inner.y + inner.height) {
-            buf.setString(inner.x + 1, desc_y, "Arrows:Move  Space:Place  Tab:Cycle  Enter:Sim", C.hint);
+            const hint_str = if (self.sim_active)
+                "Space:Skip row  Enter:Skip all  Esc:Cancel"
+            else
+                "Arrows:Move  Space:Place  Tab:Cycle  Enter:Sim";
+            buf.setString(inner.x + 1, desc_y, hint_str, C.hint);
         }
         if (desc_y + 1 < inner.y + inner.height) {
             buf.setString(inner.x + 1, desc_y + 1, "?:Help  L:Levels  D:Description  Ctrl+Z:Undo", C.dim);
         }
     }
 
-    fn renderLadderCell(self: DiagramWidget, buf: *Buffer, x: u16, y: u16, cell: LadderCell, is_cursor: bool, width: u16) void {
-        // Build the cell visual representation
+    fn renderLadderCell(self: DiagramWidget, buf: *Buffer, x: u16, y: u16, cell: LadderCell, is_cursor: bool, width: u16, grid_x: usize, grid_y: usize) void {
         var str_buf: [5]u8 = undefined;
         const display: struct { str: []const u8, style: Style } = switch (cell) {
             .empty => .{
@@ -229,13 +252,13 @@ pub const DiagramWidget = struct {
                 const mid = width / 2;
                 @memset(&str_buf, ' ');
                 if (mid < str_buf.len) str_buf[mid] = '|';
-                break :blk .{ .str = str_buf[0..width], .style = C.wire };
+                break :blk .{ .str = str_buf[0..width], .style = C.wire_v };
             },
             .junction => blk: {
                 @memset(&str_buf, '-');
                 const mid = width / 2;
                 if (mid < str_buf.len) str_buf[mid] = '+';
-                break :blk .{ .str = str_buf[0..width], .style = C.junction };
+                break :blk .{ .str = str_buf[0..width], .style = C.junction_style };
             },
             .rail_left => blk: {
                 @memset(str_buf[0..width], ' ');
@@ -275,14 +298,87 @@ pub const DiagramWidget = struct {
             },
         };
 
-        const final_style = if (is_cursor) C.cursor else display.style;
+        // Determine final style: cursor > power > base
+        const final_style = if (is_cursor)
+            C.cursor
+        else if (self.sim_active)
+            self.powerStyle(display.style, grid_x, grid_y)
+        else
+            display.style;
+
         buf.setString(x, y, display.str, final_style);
     }
 
-    fn fillBuf(buf: *[5]u8, char: u8, width: u16) []const u8 {
+    fn powerStyle(self: DiagramWidget, base: Style, grid_x: usize, grid_y: usize) Style {
+        if (grid_y >= 16 or grid_x >= 16) return base;
+        const cell_depth = self.sim_depth[grid_y][grid_x];
+        if (cell_depth == 0) {
+            // Not powered; check if it could have been (contact blocked it)
+            if (self.powered_cells[grid_y][grid_x]) return base;
+            const cell = self.diagram.get(grid_x, grid_y);
+            return switch (cell) {
+                .contact_no, .contact_nc => applyBg(base, C.power_blocked),
+                else => base,
+            };
+        }
+        if (cell_depth == self.sim_visible_depth) {
+            return applyBg(C.power_front, C.power_front);
+        }
+        if (cell_depth < self.sim_visible_depth) {
+            return applyBg(base, C.power_behind);
+        }
+        return base;
+    }
+
+    fn applyBg(base_style: Style, bg_source: Style) Style {
+        var result = base_style;
+        result.inner.bgcolor = bg_source.inner.bgcolor;
+        return result;
+    }
+
+    fn renderConnectionHints(self: DiagramWidget, buf: *Buffer, inner: Rect, cell_width: u16) void {
+        const cx = self.cursor.x;
+        const cy = self.cursor.y;
+        const cell = self.diagram.get(cx, cy);
+
+        const show_h = (cell == .junction);
+        const show_v = (cell == .junction or cell == .wire_v);
+
+        if (!show_h and !show_v) return;
+
+        const dirs = [_]struct { dx: i32, dy: i32, arrow: []const u8, needs_h: bool, needs_v: bool }{
+            .{ .dx = -1, .dy = 0, .arrow = "<", .needs_h = true, .needs_v = false },
+            .{ .dx = 1, .dy = 0, .arrow = ">", .needs_h = true, .needs_v = false },
+            .{ .dx = 0, .dy = -1, .arrow = "^", .needs_h = false, .needs_v = true },
+            .{ .dx = 0, .dy = 1, .arrow = "v", .needs_h = false, .needs_v = true },
+        };
+
+        for (dirs) |d| {
+            if (d.needs_h and !show_h) continue;
+            if (d.needs_v and !show_v) continue;
+
+            const nx_i: i32 = @as(i32, @intCast(cx)) + d.dx;
+            const ny_i: i32 = @as(i32, @intCast(cy)) + d.dy;
+            if (nx_i < 0 or ny_i < 0) continue;
+            const nx: usize = @intCast(nx_i);
+            const ny: usize = @intCast(ny_i);
+            if (nx >= self.diagram.width or ny >= self.diagram.height) continue;
+
+            // Only show in empty cells
+            if (self.diagram.get(nx, ny) != .empty) continue;
+
+            const sx = inner.x + @as(u16, @intCast(nx)) * cell_width + cell_width / 2;
+            const sy = inner.y + @as(u16, @intCast(ny));
+            if (sx < inner.x + inner.width and sy < inner.y + inner.height) {
+                buf.setString(sx, sy, d.arrow, C.conn_hint);
+            }
+        }
+    }
+
+    fn fillBuf(b: *[5]u8, char: u8, width: u16) []const u8 {
         const w = @min(width, 5);
-        @memset(buf[0..w], char);
-        return buf[0..w];
+        @memset(b[0..w], char);
+        return b[0..w];
     }
 
     fn getInputLabel(self: DiagramWidget, idx: u8) u8 {
@@ -300,10 +396,14 @@ pub const DiagramWidget = struct {
     }
 };
 
-/// Truth table widget with color-coded results
+/// Truth table widget with INPUTS | EXPECT | GOT columns and active row
 pub const TruthTableWidget = struct {
     level: Level,
     results: []const bool,
+    sim_row: usize,
+    sim_phase: SimPhase,
+    sim_actual_outputs: *const [32][ladder.MAX_IO]bool,
+    sim_row_results: *const [32]?bool,
 
     pub fn render(self: TruthTableWidget, area: Rect, buf: *Buffer) void {
         const block = zithril.Block{
@@ -316,13 +416,14 @@ pub const TruthTableWidget = struct {
         const inner = block.inner(area);
         if (inner.height == 0 or inner.width == 0) return;
 
+        const animating = self.sim_phase != .idle;
         var y_offset: u16 = 0;
 
-        // Column header
-        var header_buf: [80]u8 = undefined;
+        // Column header: INPUTS | EXPECT | GOT |
+        var header_buf: [96]u8 = undefined;
         var writer = BufWriter.init(&header_buf);
 
-        writer.write("  ");
+        writer.write("   ");
         for (self.level.input_names) |name| {
             writer.write(name);
             writer.writeChar(' ');
@@ -332,19 +433,32 @@ pub const TruthTableWidget = struct {
             writer.write(name);
             writer.writeChar(' ');
         }
-        writer.write("| OK");
+        if (animating) {
+            writer.write("| ");
+            for (self.level.output_names) |name| {
+                writer.write(name);
+                writer.writeChar(' ');
+            }
+            writer.write("|");
+        } else {
+            writer.write("| OK");
+        }
 
         buf.setString(inner.x, inner.y + y_offset, writer.slice(), C.header);
+
+        // Sub-header labels
+        if (animating) {
+            buf.setString(inner.x, inner.y + y_offset, "   ", C.header);
+            // Find the positions for "EXPECT" and "GOT" labels - just use raw header
+        }
         y_offset += 1;
 
         // Separator
         if (y_offset < inner.height) {
-            var sep_buf: [80]u8 = undefined;
+            var sep_buf: [96]u8 = undefined;
             @memset(&sep_buf, '-');
             const sep_w: u16 = @intCast(@min(writer.pos, inner.width));
-            const sep = sep_buf[0..sep_w];
-            // Put a nice separator char at the pipe positions
-            buf.setString(inner.x, inner.y + y_offset, sep, C.dim);
+            buf.setString(inner.x, inner.y + y_offset, sep_buf[0..sep_w], C.dim);
             y_offset += 1;
         }
 
@@ -352,13 +466,18 @@ pub const TruthTableWidget = struct {
         for (self.level.truth_table, 0..) |row, i| {
             if (y_offset >= inner.height) break;
 
-            var row_buf: [80]u8 = undefined;
+            var row_buf: [96]u8 = undefined;
             var row_writer = BufWriter.init(&row_buf);
 
-            // Row number
-            var num_buf: [4]u8 = undefined;
-            const num_str = std.fmt.bufPrint(&num_buf, "{d} ", .{i + 1}) catch "? ";
-            row_writer.write(num_str);
+            const is_active = animating and i == self.sim_row and
+                (self.sim_phase == .propagating or self.sim_phase == .showing_result);
+
+            // Active row marker
+            if (is_active) {
+                row_writer.write(">> ");
+            } else {
+                row_writer.write("   ");
+            }
 
             // Inputs
             for (self.level.input_names, 0..) |_, j| {
@@ -367,48 +486,121 @@ pub const TruthTableWidget = struct {
             }
             row_writer.write("| ");
 
-            // Outputs
+            // Expected outputs
             for (self.level.output_names, 0..) |_, j| {
                 row_writer.writeChar(if (row.outputs[j]) '1' else '0');
                 row_writer.writeChar(' ');
             }
             row_writer.write("| ");
 
-            // Result indicator
-            const tested = i < self.results.len;
-            if (tested) {
-                if (self.results[i]) {
-                    row_writer.writeChar('P');
+            if (animating) {
+                // GOT column
+                const row_result: ?bool = if (i < 32) self.sim_row_results[i] else null;
+                if (row_result != null) {
+                    // Row completed: show actual outputs
+                    const actual = self.sim_actual_outputs[i];
+                    for (self.level.output_names, 0..) |_, j| {
+                        row_writer.writeChar(if (actual[j]) '1' else '0');
+                        row_writer.writeChar(' ');
+                    }
+                    row_writer.write("| ");
+                    if (row_result.?) {
+                        row_writer.write("PASS");
+                    } else {
+                        row_writer.write("FAIL");
+                    }
+                } else if (is_active and self.sim_phase == .propagating) {
+                    // Currently animating this row
+                    for (self.level.output_names) |_| {
+                        row_writer.write(".. ");
+                    }
+                    row_writer.writeChar('|');
                 } else {
-                    row_writer.writeChar('F');
+                    // Untested
+                    for (self.level.output_names) |_| {
+                        row_writer.write("   ");
+                    }
+                    row_writer.writeChar('|');
                 }
+
+                // Style: active > mismatch > pass/fail > untested
+                const row_result_val: ?bool = if (i < 32) self.sim_row_results[i] else null;
+                const row_style = if (is_active)
+                    C.active_row
+                else if (row_result_val) |rv|
+                    (if (rv) C.pass else self.hasMismatch(row, i))
+                else
+                    C.untested;
+
+                buf.setString(inner.x, inner.y + y_offset, row_writer.slice(), row_style);
             } else {
-                row_writer.writeChar('-');
+                // Non-animated: simple pass/fail
+                const tested = i < self.results.len;
+                if (tested) {
+                    row_writer.writeChar(if (self.results[i]) 'P' else 'F');
+                } else {
+                    row_writer.writeChar('-');
+                }
+
+                const row_style = if (tested)
+                    (if (self.results[i]) C.pass else C.fail)
+                else
+                    C.untested;
+                buf.setString(inner.x, inner.y + y_offset, row_writer.slice(), row_style);
             }
 
-            const row_style = if (tested)
-                (if (self.results[i]) C.pass else C.fail)
-            else
-                C.untested;
-
-            buf.setString(inner.x, inner.y + y_offset, row_writer.slice(), row_style);
             y_offset += 1;
         }
 
-        // Summary
+        // Testing status line during animation
+        if (animating and self.sim_phase != .summary and y_offset + 1 < inner.height) {
+            y_offset += 1;
+            var status_buf: [80]u8 = undefined;
+            var status_writer = BufWriter.init(&status_buf);
+
+            status_writer.write("Testing: ");
+            const tt_row = self.level.truth_table[self.sim_row];
+            for (self.level.input_names, 0..) |name, j| {
+                status_writer.write(name);
+                status_writer.writeChar('=');
+                if (tt_row.inputs[j]) {
+                    status_writer.write("ON");
+                } else {
+                    status_writer.write("OFF");
+                }
+                if (j + 1 < self.level.input_names.len) {
+                    status_writer.write(", ");
+                }
+            }
+
+            buf.setString(inner.x + 1, inner.y + y_offset, status_writer.slice(), C.highlight);
+        }
+
+        // Summary line
         if (y_offset + 1 < inner.height) {
-            y_offset += 1; // blank line
+            y_offset += 1;
 
             var pass_count: usize = 0;
             var tested_count: usize = 0;
-            for (self.results) |r| {
-                tested_count += 1;
-                if (r) pass_count += 1;
+            if (animating) {
+                for (0..self.level.truth_table.len) |i| {
+                    if (i < 32) {
+                        if (self.sim_row_results[i]) |rv| {
+                            tested_count += 1;
+                            if (rv) pass_count += 1;
+                        }
+                    }
+                }
+            } else {
+                for (self.results) |r| {
+                    tested_count += 1;
+                    if (r) pass_count += 1;
+                }
             }
 
             if (tested_count > 0) {
-                var sum_buf: [32]u8 = undefined;
-                const sum_str = std.fmt.bufPrint(&sum_buf, "{d}/{d} passing", .{
+                var sum_buf: [40]u8 = undefined;
+                const sum_str = std.fmt.bufPrint(&sum_buf, "Result: {d}/{d} passing", .{
                     pass_count,
                     self.level.truth_table.len,
                 }) catch "";
@@ -421,18 +613,26 @@ pub const TruthTableWidget = struct {
         // Story text at bottom
         if (y_offset + 2 < inner.height) {
             y_offset += 2;
-            // Wrap story text to fit
-            const story = self.level.story_text;
+            const story_text = self.level.story_text;
             const max_w = inner.width -| 2;
-            if (story.len > 0 and max_w > 10) {
-                const line1_len = @min(story.len, max_w);
-                buf.setString(inner.x + 1, inner.y + y_offset, story[0..line1_len], C.story);
-                if (story.len > max_w and y_offset + 1 < inner.height) {
-                    const line2_len = @min(story.len - max_w, max_w);
-                    buf.setString(inner.x + 1, inner.y + y_offset + 1, story[max_w..][0..line2_len], C.story);
+            if (story_text.len > 0 and max_w > 10) {
+                const line1_len = @min(story_text.len, max_w);
+                buf.setString(inner.x + 1, inner.y + y_offset, story_text[0..line1_len], C.story);
+                if (story_text.len > max_w and y_offset + 1 < inner.height) {
+                    const line2_len = @min(story_text.len - max_w, max_w);
+                    buf.setString(inner.x + 1, inner.y + y_offset + 1, story_text[max_w..][0..line2_len], C.story);
                 }
             }
         }
+    }
+
+    fn hasMismatch(self: TruthTableWidget, expected_row: levels.TruthRow, row_idx: usize) Style {
+        if (row_idx >= 32) return C.fail;
+        const actual = self.sim_actual_outputs[row_idx];
+        for (self.level.output_names, 0..) |_, j| {
+            if (actual[j] != expected_row.outputs[j]) return C.mismatch;
+        }
+        return C.fail;
     }
 };
 

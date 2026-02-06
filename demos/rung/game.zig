@@ -39,7 +39,6 @@ pub const Position = struct {
     y: usize,
 };
 
-/// The ladder diagram grid
 pub const Diagram = struct {
     cells: [][]Cell,
     width: usize,
@@ -85,11 +84,17 @@ pub const Diagram = struct {
     }
 };
 
-/// Game mode
 pub const Mode = enum {
     editing,
     simulating,
     solved,
+};
+
+pub const SimPhase = enum {
+    idle,
+    propagating,
+    showing_result,
+    summary,
 };
 
 // Hit ID ranges for mouse interaction
@@ -130,7 +135,6 @@ const DiagramSnapshot = struct {
     };
 };
 
-/// Palette item indices (offset from HIT_PALETTE_BASE)
 const PALETTE_WIRE_H: u32 = 0;
 const PALETTE_WIRE_V: u32 = 1;
 const PALETTE_CONTACT_NO: u32 = 2;
@@ -141,62 +145,44 @@ const PALETTE_COIL_UNLATCH: u32 = 6;
 const PALETTE_JUNCTION: u32 = 7;
 const PALETTE_EMPTY: u32 = 8;
 
-/// Main game state
 pub const GameState = struct {
     allocator: Allocator,
-
-    // Current level (0-indexed)
     level_index: usize,
-
-    // The editable diagram
     diagram: Diagram,
-
-    // Cursor position in the diagram
     cursor: Position,
-
-    // Currently selected component for placement
     selected_component: ComponentType,
-
-    // Selected input/output index for contacts/coils (0=A, 1=B, etc.)
-    selected_index: u8,
-
-    // Game mode
+    selected_index: u8, // 0=A, 1=B, etc.
     mode: Mode,
-
-    // Simulation results for each truth table row
     results: []bool,
-
-    // Current simulation row being shown
     sim_row: usize,
-
-    // UI state
     show_help: bool,
     show_level_select: bool,
 
-    // Mouse interaction
     hit_tester: zithril.HitTester(u32, 64),
     hover_state: zithril.HoverState,
     drag_state: zithril.DragState,
     scroll_accum: zithril.ScrollAccumulator,
 
-    // Animation
     power_anim: zithril.Animation,
     victory_anim: zithril.Animation,
     mode_anim: zithril.Animation,
 
-    // Undo/redo (simple snapshot stack)
     undo_stack: [MAX_UNDO]DiagramSnapshot,
     undo_count: usize,
     undo_pos: usize,
 
-    // Enhanced UI
     show_description: bool,
     toast_message: [64]u8,
     toast_len: usize,
     toast_timer: u32,
     moves_count: usize,
 
-    // Power flow visualization
+    sim_phase: SimPhase,
+    sim_result: ladder.SimResult,
+    sim_visible_depth: u8,
+    sim_row_results: [32]?bool,
+    sim_actual_outputs: [32][ladder.MAX_IO]bool,
+    sim_phase_timer: u32,
     powered_cells: [MAX_SNAPSHOT_DIM][MAX_SNAPSHOT_DIM]bool,
 
     pub fn init(allocator: Allocator) !GameState {
@@ -240,6 +226,12 @@ pub const GameState = struct {
             .toast_timer = 0,
             .moves_count = 0,
 
+            .sim_phase = .idle,
+            .sim_result = ladder.SimResult.init(),
+            .sim_visible_depth = 0,
+            .sim_row_results = [_]?bool{null} ** 32,
+            .sim_actual_outputs = [_][ladder.MAX_IO]bool{[_]bool{false} ** ladder.MAX_IO} ** 32,
+            .sim_phase_timer = 0,
             .powered_cells = [_][MAX_SNAPSHOT_DIM]bool{[_]bool{false} ** MAX_SNAPSHOT_DIM} ** MAX_SNAPSHOT_DIM,
         };
     }
@@ -275,6 +267,12 @@ pub const GameState = struct {
         self.undo_pos = 0;
         self.toast_len = 0;
         self.toast_timer = 0;
+        self.sim_phase = .idle;
+        self.sim_result = ladder.SimResult.init();
+        self.sim_visible_depth = 0;
+        self.sim_row_results = [_]?bool{null} ** 32;
+        self.sim_actual_outputs = [_][ladder.MAX_IO]bool{[_]bool{false} ** ladder.MAX_IO} ** 32;
+        self.sim_phase_timer = 0;
         self.powered_cells = [_][MAX_SNAPSHOT_DIM]bool{[_]bool{false} ** MAX_SNAPSHOT_DIM} ** MAX_SNAPSHOT_DIM;
 
         self.power_anim.reset();
@@ -286,17 +284,88 @@ pub const GameState = struct {
     }
 
     pub fn runSimulation(self: *GameState) void {
+        // Reset all row results
+        self.sim_row_results = [_]?bool{null} ** 32;
+        self.sim_actual_outputs = [_][ladder.MAX_IO]bool{[_]bool{false} ** ladder.MAX_IO} ** 32;
+        @memset(self.results, false);
+
+        self.mode = .simulating;
+        self.sim_row = 0;
+        self.power_anim.reset();
+        self.startRowSimulation(0);
+    }
+
+    fn startRowSimulation(self: *GameState, row_index: usize) void {
+        const level = levels.get(self.level_index);
+        if (row_index >= level.truth_table.len) return;
+
+        self.sim_row = row_index;
+        const row = level.truth_table[row_index];
+        self.sim_result = ladder.simulateWithPower(&self.diagram, row.inputs);
+
+        // Store actual outputs for this row
+        if (row_index < 32) {
+            self.sim_actual_outputs[row_index] = self.sim_result.outputs;
+        }
+
+        // Update powered_cells from depth grid at visible depth
+        self.sim_visible_depth = 1;
+        self.updatePoweredFromDepth();
+        self.sim_phase = .propagating;
+        self.sim_phase_timer = 200;
+    }
+
+    fn updatePoweredFromDepth(self: *GameState) void {
+        self.powered_cells = [_][MAX_SNAPSHOT_DIM]bool{[_]bool{false} ** MAX_SNAPSHOT_DIM} ** MAX_SNAPSHOT_DIM;
+        for (0..self.diagram.height) |y| {
+            if (y >= MAX_SNAPSHOT_DIM) break;
+            for (0..self.diagram.width) |x| {
+                if (x >= MAX_SNAPSHOT_DIM) break;
+                if (self.sim_result.depth[y][x] > 0 and
+                    self.sim_result.depth[y][x] <= self.sim_visible_depth)
+                {
+                    self.powered_cells[y][x] = true;
+                }
+            }
+        }
+    }
+
+    fn finishRowSimulation(self: *GameState) void {
+        const level = levels.get(self.level_index);
+        const row_index = self.sim_row;
+        if (row_index >= level.truth_table.len) return;
+
+        const row = level.truth_table[row_index];
+        const pass = std.mem.eql(bool, &self.sim_result.outputs, &row.outputs);
+        if (row_index < 32) {
+            self.sim_row_results[row_index] = pass;
+        }
+        if (row_index < self.results.len) {
+            self.results[row_index] = pass;
+        }
+    }
+
+    fn finishAllRows(self: *GameState) void {
         const level = levels.get(self.level_index);
 
         var all_pass = true;
         for (level.truth_table, 0..) |row, i| {
+            if (i < 32 and self.sim_row_results[i] != null) {
+                if (!self.sim_row_results[i].?) all_pass = false;
+                continue;
+            }
             const actual = ladder.simulate(&self.diagram, row.inputs);
-            self.results[i] = std.mem.eql(bool, &actual, &row.outputs);
-            if (!self.results[i]) all_pass = false;
+            const pass = std.mem.eql(bool, &actual, &row.outputs);
+            if (i < 32) {
+                self.sim_row_results[i] = pass;
+                self.sim_actual_outputs[i] = actual;
+            }
+            if (i < self.results.len) self.results[i] = pass;
+            if (!pass) all_pass = false;
         }
 
+        self.sim_phase = .summary;
         self.mode = if (all_pass) .solved else .simulating;
-        self.power_anim.reset();
 
         if (all_pass) {
             self.victory_anim.reset();
@@ -304,6 +373,13 @@ pub const GameState = struct {
         } else {
             self.showToast("Simulation complete");
         }
+    }
+
+    fn cancelSimulation(self: *GameState) void {
+        self.sim_phase = .idle;
+        self.mode = .editing;
+        self.powered_cells = [_][MAX_SNAPSHOT_DIM]bool{[_]bool{false} ** MAX_SNAPSHOT_DIM} ** MAX_SNAPSHOT_DIM;
+        self.showToast("Simulation cancelled");
     }
 
     pub fn currentLevel(self: *const GameState) levels.Level {
@@ -435,7 +511,10 @@ pub const GameState = struct {
 
     fn handleButtonClick(self: *GameState, id: u32) void {
         switch (id) {
-            HIT_BTN_SIMULATE => self.runSimulation(),
+            HIT_BTN_SIMULATE => {
+                self.sim_phase = .idle;
+                self.runSimulation();
+            },
             HIT_BTN_RESET => {
                 self.loadLevel(self.level_index) catch {};
                 self.showToast("Level reset");
@@ -486,10 +565,39 @@ pub const GameState = struct {
     }
 };
 
-/// Handle input events
 pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
+            // During animation, only allow escape/space/enter
+            if (self.sim_phase != .idle and self.sim_phase != .summary) {
+                switch (key.code) {
+                    .escape => {
+                        self.cancelSimulation();
+                        return .none;
+                    },
+                    .char => |c| {
+                        if (c == ' ') {
+                            // Skip current row animation
+                            self.sim_visible_depth = self.sim_result.max_depth;
+                            self.updatePoweredFromDepth();
+                            self.finishRowSimulation();
+                            self.sim_phase = .showing_result;
+                            self.sim_phase_timer = 200;
+                            return .none;
+                        } else if (c == 'q' or c == 'Q') {
+                            return .quit;
+                        }
+                    },
+                    .enter => {
+                        // Skip all remaining rows
+                        self.finishAllRows();
+                        return .none;
+                    },
+                    else => {},
+                }
+                return .none;
+            }
+
             if (self.show_help) {
                 self.show_help = false;
                 return .none;
@@ -519,7 +627,6 @@ pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
                 return .none;
             }
 
-            // Ctrl+key combinations
             if (key.modifiers.ctrl) {
                 switch (key.code) {
                     .char => |c| {
@@ -574,6 +681,7 @@ pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
                     }
                 },
                 .enter => {
+                    self.sim_phase = .idle;
                     self.runSimulation();
                 },
                 .tab => {
@@ -602,6 +710,9 @@ pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
         },
         .mouse => |mouse| {
             _ = self.hover_state.update(zithril.Rect.init(0, 0, 0, 0), mouse);
+
+            // Block mouse during animation
+            if (self.sim_phase != .idle and self.sim_phase != .summary) return .none;
 
             switch (mouse.kind) {
                 .down => {
@@ -635,6 +746,34 @@ pub fn update(self: *GameState, event: zithril.Event) zithril.Action {
             if (self.toast_timer > 0) {
                 self.toast_timer -|= 100;
                 if (self.toast_timer == 0) self.toast_len = 0;
+            }
+
+            // Advance simulation animation
+            if (self.sim_phase == .propagating) {
+                self.sim_phase_timer -|= 100;
+                if (self.sim_phase_timer == 0) {
+                    self.sim_visible_depth +|= 1;
+                    if (self.sim_visible_depth > self.sim_result.max_depth) {
+                        self.finishRowSimulation();
+                        self.updatePoweredFromDepth();
+                        self.sim_phase = .showing_result;
+                        self.sim_phase_timer = 800;
+                    } else {
+                        self.updatePoweredFromDepth();
+                        self.sim_phase_timer = 200;
+                    }
+                }
+            } else if (self.sim_phase == .showing_result) {
+                self.sim_phase_timer -|= 100;
+                if (self.sim_phase_timer == 0) {
+                    const level = levels.get(self.level_index);
+                    const next_row = self.sim_row + 1;
+                    if (next_row >= level.truth_table.len) {
+                        self.finishAllRows();
+                    } else {
+                        self.startRowSimulation(next_row);
+                    }
+                }
             }
         },
         else => {},
@@ -713,52 +852,53 @@ fn placeComponent(state: *GameState) void {
     state.showToast(componentName(state.selected_component));
 }
 
-/// Frame type alias for convenience
 pub const FrameType = zithril.Frame(zithril.App(GameState).DefaultMaxWidgets);
 
-/// Render the game UI
 pub fn view(self: *GameState, frame: *FrameType) void {
     const area = frame.size();
     const level = self.currentLevel();
 
     self.hit_tester.clear();
 
-    // Main layout: header, content, footer
     const main_chunks = frame.layout(area, .vertical, &.{
-        zithril.Constraint.len(3), // Header
-        zithril.Constraint.flexible(1), // Content
-        zithril.Constraint.len(3), // Footer
+        zithril.Constraint.len(3),
+        zithril.Constraint.flexible(1),
+        zithril.Constraint.len(3),
     });
 
-    // Header: level info and status
     frame.render(widgets.HeaderWidget{
         .level = self.level_index + 1,
         .title = level.name,
         .mode = self.mode,
     }, main_chunks.get(0));
 
-    // Content: diagram on left, truth table on right
     const content_chunks = frame.layout(main_chunks.get(1), .horizontal, &.{
-        zithril.Constraint.flexible(2), // Diagram (larger)
-        zithril.Constraint.flexible(1), // Truth table
+        zithril.Constraint.flexible(2),
+        zithril.Constraint.flexible(1),
     });
 
-    // Diagram panel
+    const sim_active = self.sim_phase == .propagating or self.sim_phase == .showing_result;
     frame.render(widgets.DiagramWidget{
         .diagram = &self.diagram,
         .cursor = self.cursor,
         .editing = self.mode == .editing,
         .input_names = level.input_names,
         .output_names = level.output_names,
+        .powered_cells = &self.powered_cells,
+        .sim_depth = &self.sim_result.depth,
+        .sim_visible_depth = self.sim_visible_depth,
+        .sim_active = sim_active,
     }, content_chunks.get(0));
 
-    // Truth table panel
     frame.render(widgets.TruthTableWidget{
         .level = level,
         .results = self.results,
+        .sim_row = self.sim_row,
+        .sim_phase = self.sim_phase,
+        .sim_actual_outputs = &self.sim_actual_outputs,
+        .sim_row_results = &self.sim_row_results,
     }, content_chunks.get(1));
 
-    // Footer: controls and component palette
     frame.render(widgets.PaletteWidget{
         .selected = self.selected_component,
         .selected_index = self.selected_index,
@@ -766,7 +906,6 @@ pub fn view(self: *GameState, frame: *FrameType) void {
         .output_names = level.output_names,
     }, main_chunks.get(2));
 
-    // Overlays (rendered on top)
     if (self.mode == .solved) {
         frame.render(widgets.VictoryOverlay{
             .level = self.level_index + 1,
@@ -791,7 +930,6 @@ pub fn view(self: *GameState, frame: *FrameType) void {
         }, area);
     }
 
-    // Toast message (always on top)
     if (self.toast_len > 0) {
         frame.render(widgets.ToastWidget{
             .message = self.toast_message[0..self.toast_len],

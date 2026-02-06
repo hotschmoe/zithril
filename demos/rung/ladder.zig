@@ -10,12 +10,13 @@ const game = @import("game.zig");
 const Cell = game.Cell;
 const Diagram = game.Diagram;
 
-/// Maximum number of inputs/outputs supported
 pub const MAX_IO = 8;
 
 pub const SimResult = struct {
     outputs: [MAX_IO]bool,
     powered: [MAX_ROWS][MAX_COLS]bool,
+    depth: [MAX_ROWS][MAX_COLS]u8,
+    max_depth: u8,
 
     pub const MAX_ROWS = 16;
     pub const MAX_COLS = 16;
@@ -24,6 +25,8 @@ pub const SimResult = struct {
         return .{
             .outputs = [_]bool{false} ** MAX_IO,
             .powered = [_][MAX_COLS]bool{[_]bool{false} ** MAX_COLS} ** MAX_ROWS,
+            .depth = [_][MAX_COLS]u8{[_]u8{0} ** MAX_COLS} ** MAX_ROWS,
+            .max_depth = 0,
         };
     }
 };
@@ -36,43 +39,44 @@ const QueueEntry = struct {
     from: Direction,
 };
 
-/// Simulate the ladder diagram with given inputs.
-/// Returns the resulting output states.
 pub fn simulate(diagram: *const Diagram, inputs: [MAX_IO]bool) [MAX_IO]bool {
     const result = simulateWithPower(diagram, inputs);
     return result.outputs;
 }
 
-/// Simulate with full power-flow tracking.
-/// Uses BFS flood-fill from left rail cells.
 pub fn simulateWithPower(diagram: *const Diagram, inputs: [MAX_IO]bool) SimResult {
     var result = SimResult.init();
     var latches_set: [MAX_IO]bool = [_]bool{false} ** MAX_IO;
     var latches_clear: [MAX_IO]bool = [_]bool{false} ** MAX_IO;
 
-    // BFS queue - static buffer, no allocator needed
     const MAX_QUEUE = SimResult.MAX_ROWS * SimResult.MAX_COLS * 4;
     var queue: [MAX_QUEUE]QueueEntry = undefined;
     var head: usize = 0;
     var tail: usize = 0;
 
-    // Track visited (cell + direction) to avoid infinite loops
-    // 4 directions per cell
     var visited: [SimResult.MAX_ROWS][SimResult.MAX_COLS][4]bool =
         [_][SimResult.MAX_COLS][4]bool{[_][4]bool{[_]bool{false} ** 4} ** SimResult.MAX_COLS} ** SimResult.MAX_ROWS;
 
-    // Seed: all left rail cells inject power flowing right
+    var current_depth: u8 = 1;
+
     for (0..diagram.height) |y| {
         if (y >= SimResult.MAX_ROWS) break;
         const cell = diagram.get(0, y);
         if (cell == .rail_left) {
             result.powered[y][0] = true;
+            result.depth[y][0] = current_depth;
             enqueue(&queue, &tail, MAX_QUEUE, .{ .x = 1, .y = y, .from = .left });
         }
     }
 
-    // BFS propagation
+    var level_end = tail;
+
     while (head != tail) {
+        if (head == level_end) {
+            current_depth +|= 1;
+            level_end = tail;
+        }
+
         const entry = queue[head];
         head = (head + 1) % MAX_QUEUE;
 
@@ -92,8 +96,10 @@ pub fn simulateWithPower(diagram: *const Diagram, inputs: [MAX_IO]bool) SimResul
         if (!cellConducts(cell, entry.from, inputs)) continue;
 
         result.powered[y][x] = true;
+        if (result.depth[y][x] == 0) {
+            result.depth[y][x] = current_depth;
+        }
 
-        // Process coil outputs
         switch (cell) {
             .coil => |idx| {
                 if (idx < MAX_IO) result.outputs[idx] = true;
@@ -107,7 +113,6 @@ pub fn simulateWithPower(diagram: *const Diagram, inputs: [MAX_IO]bool) SimResul
             else => {},
         }
 
-        // Propagate to neighbors based on cell type
         const exits = cellExits(cell, entry.from);
 
         if (exits.right and x + 1 < diagram.width and x + 1 < SimResult.MAX_COLS) {
@@ -123,6 +128,8 @@ pub fn simulateWithPower(diagram: *const Diagram, inputs: [MAX_IO]bool) SimResul
             enqueue(&queue, &tail, MAX_QUEUE, .{ .x = x, .y = y - 1, .from = .down });
         }
     }
+
+    result.max_depth = current_depth;
 
     // Apply latches: set wins over clear when both active
     for (0..MAX_IO) |i| {
@@ -140,7 +147,6 @@ const Exits = struct {
     down: bool = false,
 };
 
-/// Determine if a cell conducts power arriving from a given direction.
 fn cellConducts(cell: Cell, from: Direction, inputs: [MAX_IO]bool) bool {
     return switch (cell) {
         .empty => false,
@@ -155,7 +161,6 @@ fn cellConducts(cell: Cell, from: Direction, inputs: [MAX_IO]bool) bool {
     };
 }
 
-/// Determine which directions power exits a cell, given it entered from `from`.
 fn cellExits(cell: Cell, from: Direction) Exits {
     return switch (cell) {
         .empty => .{},
@@ -182,7 +187,6 @@ fn enqueue(queue: []QueueEntry, tail: *usize, max: usize, entry: QueueEntry) voi
     tail.* = (tail.* + 1) % max;
 }
 
-/// Check if a diagram is valid (has proper structure).
 pub fn validate(diagram: *const Diagram) ValidationResult {
     var result = ValidationResult{};
 
@@ -224,8 +228,6 @@ pub const ValidationResult = struct {
         return self.errors == 0;
     }
 };
-
-// Tests
 
 test "NO contact logic" {
     const inputs_off = [_]bool{false} ** MAX_IO;
@@ -299,19 +301,19 @@ test "simple series circuit" {
     try std.testing.expect(result.outputs[0]);
     try std.testing.expect(result.powered[0][1]); // contact powered
     try std.testing.expect(result.powered[0][3]); // coil powered
+
+    // Depth ordering: rail(1) < contact(2) < wire(3) < coil(4)
+    try std.testing.expect(result.depth[0][0] == 1); // rail_left seeded at depth 1
+    try std.testing.expect(result.depth[0][1] > 0); // contact powered
+    try std.testing.expect(result.depth[0][2] > result.depth[0][1]); // wire after contact
+    try std.testing.expect(result.depth[0][3] > result.depth[0][2]); // coil after wire
+    try std.testing.expect(result.max_depth >= result.depth[0][3]);
 }
 
 test "OR gate parallel branches" {
     // Row 0: [rail_left] [contact_no:0] [wire_h] [coil:0] [rail_right]
-    // Row 1: [rail_left] [junction]     [wire_h] [junction] [rail_right]  (junction connecting rows)
-    // Row 2: [rail_left] [contact_no:1] [wire_h] [coil:0]  [rail_right]
-    //
-    // Actually, for a proper OR, we need junctions linking the branches.
-    // Better layout (5 wide, 3 tall):
-    // Row 0: [rail_left] [contact_no:0] [wire_h]       [coil:0]  [rail_right]
-    // Row 1: [rail_left] [junction]     [empty]         [junction] [rail_right]
-    // Row 2: [rail_left] [contact_no:1] [wire_h]        [coil:0]  [rail_right]
-
+    // Row 1: [rail_left] [wire_h]       [empty]  [wire_h] [rail_right]
+    // Row 2: [rail_left] [contact_no:1] [wire_h] [coil:0] [rail_right]
     var cells: [3][5]Cell = undefined;
     cells[0] = .{ .rail_left, .{ .contact_no = 0 }, .wire_h, .{ .coil = 0 }, .rail_right };
     cells[1] = .{ .rail_left, .wire_h, .empty, .wire_h, .rail_right };
@@ -350,16 +352,11 @@ test "OR gate parallel branches" {
 }
 
 test "junction splits power vertically" {
-    // Test that junction propagates power to adjacent rows
     // Row 0: [rail_left] [junction] [coil:0] [rail_right]
     // Row 1: [rail_left] [junction] [coil:1] [rail_right]
-
     var cells: [2][4]Cell = undefined;
     cells[0] = .{ .rail_left, .junction, .{ .coil = 0 }, .rail_right };
     cells[1] = .{ .rail_left, .junction, .{ .coil = 1 }, .rail_right };
-
-    // Junction at (1,0) should power junction at (1,1) via vertical propagation
-    // and both coils should be energized
 
     var rows: [2][]Cell = .{ &cells[0], &cells[1] };
     const diagram = Diagram{

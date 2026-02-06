@@ -61,7 +61,6 @@ pub const Level = struct {
     available_components: []const game.ComponentType,
 };
 
-/// Standard level setup: place power rails on left and right edges.
 fn setupRails(diagram: *Diagram) void {
     for (0..diagram.height) |y| {
         diagram.set(0, y, .rail_left);
@@ -99,19 +98,6 @@ const latch_components = &[_]game.ComponentType{
     .empty,
 };
 
-const all_components = &[_]game.ComponentType{
-    .wire_horizontal,
-    .wire_vertical,
-    .contact_no,
-    .contact_nc,
-    .coil,
-    .coil_latch,
-    .coil_unlatch,
-    .junction,
-    .empty,
-};
-
-// Level definitions
 
 const levels = [_]Level{
     // Level 1: Direct Wire
@@ -424,7 +410,7 @@ const levels = [_]Level{
         .difficulty = .expert,
         .par_moves = 8,
         .story_text = "A two-stage startup sequence: hydraulics first, then main drive.",
-        .available_components = all_components,
+        .available_components = latch_components,
     },
 
     // Level 15: Traffic Light
@@ -450,7 +436,6 @@ const levels = [_]Level{
     },
 };
 
-/// Get a level by index
 pub fn get(index: usize) Level {
     if (index >= levels.len) {
         return levels[levels.len - 1]; // Return last level if out of bounds
@@ -458,7 +443,6 @@ pub fn get(index: usize) Level {
     return levels[index];
 }
 
-/// Total number of levels
 pub fn count() usize {
     return levels.len;
 }
