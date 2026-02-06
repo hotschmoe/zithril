@@ -166,6 +166,53 @@ pub const ScrollableList = widgets.ScrollableList;
 pub const TextInput = widgets.TextInput;
 pub const TextInputState = widgets.TextInputState;
 
+// Data visualization widgets
+pub const Sparkline = widgets.Sparkline;
+pub const SparklineDirection = widgets.SparklineDirection;
+pub const BarChart = widgets.BarChart;
+pub const Bar = widgets.Bar;
+pub const BarGroup = widgets.BarGroup;
+pub const BarChartOrientation = widgets.BarChartOrientation;
+pub const Chart = widgets.Chart;
+pub const ChartAxis = widgets.Axis;
+pub const LineDataset = widgets.LineDataset;
+pub const ScatterDataset = widgets.ScatterDataset;
+pub const ChartMarkers = widgets.Markers;
+pub const ChartLabel = widgets.ChartLabel;
+pub const LineGauge = widgets.LineGauge;
+pub const LineSet = widgets.LineSet;
+
+// Drawing widgets
+pub const Canvas = widgets.Canvas;
+pub const CanvasMarker = widgets.CanvasMarker;
+pub const CanvasShape = widgets.CanvasShape;
+pub const CanvasPainter = widgets.CanvasPainter;
+pub const CanvasCircle = widgets.CanvasCircle;
+pub const CanvasLine = widgets.CanvasLine;
+pub const CanvasRectangle = widgets.CanvasRectangle;
+pub const CanvasPoints = widgets.CanvasPoints;
+
+// Navigation widgets
+pub const Tree = widgets.Tree;
+pub const TreeItem = widgets.TreeItem;
+pub const TreeState = widgets.TreeState;
+pub const TreeSymbols = widgets.TreeSymbols;
+pub const MutableTreeItem = widgets.MutableTreeItem;
+pub const Menu = widgets.Menu;
+pub const MenuItem = widgets.MenuItem;
+pub const MenuState = widgets.MenuState;
+pub const MenuSymbols = widgets.MenuSymbols;
+
+// Specialty widgets
+pub const Calendar = widgets.Calendar;
+pub const BigText = widgets.BigText;
+pub const PixelSize = widgets.PixelSize;
+pub const Font8x8 = widgets.Font8x8;
+pub const CodeEditor = widgets.CodeEditor;
+pub const CodeEditorLanguage = widgets.CodeEditorLanguage;
+pub const CodeEditorTheme = widgets.CodeEditorTheme;
+pub const TokenType = widgets.TokenType;
+
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
     try std.testing.expect(style.hasAttribute(.bold));

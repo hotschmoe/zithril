@@ -126,6 +126,9 @@ pub fn build(b: *std.Build) void {
     // Demos - larger applications in their own directories
     const demos = [_]struct { name: []const u8, desc: []const u8 }{
         .{ .name = "rung", .desc = "Ladder logic puzzle game" },
+        .{ .name = "dashboard", .desc = "System monitoring dashboard" },
+        .{ .name = "explorer", .desc = "File explorer with tree navigation" },
+        .{ .name = "dataviz", .desc = "Data visualization gallery" },
     };
 
     for (demos) |demo| {
