@@ -152,6 +152,46 @@ pub const Style = struct {
         return self.notHidden();
     }
 
+    /// Enable double underline (SGR 21).
+    pub fn underline2(self: Style) Style {
+        return .{ .inner = self.inner.underline2() };
+    }
+
+    /// Disable double underline.
+    pub fn notUnderline2(self: Style) Style {
+        return .{ .inner = self.inner.notUnderline2() };
+    }
+
+    /// Enable frame (SGR 51).
+    pub fn frame(self: Style) Style {
+        return .{ .inner = self.inner.frame() };
+    }
+
+    /// Disable frame.
+    pub fn notFrame(self: Style) Style {
+        return .{ .inner = self.inner.notFrame() };
+    }
+
+    /// Enable encircle (SGR 52).
+    pub fn encircle(self: Style) Style {
+        return .{ .inner = self.inner.encircle() };
+    }
+
+    /// Disable encircle.
+    pub fn notEncircle(self: Style) Style {
+        return .{ .inner = self.inner.notEncircle() };
+    }
+
+    /// Enable overline (SGR 53).
+    pub fn overline(self: Style) Style {
+        return .{ .inner = self.inner.overline() };
+    }
+
+    /// Disable overline.
+    pub fn notOverline(self: Style) Style {
+        return .{ .inner = self.inner.notOverline() };
+    }
+
     /// Merge another style on top of this one.
     /// Non-default values in `other` override values in `self`.
     pub fn patch(self: Style, other: Style) Style {
@@ -350,6 +390,90 @@ test "behavior: Style.hidden renders correct ANSI code" {
 test "behavior: Style disable attributes" {
     const style = Style.init().bold().notBold();
     try std.testing.expect(!style.hasAttribute(.bold));
+}
+
+test "behavior: Style.underline2 enables double underline" {
+    const style = Style.init().underline2();
+    try std.testing.expect(style.hasAttribute(.underline2));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notUnderline2 disables double underline" {
+    const style = Style.init().underline2().notUnderline2();
+    try std.testing.expect(!style.hasAttribute(.underline2));
+}
+
+test "behavior: Style.underline2 renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().underline2();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[21m", stream.getWritten());
+}
+
+test "behavior: Style.frame enables frame attribute" {
+    const style = Style.init().frame();
+    try std.testing.expect(style.hasAttribute(.frame));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notFrame disables frame attribute" {
+    const style = Style.init().frame().notFrame();
+    try std.testing.expect(!style.hasAttribute(.frame));
+}
+
+test "behavior: Style.frame renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().frame();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[51m", stream.getWritten());
+}
+
+test "behavior: Style.encircle enables encircle attribute" {
+    const style = Style.init().encircle();
+    try std.testing.expect(style.hasAttribute(.encircle));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notEncircle disables encircle attribute" {
+    const style = Style.init().encircle().notEncircle();
+    try std.testing.expect(!style.hasAttribute(.encircle));
+}
+
+test "behavior: Style.encircle renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().encircle();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[52m", stream.getWritten());
+}
+
+test "behavior: Style.overline enables overline attribute" {
+    const style = Style.init().overline();
+    try std.testing.expect(style.hasAttribute(.overline));
+    try std.testing.expect(!style.isEmpty());
+}
+
+test "behavior: Style.notOverline disables overline attribute" {
+    const style = Style.init().overline().notOverline();
+    try std.testing.expect(!style.hasAttribute(.overline));
+}
+
+test "behavior: Style.overline renders correct ANSI code" {
+    var buf: [128]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buf);
+
+    const style = Style.init().overline();
+    try style.renderAnsi(.truecolor, stream.writer());
+
+    try std.testing.expectEqualStrings("\x1b[53m", stream.getWritten());
 }
 
 // ============================================================

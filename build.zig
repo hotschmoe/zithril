@@ -129,6 +129,7 @@ pub fn build(b: *std.Build) void {
         .{ .name = "dashboard", .desc = "System monitoring dashboard" },
         .{ .name = "explorer", .desc = "File explorer with tree navigation" },
         .{ .name = "dataviz", .desc = "Data visualization gallery" },
+        .{ .name = "showcase", .desc = "Rich text feature showcase" },
     };
 
     for (demos) |demo| {

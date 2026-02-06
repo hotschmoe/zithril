@@ -111,6 +111,33 @@ pub const Input = input_mod.Input;
 pub const text_mod = @import("text.zig");
 pub const displayWidth = text_mod.displayWidth;
 
+// Theme system
+pub const theme_mod = @import("theme.zig");
+pub const Theme = theme_mod.Theme;
+
+// ANSI parsing
+pub const ansi_mod = @import("ansi.zig");
+pub const AnsiText = ansi_mod.Text;
+pub const AnsiSpan = ansi_mod.Span;
+pub const fromAnsi = ansi_mod.fromAnsi;
+pub const stripAnsi = ansi_mod.stripAnsi;
+pub const stripToOwned = ansi_mod.stripToOwned;
+pub const parseAnsiToSegments = ansi_mod.parseAnsiToSegments;
+pub const freeAnsiSegments = ansi_mod.freeSegments;
+
+// Measurement protocol
+pub const measurement_mod = @import("measurement.zig");
+pub const Measurement = measurement_mod.Measurement;
+pub const fromConstraint = measurement_mod.fromConstraint;
+
+// Highlighter (pattern-based text highlighting)
+pub const highlighter_mod = @import("highlighter.zig");
+pub const Highlighter = highlighter_mod.Highlighter;
+pub const HighlightRule = highlighter_mod.HighlightRule;
+pub const HighlightMatch = highlighter_mod.Match;
+pub const highlightText = highlighter_mod.highlightText;
+pub const reprHighlighter = highlighter_mod.repr;
+
 // Animation helpers
 pub const animation = @import("animation.zig");
 pub const Animation = animation.Animation;
@@ -212,6 +239,16 @@ pub const CodeEditor = widgets.CodeEditor;
 pub const CodeEditorLanguage = widgets.CodeEditorLanguage;
 pub const CodeEditorTheme = widgets.CodeEditorTheme;
 pub const TokenType = widgets.TokenType;
+
+// Pretty printing
+pub const pretty_mod = @import("pretty.zig");
+pub const Pretty = pretty_mod.Pretty;
+pub const PrettyTheme = pretty_mod.PrettyTheme;
+pub const PrettyOptions = pretty_mod.PrettyOptions;
+pub const formatToBuffer = pretty_mod.formatToBuffer;
+pub const freeSegments = pretty_mod.freeSegments;
+pub const prettyFormat = pretty_mod.pretty;
+pub const prettyFormatWithOptions = pretty_mod.prettyWithOptions;
 
 test "style wrapper" {
     const style = Style.init().bold().fg(.red);
