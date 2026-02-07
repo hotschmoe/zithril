@@ -322,7 +322,7 @@ fn tabWalk(
             }
         }
 
-        if (std.mem.eql(Cell, harness.current_buf.cells, initial_cells)) {
+        if (cellSliceEql(harness.current_buf.cells, initial_cells)) {
             cycle_complete = true;
             break;
         }
@@ -369,6 +369,14 @@ fn tabWalk(
         .findings = try findings.toOwnedSlice(allocator),
         .allocator = allocator,
     };
+}
+
+fn cellSliceEql(a: []const Cell, b: []const Cell) bool {
+    if (a.len != b.len) return false;
+    for (a, b) |ca, cb| {
+        if (!ca.eql(cb)) return false;
+    }
+    return true;
 }
 
 fn cleanupFindings(allocator: std.mem.Allocator, findings: *std.ArrayListUnmanaged(Finding)) void {
@@ -851,8 +859,8 @@ test "behavior: auditKeyboardNav restores harness state" {
     defer result.deinit();
 
     try std.testing.expectEqual(initial_focus, state.focus);
-    try std.testing.expect(std.mem.eql(Cell, harness.current_buf.cells, initial_cells));
-    try std.testing.expect(std.mem.eql(Cell, harness.previous_buf.cells, initial_cells));
+    try std.testing.expect(cellSliceEql(harness.current_buf.cells, initial_cells));
+    try std.testing.expect(cellSliceEql(harness.previous_buf.cells, initial_cells));
 }
 
 test "behavior: auditFocusVisibility restores harness state" {
@@ -876,8 +884,8 @@ test "behavior: auditFocusVisibility restores harness state" {
     defer result.deinit();
 
     try std.testing.expectEqual(initial_focus, state.focus);
-    try std.testing.expect(std.mem.eql(Cell, harness.current_buf.cells, initial_cells));
-    try std.testing.expect(std.mem.eql(Cell, harness.previous_buf.cells, initial_cells));
+    try std.testing.expect(cellSliceEql(harness.current_buf.cells, initial_cells));
+    try std.testing.expect(cellSliceEql(harness.previous_buf.cells, initial_cells));
 }
 
 test "regression: Finding details field is optional" {

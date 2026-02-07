@@ -1,0 +1,18 @@
+# Workbench Explorer Mode scenario
+# Tests tree navigation and focus cycling
+
+size 80 24
+
+# Start in Explorer mode (default)
+# Navigate tree down
+key j
+key j
+key j
+
+# Navigate tree up
+key k
+
+# Cycle focus: tree -> search -> preview -> tree
+key tab
+key tab
+key tab

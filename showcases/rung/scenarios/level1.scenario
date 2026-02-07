@@ -1,0 +1,17 @@
+# Rung Level 1 scenario
+# Basic playthrough test
+
+size 80 24
+
+# Verify initial render
+tick
+
+# Navigate with arrow keys
+key right
+key down
+
+# Toggle element
+key enter
+
+# Tick to update simulation
+tick 3

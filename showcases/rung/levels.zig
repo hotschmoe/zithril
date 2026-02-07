@@ -98,7 +98,6 @@ const latch_components = &[_]game.ComponentType{
     .empty,
 };
 
-
 const levels = [_]Level{
     // Level 1: Direct Wire
     .{

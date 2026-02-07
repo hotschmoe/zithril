@@ -131,7 +131,7 @@ pub const ScenarioParser = struct {
 
         if (std.mem.eql(u8, command, "key")) {
             const arg = tokens.next() orelse return ParseError.MissingArgument;
-            return parseKeyDirective(arg);
+            return @as(?Directive, try parseKeyDirective(arg));
         }
 
         if (std.mem.eql(u8, command, "type")) {
@@ -255,11 +255,11 @@ pub const ScenarioParser = struct {
     }
 
     fn parseKeyDirective(arg: []const u8) ParseError!Directive {
-        if (std.mem.indexOf(u8, arg, "+")) |_| {
-            return parseModifiedKey(arg);
-        }
         if (arg.len == 1) {
             return Directive{ .key = arg[0] };
+        }
+        if (std.mem.indexOf(u8, arg, "+")) |_| {
+            return parseModifiedKey(arg);
         }
         if (parseSpecialKey(arg)) |code| {
             return Directive{ .key_special = code };

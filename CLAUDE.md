@@ -152,18 +152,16 @@ A Zig TUI framework for building terminal user interfaces. Immediate mode render
 ## Zig Toolchain
 
 ```bash
-zig build                       # Build library
-zig build run-example-counter   # Run counter example
-zig build run-example-ralph     # Run reference app
-zig build run-rung              # Run ladder logic demo
-zig build run-dashboard         # Run system dashboard demo
-zig build run-explorer          # Run file explorer demo
-zig build run-dataviz           # Run data visualization gallery
-zig build run-showcase          # Run rich text feature showcase
-zig build run-example-mouse-demo # Run mouse interaction demo
-zig build test                  # Run all tests
+zig build                       # Build library + showcases
+zig build run-gallery            # Run widget gallery showcase
+zig build run-workbench          # Run interactive workbench showcase
+zig build run-rung               # Run ladder logic puzzle game
+zig build test                   # Run all tests (library + showcase QA)
+zig build test-gallery           # Run gallery QA tests only
+zig build test-workbench         # Run workbench QA tests only
+zig build test-rung              # Run rung QA tests only
 zig build test -Dupdate-snapshots=true  # Run tests, auto-update golden files
-zig fmt src/                    # Format before commits
+zig fmt src/ showcases/          # Format before commits
 ```
 
 ---

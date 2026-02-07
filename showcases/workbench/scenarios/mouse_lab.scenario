@@ -1,0 +1,18 @@
+# Workbench Mouse Lab scenario
+# Tests mouse interactions
+
+size 80 24
+
+# Switch to Mouse Lab mode
+key 3
+
+# Click in the viewport
+click 20 10
+click 40 15
+
+# Hover
+hover 30 12
+
+# Scroll
+scroll_up 30 12
+scroll_down 30 12

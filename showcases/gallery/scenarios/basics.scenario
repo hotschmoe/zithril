@@ -1,0 +1,20 @@
+# Gallery Basics Tab - Counter scenario
+# Tests counter increment/decrement and key display
+
+size 80 24
+
+# Initial state
+expect_string 2 3 "Count: 0"
+
+# Increment 3 times
+key +
+key +
+key +
+expect_string 2 3 "Count: 3"
+
+# Decrement
+key -
+expect_string 2 3 "Count: 2"
+
+# Check action is none (not quit)
+expect_action none
