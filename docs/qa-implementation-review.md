@@ -1,22 +1,83 @@
 # QA Testing Framework - Implementation Review
 
 An assessment of the four QA phases implemented in zithril v0.15.0-v0.16.0,
-updated for v0.17.0 fixes.
-Each section covers usage, a rating, and noted shortcomings.
+updated for v0.17.0 fixes (8 items resolved).
+
+---
+
+## Status Summary
+
+| Phase | Rating | Fixed in v0.17.0 | Remaining |
+|-------|--------|------------------|-----------|
+| 1. TestHarness | 9/10 | 2 (getRegion, MockBackend) | 3 |
+| 2. Snapshots | 8/10 | 3 (update-snapshots, dimensions, auto-mkdir) | 2 |
+| 3. Scenario DSL | 9/10 | 2 (escape sequences, bounds checking) | 5 |
+| 4. QA Analysis | 7/10 | 1 (state restore) | 7 |
+| **Overall** | **8/10** | **8 fixed** | **17 remaining** |
+
+### What Was Fixed in v0.17.0
+
+| # | Fix | Phase | Impact |
+|---|-----|-------|--------|
+| 1 | Removed unused MockBackend from TestHarness | P1 | -256KB per harness |
+| 2 | `getRegion(allocator, Rect)` implemented | P1 | Rectangular buffer extraction |
+| 3 | `--update-snapshots` build option | P2 | `zig build test -Dupdate-snapshots=true` |
+| 4 | Golden file dimension headers | P2 | Self-describing `# zithril-golden WxH` |
+| 5 | Auto-create directories for snapshots | P2 | No manual mkdir needed |
+| 6 | Escape sequences in scenario strings | P3 | `\"`, `\\`, `\n`, `\t` |
+| 7 | Coordinate bounds checking in scenarios | P3 | Prevents UB on out-of-bounds |
+| 8 | Save/restore harness state in audits | P4 | No more state corruption |
+
+### What Remains (by priority for future work)
+
+**Actionable improvements** (concrete, well-scoped):
+
+| # | Item | Phase | Effort | Notes |
+|---|------|-------|--------|-------|
+| A | Annotated snapshots (style-aware golden files) | P2 | Medium | Detect style regressions. Need per-cell `[row,col] char style fg bg` format. |
+| B | Mouse target size audit | P4 | Medium | `auditMouseTargets()` -- check clickable regions >= 3x1 cells. Requires HitTester. |
+| C | Verbose AuditReport.summary() | P4 | Small | Print individual findings with message + region, not just counts. |
+| D | Per-finding deduplication in audits | P4 | Small | Group by color pair or style, show unique count. |
+| E | Recording-to-scenario converter | P3 | Medium | `recorder.toScenario()` for exporting test sessions as `.scenario` files. |
+| F | Configurable snapshot path in scenarios | P3 | Small | Let ScenarioRunner configure the golden file directory. |
+
+**Known limitations** (by design or fundamental):
+
+| # | Item | Phase | Why it stays |
+|---|------|-------|-------------|
+| G | rightClick() uses ctrl modifier hack | P1 | Event model has no right-button field. Fix upstream in event.zig. |
+| H | MaxWidgets hardcoded to 64 | P1 | Unlikely to hit in practice. Could make configurable if needed. |
+| I | No async/command support | P1 | By design for Phase 1. Requires runtime command dispatch. |
+| J | Heuristic focus detection is fragile | P4 | Buffer diffing can't distinguish focus from other changes. |
+| K | Focus visibility only checks style, not content | P4 | Character-based indicators (e.g., `[*]`) not detected. |
+| L | Contrast audit skips default colors | P4 | No RGB triplet for terminal defaults. Would need background detection. |
+| M | `repeat` only affects next single directive | P3 | Documented behavior. Block form would require parser changes. |
+
+**Low-priority / cosmetic**:
+
+| # | Item | Phase | Notes |
+|---|------|-------|-------|
+| N | 1MB golden file size cap | P2 | Undocumented limit. Unlikely to hit. |
+| O | Trailing whitespace in golden files | P2 | Cosmetic. Editors may strip. |
+| P | `size` must be first directive | P3 | Works correctly, just no error on mid-file size. |
+| Q | `addFailure()` silently drops OOM | P3 | Moot with std.testing.allocator. |
+| R | `wait <ms>` directive not implemented | P3 | `tick` covers frame-by-frame. Wall-clock delay is niche. |
+| S | No programmatic finding access by region | P4 | Convenience API. Users can iterate manually. |
+| T | Screen reader hint audit | P4 | Aspirational. No semantic labeling infrastructure. |
 
 ---
 
 ## Phase 1: TestHarness
 
 **Files**: `src/testing.zig` (TestHarness struct, ~300 lines)
-**Tests**: 35 in testing.zig
-**Version**: v0.15.0
+**Tests**: 35+ in testing.zig
+**Version**: v0.15.0, updated v0.17.0
 
 ### What It Is
 
 A generic struct `TestHarness(State)` that drives the full update/view/render
-cycle without a real terminal. It wires together MockBackend, double-buffered
-rendering, and event injection so users can test TUI apps with a few lines.
+cycle without a real terminal. Double-buffered rendering and event injection
+let users test TUI apps with a few lines.
 
 ### How to Use
 
@@ -88,55 +149,33 @@ test "counter increments" {
 
 ### Buffer Access
 
-| Method                  | Returns                           |
-|-------------------------|-----------------------------------|
-| `getCell(x, y)`         | Raw Cell struct                   |
-| `getBuffer()`           | Const pointer to current buffer   |
-| `getText(allocator)`    | Full buffer as allocated string   |
-| `getRow(allocator, y)`  | Single row as allocated string    |
+| Method                         | Returns                            |
+|--------------------------------|------------------------------------|
+| `getCell(x, y)`                | Raw Cell struct                    |
+| `getBuffer()`                  | Const pointer to current buffer    |
+| `getText(allocator)`           | Full buffer as allocated string    |
+| `getRow(allocator, y)`         | Single row as allocated string     |
+| `getRegion(allocator, Rect)`   | Rectangular region as text (v0.17) |
 
-### Rating: 9/10
+### Remaining Work
 
-The TestHarness is clean, complete, and well-tested. It faithfully implements
-the event-update-render loop, provides rich error messages on assertion failure
-(including Unicode codepoints and positional context), and handles wide
-characters correctly. The 35 tests cover all public methods including edge
-cases (out-of-bounds row access, empty buffers, resize during test).
-
-### Shortcomings
-
-1. ~~**`getRegion(rect)` not implemented.**~~ **FIXED in v0.17.0.** `getRegion(allocator, Rect)`
-   extracts a rectangular region of the buffer as text, with clamping to buffer bounds.
-
-2. ~~**MockBackend allocated but unused.**~~ **FIXED in v0.17.0.** Removed the unused
-   MockBackend field from TestHarness, eliminating the wasted 256KB allocation.
-
-3. **rightClick() uses ctrl modifier hack.** There is no dedicated right-button
-   field on MouseKind, so right-click is simulated via `ctrl + left click`.
-   Works for apps that follow this convention, but is not a true right-click
-   event. This is a limitation of the event model, not the harness itself.
-
-4. **MaxWidgets hardcoded to 64.** Not configurable per-harness. Unlikely to
-   be a problem in practice, but large UIs with many widgets per frame could
-   hit this ceiling.
-
-5. **No async/command support.** `Action.command` exists as a variant but the
-   harness does not execute commands. By design for Phase 1, but means
-   command-driven apps cannot be fully tested yet.
+- [G] rightClick() uses ctrl modifier hack (event model limitation)
+- [H] MaxWidgets hardcoded to 64 (configurable if needed)
+- [I] No async/command support (future: runtime command dispatch)
 
 ---
 
 ## Phase 2: Snapshot Diffs (Golden File Workflow)
 
-**Files**: `src/testing.zig` (Snapshot struct + bufferToText, ~180 lines)
-**Tests**: ~12 snapshot-specific tests in testing.zig
-**Version**: v0.15.0
+**Files**: `src/testing.zig` (Snapshot struct + bufferToText, ~200 lines)
+**Tests**: ~14 snapshot-specific tests in testing.zig
+**Version**: v0.15.0, updated v0.17.0
 
 ### What It Is
 
 A golden file testing system. Captures the rendered buffer as plain text,
-saves it to `.golden` files, and compares subsequent runs against the baseline.
-Mismatches produce line-by-line diffs.
+saves it to `.golden` files with dimension headers, and compares subsequent
+runs against the baseline. Mismatches produce line-by-line diffs.
 
 ### How to Use
 
@@ -156,11 +195,14 @@ try harness.expectSnapshot(
 **Golden file workflow:**
 
 ```zig
-// First run: create baseline
+// First run: create baseline (auto-creates directories)
 try harness.saveSnapshot("tests/golden/counter_initial.golden");
 
 // Subsequent runs: compare against baseline
 try harness.expectSnapshotFile("tests/golden/counter_initial.golden");
+
+// Or auto-update on mismatch:
+//   zig build test -Dupdate-snapshots=true
 ```
 
 **Standalone Snapshot API:**
@@ -169,19 +211,9 @@ try harness.expectSnapshotFile("tests/golden/counter_initial.golden");
 var snap = try Snapshot.fromBuffer(allocator, buffer);
 defer snap.deinit();
 
-// Compare two snapshots
-var other = try Snapshot.fromBuffer(allocator, other_buffer);
-defer other.deinit();
-
-if (!snap.eql(other)) {
-    const diff_text = try snap.diff(allocator, other);
-    defer allocator.free(diff_text);
-    std.debug.print("{s}\n", .{diff_text});
-}
-
-// File I/O
+// File I/O (header stores dimensions automatically)
 try snap.saveToFile("tests/golden/my_test.golden");
-var loaded = try Snapshot.loadFromFile(allocator, "tests/golden/my_test.golden", 80, 24);
+var loaded = try Snapshot.loadFromFile(allocator, "tests/golden/my_test.golden");
 defer loaded.deinit();
 ```
 
@@ -203,49 +235,19 @@ Line 5:
   Actual:   "|  [Stop]     |"
 ```
 
-### Rating: 7/10
+### Remaining Work
 
-The core workflow is solid. File save/load, inline comparison, and diff output
-all work correctly. The integration with TestHarness is seamless. However, this
-is the thinnest of the four phases -- it does the basics well but lacks the
-polish that would make it a standout feature.
-
-### Shortcomings
-
-1. ~~**No `--update-snapshots` build option.**~~ **FIXED in v0.17.0.** Run
-   `zig build test -Dupdate-snapshots=true` to auto-update golden files when
-   the UI changes intentionally. Also supports `ZITHRIL_UPDATE_SNAPSHOTS=1`
-   environment variable for direct `zig test` usage.
-
-2. **Annotated snapshots not implemented.** The design doc describes a
-   `[row,col] char style_flags fg bg` format for style-aware golden files.
-   `bufferToAnnotatedText()` exists but only produces a simple debug
-   pretty-print with row numbers -- it does NOT capture style attributes per
-   cell. Plain text snapshots cannot detect style regressions (e.g., a label
-   losing its bold attribute).
-
-3. ~~**loadFromFile dimensions are caller-supplied.**~~ **FIXED in v0.17.0.**
-   Golden files now include a `# zithril-golden WxH` header line. `loadFromFile()`
-   parses the header to extract dimensions automatically.
-
-4. **1MB file size cap.** `loadFromFile()` limits reads to 1MB. Very large
-   terminal captures (e.g., 200x100 buffer with Unicode) could approach this.
-   The limit is undocumented.
-
-5. **Trailing whitespace preserved.** Golden files include trailing spaces to
-   fill the terminal width. This makes files harder to read in editors that
-   strip trailing whitespace and can cause spurious diffs. No option to trim.
-
-6. ~~**No directory auto-creation.**~~ **FIXED in v0.17.0.** `saveToFile()` now
-   creates parent directories automatically via `makePath`.
+- [A] Annotated snapshots -- style-aware golden files with per-cell attributes
+- [N] 1MB file size cap (undocumented, unlikely to hit)
+- [O] Trailing whitespace preserved (cosmetic, editor strip issues)
 
 ---
 
 ## Phase 3: Scenario DSL (Data-Driven Test Files)
 
-**Files**: `src/scenario.zig` (1305 lines)
-**Tests**: 15 in scenario.zig (68 parser tests + 13 runner tests from test analysis)
-**Version**: v0.16.0
+**Files**: `src/scenario.zig` (~1500 lines)
+**Tests**: ~45 in scenario.zig (parser tests + runner tests)
+**Version**: v0.16.0, updated v0.17.0
 
 ### What It Is
 
@@ -269,10 +271,10 @@ key +
 # Verify count
 expect_string 0 0 "Count: 3"
 
-# Type a sequence
-type "hello"
+# Type a sequence (supports escape sequences)
+type "hello\tworld"
 
-# Mouse interaction
+# Mouse interaction (bounds-checked)
 click 10 5
 expect_style 10 5 bold
 
@@ -297,14 +299,13 @@ snapshot counter_final
 ```zig
 test "scenario: counter basic" {
     var state = Counter{};
-    var runner = try zithril.ScenarioRunner(Counter).init(
+    var runner = ScenarioRunner(Counter).init(
         std.testing.allocator,
         &state,
         Counter.update,
         Counter.view,
     );
 
-    // From string
     const result = try runner.run(
         \\size 40 10
         \\key +
@@ -312,23 +313,6 @@ test "scenario: counter basic" {
     );
     defer result.deinit();
     try std.testing.expect(result.passed);
-
-    // From file
-    const file_result = try runner.runFile("tests/scenarios/counter_basic.scenario");
-    defer file_result.deinit();
-    try std.testing.expect(file_result.passed);
-}
-```
-
-**Inspect failures:**
-
-```zig
-if (!result.passed) {
-    for (result.failures) |f| {
-        std.debug.print("Line {d}: {s} - expected {s}, got {s}\n", .{
-            f.line, f.directive_text, f.expected, f.actual,
-        });
-    }
 }
 ```
 
@@ -349,8 +333,9 @@ key alt+<char>                   With alt modifier
 key shift+<char>                 With shift modifier
 key ctrl+alt+<char>              Combined modifiers
 type "hello world"               Type each character in sequence
+                                 Supports: \", \\, \n, \t
 
-# Mouse
+# Mouse (bounds-checked against buffer dimensions)
 click <x> <y>                   Left click (down + up)
 right_click <x> <y>             Right click
 mouse_down <x> <y>              Button press
@@ -364,7 +349,7 @@ scroll_down <x> <y>             Scroll wheel down
 tick                             Advance one frame
 tick <n>                         Advance n frames
 
-# Assertions
+# Assertions (bounds-checked against buffer dimensions)
 expect_string <x> <y> "<text>"  String at position
 expect_cell <x> <y> <char>      Single character
 expect_empty <x> <y>            Cell is blank
@@ -380,118 +365,59 @@ repeat <n>                       Repeat next directive n times
 # comment                        Ignored
 ```
 
-### Rating: 8/10
+### Remaining Work
 
-The Scenario DSL is well-structured and covers the vast majority of the design
-doc's specification. The parser handles 22 directive types with clean error
-reporting (line numbers, directive names, expected vs actual). The tagged union
-approach for directives is idiomatic Zig. Test coverage is strong with both
-parser-level and runner-level tests.
-
-### Shortcomings
-
-1. **`wait <ms>` directive not implemented.** Listed in the design doc for
-   timed delays between events (useful for animation testing). The `tick`
-   directive advances frame-by-frame but there is no wall-clock delay. This
-   matters for apps with time-based animations.
-
-2. ~~**No escape sequences in strings.**~~ **FIXED in v0.17.0.** Quoted strings
-   now support `\"`, `\\`, `\n`, and `\t` escape sequences. Invalid escape
-   sequences produce an `InvalidEscapeSequence` parse error.
-
-3. **`repeat` only affects the next single directive.** Cannot repeat a block
-   of directives. To repeat a sequence (e.g., key + assertion), users must
-   write it out manually or use multiple `repeat` lines. The design doc implies
-   this limitation ("Repeat next directive n times") but a block form would be
-   more useful.
-
-4. **Snapshot path hardcoded to `tests/golden/{name}.golden`.** Not
-   configurable on the ScenarioRunner. If a project uses a different directory
-   structure, the scenario `snapshot` directive cannot accommodate it.
-
-5. **`size` must be the first directive.** If `size` appears anywhere else in
-   the file, it is silently treated as first (extracted before execution). The
-   parser does not error on `size` appearing mid-file, but the behavior is
-   unclear -- it always uses the first parsed `size` and ignores the rest.
-
-6. ~~**No coordinate bounds checking.**~~ **FIXED in v0.17.0.** Mouse and
-   assertion directives now validate coordinates against buffer dimensions.
-   Out-of-bounds coordinates are reported as scenario failures rather than
-   silently producing undefined behavior.
-
-7. **`addFailure()` silently drops OOM.** When recording a failure, if the
-   allocator runs out of memory, the failure is silently lost. In testing
-   contexts with `std.testing.allocator` this is unlikely, but it could mask
-   issues with general-purpose allocators.
-
-8. **No recording-to-scenario converter.** The design doc describes a workflow
-   where TestRecorder sessions are exported as `.scenario` files. This
-   `recorder.toScenario()` method is not implemented.
+- [E] Recording-to-scenario converter (`recorder.toScenario()`)
+- [F] Configurable snapshot path in ScenarioRunner
+- [M] `repeat` for blocks of directives (currently single-directive only)
+- [P] `size` mid-file should produce a parse error
+- [Q] `addFailure()` should propagate OOM instead of silently dropping
+- [R] `wait <ms>` directive for wall-clock delays
 
 ---
 
 ## Phase 4: QA Analysis (Accessibility Auditing)
 
-**Files**: `src/audit.zig` (904 lines)
-**Tests**: 10 tests covering all 3 audit functions
-**Version**: v0.16.0
+**Files**: `src/audit.zig` (~830 lines)
+**Tests**: 12+ tests covering all 3 audit functions
+**Version**: v0.16.0, updated v0.17.0
 
 ### What It Is
 
 Automated analysis tools that inspect the rendered buffer and app behavior to
 identify accessibility and usability issues. Three audits are implemented:
-contrast checking, keyboard navigation, and focus visibility.
+contrast checking, keyboard navigation, and focus visibility. Audits now
+save and restore harness state so they can be used mid-test without side effects.
 
 ### How to Use
 
 **Contrast audit (works on any Buffer):**
 
 ```zig
-var buf = try Buffer.init(allocator, 80, 24);
-defer buf.deinit();
-
-// Render your UI into buf...
-buf.setString(0, 0, "Warning", Style.init().fg(.{ .rgb = .{ 0x88, 0x88, 0x88 }})
-                                            .bg(.{ .rgb = .{ 0x99, 0x99, 0x99 }}));
-
 var result = try zithril.auditContrast(allocator, &buf);
 defer result.deinit();
 
-// Check results
 if (result.failCount() > 0) {
     std.debug.print("{d} contrast failures\n", .{result.failCount()});
 }
 ```
 
-**Keyboard navigation audit (requires TestHarness):**
+**Keyboard navigation audit (requires TestHarness, state-safe):**
 
 ```zig
-var state = MyState{};
-var harness = try zithril.TestHarness(MyState).init(allocator, .{
-    .state = &state, .update = update, .view = view,
-    .width = 80, .height = 24,
-});
-defer harness.deinit();
-
 var nav = try zithril.auditKeyboardNav(MyState, allocator, &harness, .{
-    .max_tabs = 20,  // default: 20
-});
-defer nav.deinit();
-
-// Expect at least one tab stop
-try std.testing.expect(nav.passCount() > 0);
-```
-
-**Focus visibility audit (requires TestHarness):**
-
-```zig
-var focus = try zithril.auditFocusVisibility(MyState, allocator, &harness, .{
     .max_tabs = 20,
 });
-defer focus.deinit();
+defer nav.deinit();
+// harness state is restored after audit
+```
 
-// All focused elements should be visually distinguishable
-try std.testing.expect(focus.failCount() == 0);
+**Focus visibility audit (requires TestHarness, state-safe):**
+
+```zig
+var focus = try zithril.auditFocusVisibility(MyState, allocator, &harness, .{});
+defer focus.deinit();
+// harness state is restored after audit
 ```
 
 **Aggregate report:**
@@ -507,13 +433,6 @@ try report.addResult(focus_result);
 const summary = try report.summary(allocator);
 defer allocator.free(summary);
 std.debug.print("{s}\n", .{summary});
-// Output:
-//   QA AUDIT REPORT
-//   ===============
-//   contrast: 45 findings (2 fail, 3 warn, 40 pass)
-//   keyboard_navigation: 5 findings (0 fail, 1 warn, 4 pass)
-//   focus_visibility: 4 findings (1 fail, 0 warn, 3 pass)
-//   Overall pass rate: 87.0%
 ```
 
 ### Severity Mapping
@@ -525,105 +444,37 @@ std.debug.print("{s}\n", .{summary});
 | AA Large only  | fail     | Insufficient for body text |
 | Below AA      | fail     | Fails accessibility check  |
 
-### Rating: 6/10
+### Remaining Work
 
-This is the most ambitious phase and the most incomplete. The three implemented
-audits work correctly and the type system (Finding, AuditResult, AuditReport)
-is well-designed for aggregation and reporting. However, the heuristic-based
-approach for keyboard and focus audits has fundamental limitations, and two of
-the five planned audit types are missing entirely.
-
-### Shortcomings
-
-1. **Mouse target size audit not implemented.** Listed in the design doc and
-   present as `AuditCategory.mouse_targets` in the enum, but no corresponding
-   `auditMouseTargets()` function exists. The design describes checking that
-   clickable regions are at least 3x1 cells, which would require HitTester
-   integration.
-
-2. **Screen reader hint audit not implemented.** Described in the design doc as
-   "aspirational" and not expected for v0.16.0, but worth noting. No
-   infrastructure for semantic labeling of widgets exists yet.
-
-3. **Heuristic focus detection is fragile.** Both `auditKeyboardNav` and
-   `auditFocusVisibility` detect focus changes by diffing the buffer before
-   and after Tab presses. This approach:
-   - Fails if the app changes content but not style on focus (e.g., prepending
-     a `>` marker without changing cell style)
-   - Produces false positives if non-focus content changes on Tab (e.g.,
-     a counter that increments each frame)
-   - Cannot distinguish "focus moved" from "something else changed"
-
-4. **Contrast audit skips default colors.** Cells using the terminal's default
-   foreground/background colors are silently skipped because there is no RGB
-   triplet to calculate a ratio from. In practice, many TUI apps rely heavily
-   on default colors. The audit only checks explicitly-set RGB colors, which
-   may be a small fraction of the rendered content.
-
-5. **No per-finding deduplication.** If the same color pair appears in 50
-   different regions, 50 separate findings are generated. A "unique issues"
-   count or grouping by color pair would make reports more actionable.
-
-6. **`auditFocusVisibility` only checks style, not content.** If an app's
-   focus indicator is a character change (e.g., `[ ]` becomes `[*]`), the
-   focus visibility audit will report a false failure because it only calls
-   `detectStyleChange()`, not a content diff.
-
-7. **No programmatic finding access by region.** Findings have a `.region`
-   field but there is no API to query "findings overlapping this Rect" or
-   "findings for this widget." Users must iterate the findings array manually.
-
-8. ~~**Keyboard audit mutates harness state.**~~ **FIXED in v0.17.0.** Both
-   `auditKeyboardNav` and `auditFocusVisibility` now save and restore the
-   harness state (both buffer cells and user State) before and after the
-   audit. The harness is left in its original state after audit completion.
-
-9. **AuditReport.summary() format is basic.** Counts findings per category but
-   does not print individual findings. Users must iterate `.findings` manually
-   to see details. A verbose summary mode showing each finding's message and
-   region would be useful.
+- [B] Mouse target size audit (`auditMouseTargets()` -- requires HitTester)
+- [C] Verbose AuditReport.summary() (print individual findings)
+- [D] Per-finding deduplication (group by color pair or style)
+- [J] Heuristic focus detection is fragile (fundamental limitation)
+- [K] Focus visibility only checks style, not content changes
+- [L] Contrast audit skips default/terminal colors (no RGB available)
+- [S] Programmatic finding access by region (convenience API)
+- [T] Screen reader hint audit (aspirational, no infrastructure)
 
 ---
 
 ## Cross-Cutting Observations
 
-### What Works Well Across All Phases
+### What Works Well
 
 - **Consistent allocator discipline.** Every allocation is caller-owned,
   every struct has a matching `deinit()`, errdefer chains are correct.
 - **Rich error messages.** All assertions print context: position, expected
-  vs actual values, Unicode codepoints. Failures are debuggable without
-  stepping through code.
+  vs actual values, Unicode codepoints.
 - **UTF-8 correctness.** Wide characters, multi-byte sequences, and
   codepoint-level comparison are handled throughout.
-- **Composability.** The phases layer cleanly: Scenarios use TestHarness,
-  Audits use TestHarness, Snapshots work with both. No circular
-  dependencies, no tight coupling.
-- **Comprehensive test suites.** 60+ tests across the three source files.
-  Tests cover sanity, behavior, and regression categories.
+- **Composability.** Scenarios use TestHarness, Audits use TestHarness,
+  Snapshots work with both. No circular dependencies.
+- **Comprehensive test suites.** 70+ tests across the three source files.
 
-### What's Missing Across the Board
+### Cross-Cutting Gaps
 
-- **No example app with QA tests.** The framework has `examples/` and `demos/`
-  directories but no example showing how to set up a full QA test suite with
-  scenarios, golden files, and audits. A reference example would accelerate
-  adoption.
-- **No CI integration guide.** The design doc mentions artifact collection and
-  `zig build test` integration, but there is no documentation on how to set up
-  golden file management in CI (committing baselines, handling updates,
-  reporting failures).
-- **`screen_reader_hints` category unused.** Not in the enum, not planned for
-  implementation. The design doc acknowledges this as aspirational.
-
-### Overall Framework Rating: 8/10
-
-The QA Testing Framework delivers on its core promise: a single entry point
-(TestHarness) that wires together all testing primitives, with three layers
-of progressively higher abstraction (assertions, snapshots, scenarios) and
-automated accessibility analysis. The implementation is idiomatic Zig with
-solid memory management and good test coverage.
-
-The main areas for improvement are the snapshot workflow (needs auto-update),
-the audit heuristics (inherently limited by buffer-level analysis), and the
-two missing audit types. These are reasonable gaps for a v0.16.0 release and
-represent clear next steps rather than fundamental design flaws.
+- **No example app with QA tests.** No example showing how to set up a
+  full QA test suite with scenarios, golden files, and audits. Planned
+  for the demo/showcase overhaul.
+- **No CI integration guide.** No documentation on golden file management
+  in CI (committing baselines, handling updates, reporting failures).
