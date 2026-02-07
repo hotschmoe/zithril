@@ -162,6 +162,7 @@ zig build run-dataviz           # Run data visualization gallery
 zig build run-showcase          # Run rich text feature showcase
 zig build run-example-mouse-demo # Run mouse interaction demo
 zig build test                  # Run all tests
+zig build test -Dupdate-snapshots=true  # Run tests, auto-update golden files
 zig fmt src/                    # Format before commits
 ```
 

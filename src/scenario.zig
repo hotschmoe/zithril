@@ -75,6 +75,7 @@ pub const ParseError = error{
     InvalidStyleAttribute,
     InvalidActionKind,
     UnterminatedString,
+    InvalidEscapeSequence,
     EmptyScenario,
     OutOfMemory,
 };
@@ -82,12 +83,15 @@ pub const ParseError = error{
 pub const ScenarioParser = struct {
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) ParseError![]Directive {
         var directives: std.ArrayListUnmanaged(Directive) = .{};
-        errdefer directives.deinit(allocator);
+        errdefer {
+            freeDirectives(allocator, directives.items);
+            directives.deinit(allocator);
+        }
 
         var line_iter = std.mem.splitScalar(u8, text, '\n');
         while (line_iter.next()) |raw_line| {
             const line = std.mem.trimRight(u8, raw_line, " \t\r");
-            if (parseLine(line)) |maybe_directive| {
+            if (parseLine(allocator, line)) |maybe_directive| {
                 if (maybe_directive) |directive| {
                     directives.append(allocator, directive) catch return ParseError.OutOfMemory;
                 }
@@ -99,7 +103,17 @@ pub const ScenarioParser = struct {
         return directives.toOwnedSlice(allocator) catch return ParseError.OutOfMemory;
     }
 
-    pub fn parseLine(line: []const u8) ParseError!?Directive {
+    pub fn freeDirectives(allocator: std.mem.Allocator, directives: []const Directive) void {
+        for (directives) |d| {
+            switch (d) {
+                .type_text => |t| allocator.free(t),
+                .expect_string => |es| allocator.free(es.text),
+                else => {},
+            }
+        }
+    }
+
+    pub fn parseLine(allocator: std.mem.Allocator, line: []const u8) ParseError!?Directive {
         const trimmed = std.mem.trimLeft(u8, line, " \t");
         if (trimmed.len == 0) return null;
         if (trimmed[0] == '#') return null;
@@ -122,7 +136,7 @@ pub const ScenarioParser = struct {
 
         if (std.mem.eql(u8, command, "type")) {
             const rest = tokens.rest();
-            const text = parseQuotedString(rest) orelse return ParseError.UnterminatedString;
+            const text = try parseQuotedString(allocator, rest) orelse return ParseError.UnterminatedString;
             return Directive{ .type_text = text };
         }
 
@@ -188,7 +202,7 @@ pub const ScenarioParser = struct {
             const x = parseU16(tokens.next() orelse return ParseError.MissingArgument) orelse return ParseError.InvalidInteger;
             const y = parseU16(tokens.next() orelse return ParseError.MissingArgument) orelse return ParseError.InvalidInteger;
             const rest = tokens.rest();
-            const text = parseQuotedString(rest) orelse return ParseError.UnterminatedString;
+            const text = try parseQuotedString(allocator, rest) orelse return ParseError.UnterminatedString;
             return Directive{ .expect_string = .{ .x = x, .y = y, .text = text } };
         }
 
@@ -338,12 +352,32 @@ pub const ScenarioParser = struct {
         return null;
     }
 
-    fn parseQuotedString(input: []const u8) ?[]const u8 {
+    fn parseQuotedString(allocator: std.mem.Allocator, input: []const u8) ParseError!?[]const u8 {
         const trimmed = std.mem.trimLeft(u8, input, " \t");
         if (trimmed.len < 2) return null;
         if (trimmed[0] != '"') return null;
-        if (std.mem.indexOfScalarPos(u8, trimmed, 1, '"')) |end| {
-            return trimmed[1..end];
+
+        var result: std.ArrayListUnmanaged(u8) = .{};
+        errdefer result.deinit(allocator);
+
+        var i: usize = 1;
+        while (i < trimmed.len) : (i += 1) {
+            if (trimmed[i] == '"') {
+                return result.toOwnedSlice(allocator) catch return ParseError.OutOfMemory;
+            }
+            if (trimmed[i] == '\\' and i + 1 < trimmed.len) {
+                i += 1;
+                const escaped: u8 = switch (trimmed[i]) {
+                    '"' => '"',
+                    '\\' => '\\',
+                    'n' => '\n',
+                    't' => '\t',
+                    else => return ParseError.InvalidEscapeSequence,
+                };
+                result.append(allocator, escaped) catch return ParseError.OutOfMemory;
+            } else {
+                result.append(allocator, trimmed[i]) catch return ParseError.OutOfMemory;
+            }
         }
         return null;
     }
@@ -455,7 +489,10 @@ pub fn ScenarioRunner(comptime State: type) type {
 
         pub fn run(self: *Self, scenario_text: []const u8) !ScenarioResult {
             const directives = try ScenarioParser.parse(self.allocator, scenario_text);
-            defer self.allocator.free(directives);
+            defer {
+                ScenarioParser.freeDirectives(self.allocator, directives);
+                self.allocator.free(directives);
+            }
 
             var result = ScenarioResult.init(self.allocator);
             result.total_directives = directives.len;
@@ -529,8 +566,20 @@ pub fn ScenarioRunner(comptime State: type) type {
             return self.run(text);
         }
 
+        fn coordsInBounds(harness: *Harness, x: u16, y: u16) bool {
+            return x < harness.current_buf.width and y < harness.current_buf.height;
+        }
+
+        fn addOobFailure(result: *ScenarioResult, line: usize, directive_name: []const u8, x: u16, y: u16, w: u16, h: u16) void {
+            var buf: [128]u8 = undefined;
+            const actual = std.fmt.bufPrint(&buf, "coordinates out of bounds: ({d}, {d}) exceeds {d}x{d}", .{ x, y, w, h }) catch "(out of bounds)";
+            result.addFailure(line, directive_name, "within bounds", actual);
+        }
+
         fn executeDirective(self: *Self, harness: *Harness, directive: Directive, line: usize, result: *ScenarioResult) void {
             _ = self;
+            const buf_w = harness.current_buf.width;
+            const buf_h = harness.current_buf.height;
 
             switch (directive) {
                 .key => |char| {
@@ -548,27 +597,63 @@ pub fn ScenarioRunner(comptime State: type) type {
                     }
                 },
                 .click => |pos| {
+                    if (!coordsInBounds(harness, pos.x, pos.y)) {
+                        addOobFailure(result, line, "click", pos.x, pos.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.click(pos.x, pos.y);
                 },
                 .right_click => |pos| {
+                    if (!coordsInBounds(harness, pos.x, pos.y)) {
+                        addOobFailure(result, line, "right_click", pos.x, pos.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.rightClick(pos.x, pos.y);
                 },
                 .mouse_down => |pos| {
+                    if (!coordsInBounds(harness, pos.x, pos.y)) {
+                        addOobFailure(result, line, "mouse_down", pos.x, pos.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.mouseDown(pos.x, pos.y);
                 },
                 .mouse_up => |pos| {
+                    if (!coordsInBounds(harness, pos.x, pos.y)) {
+                        addOobFailure(result, line, "mouse_up", pos.x, pos.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.mouseUp(pos.x, pos.y);
                 },
                 .hover => |pos| {
+                    if (!coordsInBounds(harness, pos.x, pos.y)) {
+                        addOobFailure(result, line, "hover", pos.x, pos.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.hover(pos.x, pos.y);
                 },
                 .drag => |d| {
+                    if (!coordsInBounds(harness, d.x1, d.y1)) {
+                        addOobFailure(result, line, "drag", d.x1, d.y1, buf_w, buf_h);
+                        return;
+                    }
+                    if (!coordsInBounds(harness, d.x2, d.y2)) {
+                        addOobFailure(result, line, "drag", d.x2, d.y2, buf_w, buf_h);
+                        return;
+                    }
                     harness.drag(d.x1, d.y1, d.x2, d.y2);
                 },
                 .scroll_up => |pos| {
+                    if (!coordsInBounds(harness, pos.x, pos.y)) {
+                        addOobFailure(result, line, "scroll_up", pos.x, pos.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.scroll(pos.x, pos.y, .scroll_up);
                 },
                 .scroll_down => |pos| {
+                    if (!coordsInBounds(harness, pos.x, pos.y)) {
+                        addOobFailure(result, line, "scroll_down", pos.x, pos.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.scroll(pos.x, pos.y, .scroll_down);
                 },
                 .tick => {
@@ -578,11 +663,19 @@ pub fn ScenarioRunner(comptime State: type) type {
                     harness.tickN(n);
                 },
                 .expect_string => |es| {
+                    if (!coordsInBounds(harness, es.x, es.y)) {
+                        addOobFailure(result, line, "expect_string", es.x, es.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.expectString(es.x, es.y, es.text) catch {
                         result.addFailure(line, "expect_string", es.text, "(mismatch)");
                     };
                 },
                 .expect_cell => |ec| {
+                    if (!coordsInBounds(harness, ec.x, ec.y)) {
+                        addOobFailure(result, line, "expect_cell", ec.x, ec.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.expectCell(ec.x, ec.y, ec.char) catch {
                         var buf: [32]u8 = undefined;
                         const actual_cell = harness.current_buf.get(ec.x, ec.y);
@@ -593,11 +686,19 @@ pub fn ScenarioRunner(comptime State: type) type {
                     };
                 },
                 .expect_empty => |ee| {
+                    if (!coordsInBounds(harness, ee.x, ee.y)) {
+                        addOobFailure(result, line, "expect_empty", ee.x, ee.y, buf_w, buf_h);
+                        return;
+                    }
                     harness.expectEmpty(ee.x, ee.y) catch {
                         result.addFailure(line, "expect_empty", "(empty)", "(not empty)");
                     };
                 },
                 .expect_style => |es| {
+                    if (!coordsInBounds(harness, es.x, es.y)) {
+                        addOobFailure(result, line, "expect_style", es.x, es.y, buf_w, buf_h);
+                        return;
+                    }
                     const cell = harness.current_buf.get(es.x, es.y);
                     const rich_attr = es.attr.toStyleAttribute();
                     if (!cell.style.hasAttribute(rich_attr)) {
@@ -658,50 +759,50 @@ test "sanity: parse blank lines" {
 }
 
 test "sanity: parseLine returns null for blank" {
-    const result = try ScenarioParser.parseLine("");
+    const result = try ScenarioParser.parseLine(std.testing.allocator, "");
     try std.testing.expect(result == null);
 }
 
 test "sanity: parseLine returns null for comment" {
-    const result = try ScenarioParser.parseLine("# comment");
+    const result = try ScenarioParser.parseLine(std.testing.allocator, "# comment");
     try std.testing.expect(result == null);
 }
 
 test "behavior: parse size directive" {
-    const result = (try ScenarioParser.parseLine("size 100 50")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "size 100 50")).?;
     try std.testing.expect(result == .size);
     try std.testing.expectEqual(@as(u16, 100), result.size.width);
     try std.testing.expectEqual(@as(u16, 50), result.size.height);
 }
 
 test "behavior: parse key character" {
-    const result = (try ScenarioParser.parseLine("key a")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "key a")).?;
     try std.testing.expect(result == .key);
     try std.testing.expectEqual(@as(u21, 'a'), result.key);
 }
 
 test "behavior: parse key special" {
-    const result = (try ScenarioParser.parseLine("key enter")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "key enter")).?;
     try std.testing.expect(result == .key_special);
     try std.testing.expect(result.key_special == .enter);
 }
 
 test "behavior: parse key with modifiers" {
-    const result = (try ScenarioParser.parseLine("key ctrl+c")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "key ctrl+c")).?;
     try std.testing.expect(result == .key_with_mods);
     try std.testing.expect(result.key_with_mods.mods.ctrl);
     try std.testing.expect(!result.key_with_mods.mods.alt);
 }
 
 test "behavior: parse key ctrl+alt+x" {
-    const result = (try ScenarioParser.parseLine("key ctrl+alt+x")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "key ctrl+alt+x")).?;
     try std.testing.expect(result == .key_with_mods);
     try std.testing.expect(result.key_with_mods.mods.ctrl);
     try std.testing.expect(result.key_with_mods.mods.alt);
 }
 
 test "behavior: parse key shift+enter" {
-    const result = (try ScenarioParser.parseLine("key shift+enter")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "key shift+enter")).?;
     try std.testing.expect(result == .key_with_mods);
     try std.testing.expect(result.key_with_mods.mods.shift);
     try std.testing.expect(result.key_with_mods.code == .enter);
@@ -717,60 +818,61 @@ test "behavior: parse key special names" {
     for (names) |name| {
         var buf: [32]u8 = undefined;
         const line = std.fmt.bufPrint(&buf, "key {s}", .{name}) catch unreachable;
-        const result = try ScenarioParser.parseLine(line);
+        const result = try ScenarioParser.parseLine(std.testing.allocator, line);
         try std.testing.expect(result != null);
         try std.testing.expect(result.? == .key_special);
     }
 }
 
 test "behavior: parse function keys" {
-    const result = (try ScenarioParser.parseLine("key f5")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "key f5")).?;
     try std.testing.expect(result == .key_special);
     try std.testing.expect(result.key_special == .f);
     try std.testing.expectEqual(@as(u8, 5), result.key_special.f);
 }
 
 test "behavior: parse type directive" {
-    const result = (try ScenarioParser.parseLine("type \"hello world\"")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "type \"hello world\"")).?;
+    defer std.testing.allocator.free(result.type_text);
     try std.testing.expect(result == .type_text);
     try std.testing.expectEqualStrings("hello world", result.type_text);
 }
 
 test "behavior: parse click" {
-    const result = (try ScenarioParser.parseLine("click 10 5")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "click 10 5")).?;
     try std.testing.expect(result == .click);
     try std.testing.expectEqual(@as(u16, 10), result.click.x);
     try std.testing.expectEqual(@as(u16, 5), result.click.y);
 }
 
 test "behavior: parse right_click" {
-    const result = (try ScenarioParser.parseLine("right_click 20 15")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "right_click 20 15")).?;
     try std.testing.expect(result == .right_click);
     try std.testing.expectEqual(@as(u16, 20), result.right_click.x);
     try std.testing.expectEqual(@as(u16, 15), result.right_click.y);
 }
 
 test "behavior: parse mouse_down" {
-    const result = (try ScenarioParser.parseLine("mouse_down 3 7")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "mouse_down 3 7")).?;
     try std.testing.expect(result == .mouse_down);
     try std.testing.expectEqual(@as(u16, 3), result.mouse_down.x);
     try std.testing.expectEqual(@as(u16, 7), result.mouse_down.y);
 }
 
 test "behavior: parse mouse_up" {
-    const result = (try ScenarioParser.parseLine("mouse_up 3 7")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "mouse_up 3 7")).?;
     try std.testing.expect(result == .mouse_up);
 }
 
 test "behavior: parse hover" {
-    const result = (try ScenarioParser.parseLine("hover 12 8")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "hover 12 8")).?;
     try std.testing.expect(result == .hover);
     try std.testing.expectEqual(@as(u16, 12), result.hover.x);
     try std.testing.expectEqual(@as(u16, 8), result.hover.y);
 }
 
 test "behavior: parse drag" {
-    const result = (try ScenarioParser.parseLine("drag 0 0 10 10")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "drag 0 0 10 10")).?;
     try std.testing.expect(result == .drag);
     try std.testing.expectEqual(@as(u16, 0), result.drag.x1);
     try std.testing.expectEqual(@as(u16, 0), result.drag.y1);
@@ -779,28 +881,29 @@ test "behavior: parse drag" {
 }
 
 test "behavior: parse scroll_up" {
-    const result = (try ScenarioParser.parseLine("scroll_up 5 10")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "scroll_up 5 10")).?;
     try std.testing.expect(result == .scroll_up);
 }
 
 test "behavior: parse scroll_down" {
-    const result = (try ScenarioParser.parseLine("scroll_down 5 10")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "scroll_down 5 10")).?;
     try std.testing.expect(result == .scroll_down);
 }
 
 test "behavior: parse tick" {
-    const result = (try ScenarioParser.parseLine("tick")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "tick")).?;
     try std.testing.expect(result == .tick);
 }
 
 test "behavior: parse tick with count" {
-    const result = (try ScenarioParser.parseLine("tick 5")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "tick 5")).?;
     try std.testing.expect(result == .tick_n);
     try std.testing.expectEqual(@as(u32, 5), result.tick_n);
 }
 
 test "behavior: parse expect_string" {
-    const result = (try ScenarioParser.parseLine("expect_string 0 0 \"Count: 0\"")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "expect_string 0 0 \"Count: 0\"")).?;
+    defer std.testing.allocator.free(result.expect_string.text);
     try std.testing.expect(result == .expect_string);
     try std.testing.expectEqual(@as(u16, 0), result.expect_string.x);
     try std.testing.expectEqual(@as(u16, 0), result.expect_string.y);
@@ -808,7 +911,7 @@ test "behavior: parse expect_string" {
 }
 
 test "behavior: parse expect_cell" {
-    const result = (try ScenarioParser.parseLine("expect_cell 5 3 X")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "expect_cell 5 3 X")).?;
     try std.testing.expect(result == .expect_cell);
     try std.testing.expectEqual(@as(u16, 5), result.expect_cell.x);
     try std.testing.expectEqual(@as(u16, 3), result.expect_cell.y);
@@ -816,7 +919,7 @@ test "behavior: parse expect_cell" {
 }
 
 test "behavior: parse expect_empty" {
-    const result = (try ScenarioParser.parseLine("expect_empty 10 20")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "expect_empty 10 20")).?;
     try std.testing.expect(result == .expect_empty);
 }
 
@@ -827,37 +930,37 @@ test "behavior: parse expect_style" {
     for (attrs) |attr| {
         var buf: [64]u8 = undefined;
         const line = std.fmt.bufPrint(&buf, "expect_style 0 0 {s}", .{attr}) catch unreachable;
-        const result = try ScenarioParser.parseLine(line);
+        const result = try ScenarioParser.parseLine(std.testing.allocator, line);
         try std.testing.expect(result != null);
         try std.testing.expect(result.? == .expect_style);
     }
 }
 
 test "behavior: parse expect_action none" {
-    const result = (try ScenarioParser.parseLine("expect_action none")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "expect_action none")).?;
     try std.testing.expect(result == .expect_action);
     try std.testing.expect(result.expect_action == .none);
 }
 
 test "behavior: parse expect_action quit" {
-    const result = (try ScenarioParser.parseLine("expect_action quit")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "expect_action quit")).?;
     try std.testing.expect(result == .expect_action);
     try std.testing.expect(result.expect_action == .quit);
 }
 
 test "behavior: parse expect_quit" {
-    const result = (try ScenarioParser.parseLine("expect_quit")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "expect_quit")).?;
     try std.testing.expect(result == .expect_quit);
 }
 
 test "behavior: parse snapshot" {
-    const result = (try ScenarioParser.parseLine("snapshot my_snapshot")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "snapshot my_snapshot")).?;
     try std.testing.expect(result == .snapshot);
     try std.testing.expectEqualStrings("my_snapshot", result.snapshot);
 }
 
 test "behavior: parse repeat" {
-    const result = (try ScenarioParser.parseLine("repeat 3")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "repeat 3")).?;
     try std.testing.expect(result == .repeat);
     try std.testing.expectEqual(@as(u32, 3), result.repeat);
 }
@@ -876,7 +979,10 @@ test "behavior: parse multi-line scenario" {
         \\expect_string 0 0 "Count: 3"
     ;
     const directives = try ScenarioParser.parse(std.testing.allocator, scenario);
-    defer std.testing.allocator.free(directives);
+    defer {
+        ScenarioParser.freeDirectives(std.testing.allocator, directives);
+        std.testing.allocator.free(directives);
+    }
 
     try std.testing.expectEqual(@as(usize, 5), directives.len);
     try std.testing.expect(directives[0] == .size);
@@ -1226,62 +1332,63 @@ test "behavior: ScenarioRunner multiple failures collected" {
 }
 
 test "regression: trailing whitespace in lines" {
-    const result = try ScenarioParser.parseLine("key a   ");
+    const result = try ScenarioParser.parseLine(std.testing.allocator, "key a   ");
     try std.testing.expect(result != null);
     try std.testing.expect(result.? == .key);
 }
 
 test "regression: leading whitespace in lines" {
-    const result = try ScenarioParser.parseLine("  key a");
+    const result = try ScenarioParser.parseLine(std.testing.allocator, "  key a");
     try std.testing.expect(result != null);
     try std.testing.expect(result.? == .key);
 }
 
 test "regression: comment with leading whitespace" {
-    const result = try ScenarioParser.parseLine("   # comment");
+    const result = try ScenarioParser.parseLine(std.testing.allocator, "   # comment");
     try std.testing.expect(result == null);
 }
 
 test "regression: unknown directive returns error" {
-    const result = ScenarioParser.parseLine("bogus_command");
+    const result = ScenarioParser.parseLine(std.testing.allocator, "bogus_command");
     try std.testing.expectError(ParseError.UnknownDirective, result);
 }
 
 test "regression: missing argument returns error" {
-    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine("size 10"));
-    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine("key"));
-    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine("click 10"));
-    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine("expect_action"));
-    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine("repeat"));
+    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine(std.testing.allocator, "size 10"));
+    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine(std.testing.allocator, "key"));
+    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine(std.testing.allocator, "click 10"));
+    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine(std.testing.allocator, "expect_action"));
+    try std.testing.expectError(ParseError.MissingArgument, ScenarioParser.parseLine(std.testing.allocator, "repeat"));
 }
 
 test "regression: invalid integer returns error" {
-    try std.testing.expectError(ParseError.InvalidInteger, ScenarioParser.parseLine("size abc 10"));
-    try std.testing.expectError(ParseError.InvalidInteger, ScenarioParser.parseLine("click 10 xyz"));
+    try std.testing.expectError(ParseError.InvalidInteger, ScenarioParser.parseLine(std.testing.allocator, "size abc 10"));
+    try std.testing.expectError(ParseError.InvalidInteger, ScenarioParser.parseLine(std.testing.allocator, "click 10 xyz"));
 }
 
 test "regression: invalid key name returns error" {
-    try std.testing.expectError(ParseError.InvalidKeyName, ScenarioParser.parseLine("key notakey"));
+    try std.testing.expectError(ParseError.InvalidKeyName, ScenarioParser.parseLine(std.testing.allocator, "key notakey"));
 }
 
 test "regression: invalid modifier returns error" {
-    try std.testing.expectError(ParseError.InvalidModifier, ScenarioParser.parseLine("key bogus+a"));
+    try std.testing.expectError(ParseError.InvalidModifier, ScenarioParser.parseLine(std.testing.allocator, "key bogus+a"));
 }
 
 test "regression: invalid style attribute returns error" {
-    try std.testing.expectError(ParseError.InvalidStyleAttribute, ScenarioParser.parseLine("expect_style 0 0 bogus"));
+    try std.testing.expectError(ParseError.InvalidStyleAttribute, ScenarioParser.parseLine(std.testing.allocator, "expect_style 0 0 bogus"));
 }
 
 test "regression: invalid action kind returns error" {
-    try std.testing.expectError(ParseError.InvalidActionKind, ScenarioParser.parseLine("expect_action bogus"));
+    try std.testing.expectError(ParseError.InvalidActionKind, ScenarioParser.parseLine(std.testing.allocator, "expect_action bogus"));
 }
 
 test "regression: unterminated string returns error" {
-    try std.testing.expectError(ParseError.UnterminatedString, ScenarioParser.parseLine("type \"no close"));
+    try std.testing.expectError(ParseError.UnterminatedString, ScenarioParser.parseLine(std.testing.allocator, "type \"no close"));
 }
 
 test "regression: quoted string with spaces preserved" {
-    const result = (try ScenarioParser.parseLine("expect_string 0 0 \"hello world foo\"")).?;
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "expect_string 0 0 \"hello world foo\"")).?;
+    defer std.testing.allocator.free(result.expect_string.text);
     try std.testing.expect(result == .expect_string);
     try std.testing.expectEqualStrings("hello world foo", result.expect_string.text);
 }
@@ -1301,4 +1408,96 @@ test "regression: BoundStyleAttr conversion roundtrip" {
         const sa = attr.toStyleAttribute();
         _ = sa;
     }
+}
+
+test "behavior: escape sequence - escaped quote" {
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "type \"hello\\\"world\"")).?;
+    defer std.testing.allocator.free(result.type_text);
+    try std.testing.expect(result == .type_text);
+    try std.testing.expectEqualStrings("hello\"world", result.type_text);
+}
+
+test "behavior: escape sequence - escaped backslash" {
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "type \"path\\\\to\"")).?;
+    defer std.testing.allocator.free(result.type_text);
+    try std.testing.expect(result == .type_text);
+    try std.testing.expectEqualStrings("path\\to", result.type_text);
+}
+
+test "behavior: escape sequence - newline and tab" {
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "type \"line1\\nline2\\tend\"")).?;
+    defer std.testing.allocator.free(result.type_text);
+    try std.testing.expect(result == .type_text);
+    try std.testing.expectEqualStrings("line1\nline2\tend", result.type_text);
+}
+
+test "behavior: escape sequence - invalid escape returns error" {
+    try std.testing.expectError(ParseError.InvalidEscapeSequence, ScenarioParser.parseLine(std.testing.allocator, "type \"bad\\x\""));
+}
+
+test "behavior: escape sequence - in expect_string" {
+    const result = (try ScenarioParser.parseLine(std.testing.allocator, "expect_string 0 0 \"tab\\there\"")).?;
+    defer std.testing.allocator.free(result.expect_string.text);
+    try std.testing.expect(result == .expect_string);
+    try std.testing.expectEqualStrings("tab\there", result.expect_string.text);
+}
+
+test "behavior: coordinate bounds - click out of bounds" {
+    var state = RunnerTestHelpers.CounterState{};
+    var runner = ScenarioRunner(RunnerTestHelpers.CounterState).init(
+        std.testing.allocator,
+        &state,
+        RunnerTestHelpers.update,
+        RunnerTestHelpers.view,
+    );
+
+    const scenario =
+        \\size 10 5
+        \\click 100 200
+    ;
+    var result = try runner.run(scenario);
+    defer result.deinit();
+
+    try std.testing.expect(!result.passed);
+    try std.testing.expectEqual(@as(usize, 1), result.failCount());
+}
+
+test "behavior: coordinate bounds - expect_string out of bounds" {
+    var state = RunnerTestHelpers.CounterState{};
+    var runner = ScenarioRunner(RunnerTestHelpers.CounterState).init(
+        std.testing.allocator,
+        &state,
+        RunnerTestHelpers.update,
+        RunnerTestHelpers.view,
+    );
+
+    const scenario =
+        \\size 10 5
+        \\expect_string 50 50 "test"
+    ;
+    var result = try runner.run(scenario);
+    defer result.deinit();
+
+    try std.testing.expect(!result.passed);
+    try std.testing.expectEqual(@as(usize, 1), result.failCount());
+}
+
+test "behavior: coordinate bounds - drag both endpoints checked" {
+    var state = RunnerTestHelpers.CounterState{};
+    var runner = ScenarioRunner(RunnerTestHelpers.CounterState).init(
+        std.testing.allocator,
+        &state,
+        RunnerTestHelpers.update,
+        RunnerTestHelpers.view,
+    );
+
+    const scenario =
+        \\size 10 5
+        \\drag 0 0 100 100
+    ;
+    var result = try runner.run(scenario);
+    defer result.deinit();
+
+    try std.testing.expect(!result.passed);
+    try std.testing.expectEqual(@as(usize, 1), result.failCount());
 }

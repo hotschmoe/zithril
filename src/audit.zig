@@ -255,6 +255,8 @@ pub fn auditKeyboardNav(
         findings.deinit(allocator);
     }
 
+    const saved_state = harness.state.*;
+
     const initial_cells = try allocator.alloc(Cell, harness.current_buf.cells.len);
     defer allocator.free(initial_cells);
     @memcpy(initial_cells, harness.current_buf.cells);
@@ -319,6 +321,10 @@ pub fn auditKeyboardNav(
         });
     }
 
+    harness.state.* = saved_state;
+    @memcpy(harness.current_buf.cells, initial_cells);
+    @memcpy(harness.previous_buf.cells, initial_cells);
+
     return AuditResult{
         .category = .keyboard_navigation,
         .findings = try findings.toOwnedSlice(allocator),
@@ -340,6 +346,8 @@ pub fn auditFocusVisibility(
         }
         findings.deinit(allocator);
     }
+
+    const saved_state = harness.state.*;
 
     const initial_cells = try allocator.alloc(Cell, harness.current_buf.cells.len);
     defer allocator.free(initial_cells);
@@ -413,6 +421,10 @@ pub fn auditFocusVisibility(
             .details = null,
         });
     }
+
+    harness.state.* = saved_state;
+    @memcpy(harness.current_buf.cells, initial_cells);
+    @memcpy(harness.previous_buf.cells, initial_cells);
 
     return AuditResult{
         .category = .focus_visibility,
@@ -870,6 +882,56 @@ test "regression: AuditReport summary includes category names" {
 
     try std.testing.expect(std.mem.indexOf(u8, text, "contrast") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "1 findings") != null);
+}
+
+test "behavior: auditKeyboardNav restores harness state" {
+    const alloc = std.testing.allocator;
+    var state = FocusTestState{};
+    var harness = try TestHarness(FocusTestState).init(alloc, .{
+        .state = &state,
+        .update = focusTestUpdate,
+        .view = focusTestView,
+        .width = 20,
+        .height = 5,
+    });
+    defer harness.deinit();
+
+    const initial_focus = state.focus;
+    const initial_cells = try alloc.alloc(Cell, harness.current_buf.cells.len);
+    defer alloc.free(initial_cells);
+    @memcpy(initial_cells, harness.current_buf.cells);
+
+    var result = try auditKeyboardNav(FocusTestState, alloc, &harness, .{});
+    defer result.deinit();
+
+    try std.testing.expectEqual(initial_focus, state.focus);
+    try std.testing.expect(std.mem.eql(Cell, harness.current_buf.cells, initial_cells));
+    try std.testing.expect(std.mem.eql(Cell, harness.previous_buf.cells, initial_cells));
+}
+
+test "behavior: auditFocusVisibility restores harness state" {
+    const alloc = std.testing.allocator;
+    var state = FocusTestState{};
+    var harness = try TestHarness(FocusTestState).init(alloc, .{
+        .state = &state,
+        .update = focusTestUpdate,
+        .view = focusTestView,
+        .width = 20,
+        .height = 5,
+    });
+    defer harness.deinit();
+
+    const initial_focus = state.focus;
+    const initial_cells = try alloc.alloc(Cell, harness.current_buf.cells.len);
+    defer alloc.free(initial_cells);
+    @memcpy(initial_cells, harness.current_buf.cells);
+
+    var result = try auditFocusVisibility(FocusTestState, alloc, &harness, .{});
+    defer result.deinit();
+
+    try std.testing.expectEqual(initial_focus, state.focus);
+    try std.testing.expect(std.mem.eql(Cell, harness.current_buf.cells, initial_cells));
+    try std.testing.expect(std.mem.eql(Cell, harness.previous_buf.cells, initial_cells));
 }
 
 test "regression: Finding details field is optional" {

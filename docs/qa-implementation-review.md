@@ -1,6 +1,7 @@
 # QA Testing Framework - Implementation Review
 
-An assessment of the four QA phases implemented in zithril v0.15.0-v0.16.0.
+An assessment of the four QA phases implemented in zithril v0.15.0-v0.16.0,
+updated for v0.17.0 fixes.
 Each section covers usage, a rating, and noted shortcomings.
 
 ---
@@ -104,17 +105,11 @@ cases (out-of-bounds row access, empty buffers, resize during test).
 
 ### Shortcomings
 
-1. **`getRegion(rect)` not implemented.** The design doc specifies a method to
-   extract a rectangular region of the buffer as text. Currently users must
-   call `getRow()` multiple times or inspect cells directly. Minor gap -- most
-   tests work fine without it.
+1. ~~**`getRegion(rect)` not implemented.**~~ **FIXED in v0.17.0.** `getRegion(allocator, Rect)`
+   extracts a rectangular region of the buffer as text, with clamping to buffer bounds.
 
-2. **MockBackend allocated but unused.** The harness creates a MockBackend
-   during init but never writes ANSI output to it. The design doc mentions
-   "Diff is computed but output goes to MockBackend" but the implementation
-   renders directly to in-memory buffers. This isn't wrong (it matches how
-   Ratatui's TestBackend works), but the MockBackend allocation is wasted
-   memory.
+2. ~~**MockBackend allocated but unused.**~~ **FIXED in v0.17.0.** Removed the unused
+   MockBackend field from TestHarness, eliminating the wasted 256KB allocation.
 
 3. **rightClick() uses ctrl modifier hack.** There is no dedicated right-button
    field on MouseKind, so right-click is simulated via `ctrl + left click`.
@@ -217,12 +212,10 @@ polish that would make it a standout feature.
 
 ### Shortcomings
 
-1. **No `--update-snapshots` build option.** The design doc specifies
+1. ~~**No `--update-snapshots` build option.**~~ **FIXED in v0.17.0.** Run
    `zig build test -Dupdate-snapshots=true` to auto-update golden files when
-   the UI changes intentionally. This is NOT implemented. Users must manually
-   call `saveSnapshot()` to update baselines. This is a significant workflow
-   gap -- Rust's `insta` and Go's `teatest -update` both have this, and it's
-   the biggest quality-of-life feature for snapshot testing.
+   the UI changes intentionally. Also supports `ZITHRIL_UPDATE_SNAPSHOTS=1`
+   environment variable for direct `zig test` usage.
 
 2. **Annotated snapshots not implemented.** The design doc describes a
    `[row,col] char style_flags fg bg` format for style-aware golden files.
@@ -231,11 +224,9 @@ polish that would make it a standout feature.
    cell. Plain text snapshots cannot detect style regressions (e.g., a label
    losing its bold attribute).
 
-3. **loadFromFile dimensions are caller-supplied.** Width and height are not
-   stored in the golden file, so the caller must pass matching dimensions.
-   If the test changes dimensions but uses the same golden file, comparison
-   will silently produce incorrect diffs. Storing dimensions in a header line
-   would make golden files self-describing.
+3. ~~**loadFromFile dimensions are caller-supplied.**~~ **FIXED in v0.17.0.**
+   Golden files now include a `# zithril-golden WxH` header line. `loadFromFile()`
+   parses the header to extract dimensions automatically.
 
 4. **1MB file size cap.** `loadFromFile()` limits reads to 1MB. Very large
    terminal captures (e.g., 200x100 buffer with Unicode) could approach this.
@@ -245,9 +236,8 @@ polish that would make it a standout feature.
    fill the terminal width. This makes files harder to read in editors that
    strip trailing whitespace and can cause spurious diffs. No option to trim.
 
-6. **No directory auto-creation.** `saveToFile()` requires the parent directory
-   to exist. First-time users must `mkdir -p tests/golden/` manually. A small
-   friction point.
+6. ~~**No directory auto-creation.**~~ **FIXED in v0.17.0.** `saveToFile()` now
+   creates parent directories automatically via `makePath`.
 
 ---
 
@@ -405,10 +395,9 @@ parser-level and runner-level tests.
    directive advances frame-by-frame but there is no wall-clock delay. This
    matters for apps with time-based animations.
 
-2. **No escape sequences in strings.** `type "hello\"world"` will fail.
-   Quoted strings are parsed by finding the next `"` character -- no support
-   for `\"`, `\\`, `\n`, or other escape sequences. Users cannot type strings
-   containing quote characters.
+2. ~~**No escape sequences in strings.**~~ **FIXED in v0.17.0.** Quoted strings
+   now support `\"`, `\\`, `\n`, and `\t` escape sequences. Invalid escape
+   sequences produce an `InvalidEscapeSequence` parse error.
 
 3. **`repeat` only affects the next single directive.** Cannot repeat a block
    of directives. To repeat a sequence (e.g., key + assertion), users must
@@ -425,10 +414,10 @@ parser-level and runner-level tests.
    parser does not error on `size` appearing mid-file, but the behavior is
    unclear -- it always uses the first parsed `size` and ignores the rest.
 
-6. **No coordinate bounds checking.** Directives like `click 999 999` on an
-   80x24 buffer will execute without error. The TestHarness accesses cells at
-   those coordinates, which may silently produce wrong results or index into
-   invalid memory depending on buffer bounds checking.
+6. ~~**No coordinate bounds checking.**~~ **FIXED in v0.17.0.** Mouse and
+   assertion directives now validate coordinates against buffer dimensions.
+   Out-of-bounds coordinates are reported as scenario failures rather than
+   silently producing undefined behavior.
 
 7. **`addFailure()` silently drops OOM.** When recording a failure, if the
    allocator runs out of memory, the failure is silently lost. In testing
@@ -584,11 +573,10 @@ the five planned audit types are missing entirely.
    field but there is no API to query "findings overlapping this Rect" or
    "findings for this widget." Users must iterate the findings array manually.
 
-8. **Keyboard audit mutates harness state.** Both `auditKeyboardNav` and
-   `auditFocusVisibility` inject Tab key events into the harness, permanently
-   changing the app state. After running a keyboard audit, the harness state
-   is wherever the Tab cycle left it. There is no save/restore mechanism. Users
-   must re-init the harness (or manually reset state) to continue testing.
+8. ~~**Keyboard audit mutates harness state.**~~ **FIXED in v0.17.0.** Both
+   `auditKeyboardNav` and `auditFocusVisibility` now save and restore the
+   harness state (both buffer cells and user State) before and after the
+   audit. The harness is left in its original state after audit completion.
 
 9. **AuditReport.summary() format is basic.** Counts findings per category but
    does not print individual findings. Users must iterate `.findings` manually

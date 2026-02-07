@@ -533,17 +533,49 @@ pub const Snapshot = struct {
     }
 
     /// Save snapshot text to a file.
+    /// Writes a header line with dimensions, then the text content.
+    /// Auto-creates parent directories if they don't exist.
     pub fn saveToFile(self: Self, path: []const u8) !void {
+        if (std.fs.path.dirname(path)) |parent| {
+            try std.fs.cwd().makePath(parent);
+        }
         const file = try std.fs.cwd().createFile(path, .{});
         defer file.close();
+        var buf: [64]u8 = undefined;
+        const header = std.fmt.bufPrint(&buf, "# zithril-golden {d}x{d}\n", .{ self.width, self.height }) catch unreachable;
+        try file.writeAll(header);
         try file.writeAll(self.text);
     }
 
     /// Load a snapshot from a golden file.
-    pub fn loadFromFile(allocator: std.mem.Allocator, path: []const u8, width: u16, height: u16) !Self {
+    /// Parses the header line to extract dimensions.
+    pub fn loadFromFile(allocator: std.mem.Allocator, path: []const u8) !Self {
         const file = try std.fs.cwd().openFile(path, .{});
         defer file.close();
-        const text = try file.readToEndAlloc(allocator, 1024 * 1024);
+        const raw = try file.readToEndAlloc(allocator, 1024 * 1024);
+        errdefer allocator.free(raw);
+
+        const prefix = "# zithril-golden ";
+        if (!std.mem.startsWith(u8, raw, prefix)) {
+            return error.InvalidGoldenFileHeader;
+        }
+        const after_prefix = raw[prefix.len..];
+        const newline_pos = std.mem.indexOfScalar(u8, after_prefix, '\n') orelse
+            return error.InvalidGoldenFileHeader;
+
+        const dim_str = after_prefix[0..newline_pos];
+        const x_pos = std.mem.indexOfScalar(u8, dim_str, 'x') orelse
+            return error.InvalidGoldenFileHeader;
+
+        const width = std.fmt.parseInt(u16, dim_str[0..x_pos], 10) catch
+            return error.InvalidGoldenFileHeader;
+        const height = std.fmt.parseInt(u16, dim_str[x_pos + 1 ..], 10) catch
+            return error.InvalidGoldenFileHeader;
+
+        const text_start = prefix.len + newline_pos + 1;
+        const text = try allocator.dupe(u8, raw[text_start..]);
+        allocator.free(raw);
+
         return Self{
             .text = text,
             .width = width,
@@ -553,10 +585,28 @@ pub const Snapshot = struct {
     }
 
     /// Compare to a golden file and fail with diff on mismatch.
+    /// If ZITHRIL_UPDATE_SNAPSHOTS=1, updates the file instead of failing.
     pub fn expectMatchesFile(self: Self, allocator: std.mem.Allocator, path: []const u8) !void {
-        var loaded = try loadFromFile(allocator, path, self.width, self.height);
+        const update_mode = if (std.posix.getenv("ZITHRIL_UPDATE_SNAPSHOTS")) |v|
+            std.mem.eql(u8, v, "1")
+        else
+            false;
+
+        var loaded = loadFromFile(allocator, path) catch |err| {
+            if (err == error.FileNotFound and update_mode) {
+                try self.saveToFile(path);
+                std.debug.print("SNAPSHOT CREATED: {s}\n", .{path});
+                return;
+            }
+            return err;
+        };
         defer loaded.deinit();
         if (!self.eql(loaded)) {
+            if (update_mode) {
+                try self.saveToFile(path);
+                std.debug.print("SNAPSHOT UPDATED: {s}\n", .{path});
+                return;
+            }
             const diff_text = try self.diff(allocator, loaded);
             defer allocator.free(diff_text);
             std.debug.print("SNAPSHOT MISMATCH: {s}\n\n{s}\n", .{ path, diff_text });
@@ -659,7 +709,6 @@ pub fn TestHarness(comptime State: type) type {
         view_fn: *const fn (*State, *FrameType) void,
         current_buf: Buffer,
         previous_buf: Buffer,
-        mock: MockBackend,
         last_action: Action,
         frame_count: u64,
 
@@ -679,7 +728,6 @@ pub fn TestHarness(comptime State: type) type {
                 .view_fn = config.view,
                 .current_buf = try Buffer.init(allocator, config.width, config.height),
                 .previous_buf = try Buffer.init(allocator, config.width, config.height),
-                .mock = try MockBackend.init(allocator, config.width, config.height),
                 .last_action = Action{ .none = {} },
                 .frame_count = 0,
             };
@@ -691,7 +739,6 @@ pub fn TestHarness(comptime State: type) type {
         pub fn deinit(self: *Self) void {
             self.current_buf.deinit();
             self.previous_buf.deinit();
-            self.mock.deinit();
         }
 
         // -- Core loop --
@@ -760,7 +807,6 @@ pub fn TestHarness(comptime State: type) type {
             self.previous_buf.deinit();
             self.current_buf = try Buffer.init(self.allocator, width, height);
             self.previous_buf = try Buffer.init(self.allocator, width, height);
-            self.mock.resize(width, height);
             self.step(resizeEvent(width, height));
         }
 
@@ -892,6 +938,31 @@ pub fn TestHarness(comptime State: type) type {
             return result.toOwnedSlice(allocator);
         }
 
+        pub fn getRegion(self: Self, allocator: std.mem.Allocator, region: Rect) ![]const u8 {
+            var result: std.ArrayListUnmanaged(u8) = .{};
+            errdefer result.deinit(allocator);
+
+            const max_y = @min(region.y + region.height, self.current_buf.height);
+            const max_x = @min(region.x + region.width, self.current_buf.width);
+
+            var y = region.y;
+            while (y < max_y) : (y += 1) {
+                if (y > region.y) {
+                    try result.append(allocator, '\n');
+                }
+                var x = region.x;
+                while (x < max_x) : (x += 1) {
+                    const cell = self.current_buf.get(x, y);
+                    if (cell.width == 0) continue;
+                    var char_buf: [4]u8 = undefined;
+                    const len = std.unicode.utf8Encode(cell.char, &char_buf) catch 1;
+                    try result.appendSlice(allocator, char_buf[0..len]);
+                }
+            }
+
+            return result.toOwnedSlice(allocator);
+        }
+
         // -- Snapshot --
 
         pub fn snapshot(self: Self, allocator: std.mem.Allocator) !Snapshot {
@@ -924,6 +995,15 @@ pub fn TestHarness(comptime State: type) type {
             defer snap.deinit();
             snap.expectMatchesFile(self.allocator, path) catch |err| {
                 if (err == error.FileNotFound) {
+                    const update_mode = if (std.posix.getenv("ZITHRIL_UPDATE_SNAPSHOTS")) |v|
+                        std.mem.eql(u8, v, "1")
+                    else
+                        false;
+                    if (update_mode) {
+                        try snap.saveToFile(path);
+                        std.debug.print("SNAPSHOT CREATED: {s}\n", .{path});
+                        return;
+                    }
                     std.debug.print(
                         \\GOLDEN FILE NOT FOUND: {s}
                         \\Run with saveSnapshot() first to create the baseline.
@@ -1868,6 +1948,38 @@ test "regression: TestHarness initial render populates buffer" {
     try std.testing.expectEqual(@as(u64, 1), harness.frame_count);
 }
 
+test "behavior: TestHarness getRegion extracts rectangular region" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const region = try harness.getRegion(std.testing.allocator, Rect{ .x = 0, .y = 0, .width = 8, .height = 1 });
+    defer std.testing.allocator.free(region);
+    try std.testing.expectEqualStrings("Count: 0", region);
+}
+
+test "behavior: TestHarness getRegion clamps to buffer bounds" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 10,
+        .height = 2,
+    });
+    defer harness.deinit();
+
+    const region = try harness.getRegion(std.testing.allocator, Rect{ .x = 5, .y = 0, .width = 100, .height = 100 });
+    defer std.testing.allocator.free(region);
+    try std.testing.expect(region.len > 0);
+}
+
 // ============================================================
 // SNAPSHOT FILE I/O TESTS
 // ============================================================
@@ -1884,10 +1996,12 @@ test "behavior: Snapshot saveToFile and loadFromFile roundtrip" {
     const path = "/tmp/zithril_test_roundtrip.golden";
     try snap1.saveToFile(path);
 
-    var snap2 = try Snapshot.loadFromFile(std.testing.allocator, path, 10, 2);
+    var snap2 = try Snapshot.loadFromFile(std.testing.allocator, path);
     defer snap2.deinit();
 
     try std.testing.expect(snap1.eql(snap2));
+    try std.testing.expectEqual(@as(u16, 10), snap2.width);
+    try std.testing.expectEqual(@as(u16, 2), snap2.height);
 
     // Clean up
     std.fs.cwd().deleteFile(path) catch {};

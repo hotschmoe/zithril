@@ -46,6 +46,8 @@ pub fn build(b: *std.Build) void {
     }
 
     // Tests
+    const update_snapshots = b.option(bool, "update-snapshots", "Auto-update golden files on mismatch") orelse false;
+
     const mod_tests = b.addTest(.{
         .root_module = mod,
     });
@@ -55,6 +57,11 @@ pub fn build(b: *std.Build) void {
         .root_module = exe.root_module,
     });
     const run_exe_tests = b.addRunArtifact(exe_tests);
+
+    if (update_snapshots) {
+        run_mod_tests.setEnvironmentVariable("ZITHRIL_UPDATE_SNAPSHOTS", "1");
+        run_exe_tests.setEnvironmentVariable("ZITHRIL_UPDATE_SNAPSHOTS", "1");
+    }
 
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
