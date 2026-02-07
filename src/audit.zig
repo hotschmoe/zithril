@@ -149,13 +149,7 @@ pub const AuditReport = struct {
 
 pub fn auditContrast(allocator: std.mem.Allocator, buf: *const Buffer) !AuditResult {
     var findings: std.ArrayListUnmanaged(Finding) = .{};
-    errdefer {
-        for (findings.items) |f| {
-            allocator.free(f.message);
-            if (f.details) |d| allocator.free(d);
-        }
-        findings.deinit(allocator);
-    }
+    errdefer cleanupFindings(allocator, &findings);
 
     var y: u16 = 0;
     while (y < buf.height) : (y += 1) {
@@ -246,14 +240,29 @@ pub fn auditKeyboardNav(
     harness: *testing_mod.TestHarness(State),
     config: KeyboardAuditConfig,
 ) !AuditResult {
+    return tabWalk(State, allocator, harness, config, .keyboard_nav);
+}
+
+pub fn auditFocusVisibility(
+    comptime State: type,
+    allocator: std.mem.Allocator,
+    harness: *testing_mod.TestHarness(State),
+    config: KeyboardAuditConfig,
+) !AuditResult {
+    return tabWalk(State, allocator, harness, config, .focus_visibility);
+}
+
+const TabWalkMode = enum { keyboard_nav, focus_visibility };
+
+fn tabWalk(
+    comptime State: type,
+    allocator: std.mem.Allocator,
+    harness: *testing_mod.TestHarness(State),
+    config: KeyboardAuditConfig,
+    mode: TabWalkMode,
+) !AuditResult {
     var findings: std.ArrayListUnmanaged(Finding) = .{};
-    errdefer {
-        for (findings.items) |f| {
-            allocator.free(f.message);
-            if (f.details) |d| allocator.free(d);
-        }
-        findings.deinit(allocator);
-    }
+    errdefer cleanupFindings(allocator, &findings);
 
     const saved_state = harness.state.*;
 
@@ -265,7 +274,7 @@ pub fn auditKeyboardNav(
     defer allocator.free(prev_cells);
     @memcpy(prev_cells, harness.current_buf.cells);
 
-    var tab_stops: usize = 0;
+    var stop_count: usize = 0;
     var cycle_complete = false;
 
     var tab_i: u16 = 0;
@@ -280,15 +289,37 @@ pub fn auditKeyboardNav(
         );
 
         if (changed_rect) |rect| {
-            tab_stops += 1;
+            stop_count += 1;
 
-            const message = try std.fmt.allocPrint(allocator, "Tab stop {d}: region changed", .{tab_stops});
-            try findings.append(allocator, .{
-                .severity = .pass,
-                .region = rect,
-                .message = message,
-                .details = null,
-            });
+            switch (mode) {
+                .keyboard_nav => {
+                    const message = try std.fmt.allocPrint(allocator, "Tab stop {d}: region changed", .{stop_count});
+                    try findings.append(allocator, .{
+                        .severity = .pass,
+                        .region = rect,
+                        .message = message,
+                        .details = null,
+                    });
+                },
+                .focus_visibility => {
+                    const has_style = detectStyleChange(
+                        harness.current_buf,
+                        prev_cells,
+                        harness.current_buf.width,
+                        rect,
+                    );
+                    const message = if (has_style)
+                        try std.fmt.allocPrint(allocator, "Focus stop {d}: visible style change detected", .{stop_count})
+                    else
+                        try std.fmt.allocPrint(allocator, "Focus stop {d}: no style change - focus indicator not visible", .{stop_count});
+                    try findings.append(allocator, .{
+                        .severity = if (has_style) .pass else .fail,
+                        .region = rect,
+                        .message = message,
+                        .details = null,
+                    });
+                },
+            }
         }
 
         if (std.mem.eql(Cell, harness.current_buf.cells, initial_cells)) {
@@ -299,19 +330,22 @@ pub fn auditKeyboardNav(
         @memcpy(prev_cells, harness.current_buf.cells);
     }
 
-    if (tab_stops == 0) {
-        const message = try allocator.dupe(u8, "No tab stops detected - keyboard navigation may be missing");
+    if (stop_count == 0) {
+        const message = switch (mode) {
+            .keyboard_nav => try allocator.dupe(u8, "No tab stops detected - keyboard navigation may be missing"),
+            .focus_visibility => try allocator.dupe(u8, "No focus stops detected"),
+        };
         try findings.append(allocator, .{
             .severity = .fail,
             .region = Rect.init(0, 0, harness.current_buf.width, harness.current_buf.height),
             .message = message,
             .details = null,
         });
-    } else if (!cycle_complete) {
+    } else if (mode == .keyboard_nav and !cycle_complete) {
         const message = try std.fmt.allocPrint(
             allocator,
             "Found {d} tab stops but focus did not cycle back to start",
-            .{tab_stops},
+            .{stop_count},
         );
         try findings.append(allocator, .{
             .severity = .warn,
@@ -325,112 +359,24 @@ pub fn auditKeyboardNav(
     @memcpy(harness.current_buf.cells, initial_cells);
     @memcpy(harness.previous_buf.cells, initial_cells);
 
+    const category: AuditCategory = switch (mode) {
+        .keyboard_nav => .keyboard_navigation,
+        .focus_visibility => .focus_visibility,
+    };
+
     return AuditResult{
-        .category = .keyboard_navigation,
+        .category = category,
         .findings = try findings.toOwnedSlice(allocator),
         .allocator = allocator,
     };
 }
 
-pub fn auditFocusVisibility(
-    comptime State: type,
-    allocator: std.mem.Allocator,
-    harness: *testing_mod.TestHarness(State),
-    config: KeyboardAuditConfig,
-) !AuditResult {
-    var findings: std.ArrayListUnmanaged(Finding) = .{};
-    errdefer {
-        for (findings.items) |f| {
-            allocator.free(f.message);
-            if (f.details) |d| allocator.free(d);
-        }
-        findings.deinit(allocator);
+fn cleanupFindings(allocator: std.mem.Allocator, findings: *std.ArrayListUnmanaged(Finding)) void {
+    for (findings.items) |f| {
+        allocator.free(f.message);
+        if (f.details) |d| allocator.free(d);
     }
-
-    const saved_state = harness.state.*;
-
-    const initial_cells = try allocator.alloc(Cell, harness.current_buf.cells.len);
-    defer allocator.free(initial_cells);
-    @memcpy(initial_cells, harness.current_buf.cells);
-
-    const prev_cells = try allocator.alloc(Cell, harness.current_buf.cells.len);
-    defer allocator.free(prev_cells);
-    @memcpy(prev_cells, harness.current_buf.cells);
-
-    var tab_i: u16 = 0;
-    var stop_num: usize = 0;
-
-    while (tab_i < config.max_tabs) : (tab_i += 1) {
-        harness.pressSpecial(.tab);
-
-        const changed_rect = diffBoundingRect(
-            harness.current_buf,
-            prev_cells,
-            harness.current_buf.width,
-            harness.current_buf.height,
-        );
-
-        if (changed_rect) |rect| {
-            stop_num += 1;
-
-            const has_style_change = detectStyleChange(
-                harness.current_buf,
-                prev_cells,
-                harness.current_buf.width,
-                rect,
-            );
-
-            if (has_style_change) {
-                const message = try std.fmt.allocPrint(
-                    allocator,
-                    "Focus stop {d}: visible style change detected",
-                    .{stop_num},
-                );
-                try findings.append(allocator, .{
-                    .severity = .pass,
-                    .region = rect,
-                    .message = message,
-                    .details = null,
-                });
-            } else {
-                const message = try std.fmt.allocPrint(
-                    allocator,
-                    "Focus stop {d}: no style change - focus indicator not visible",
-                    .{stop_num},
-                );
-                try findings.append(allocator, .{
-                    .severity = .fail,
-                    .region = rect,
-                    .message = message,
-                    .details = null,
-                });
-            }
-        }
-
-        if (std.mem.eql(Cell, harness.current_buf.cells, initial_cells)) break;
-
-        @memcpy(prev_cells, harness.current_buf.cells);
-    }
-
-    if (stop_num == 0) {
-        const message = try allocator.dupe(u8, "No focus stops detected");
-        try findings.append(allocator, .{
-            .severity = .fail,
-            .region = Rect.init(0, 0, harness.current_buf.width, harness.current_buf.height),
-            .message = message,
-            .details = null,
-        });
-    }
-
-    harness.state.* = saved_state;
-    @memcpy(harness.current_buf.cells, initial_cells);
-    @memcpy(harness.previous_buf.cells, initial_cells);
-
-    return AuditResult{
-        .category = .focus_visibility,
-        .findings = try findings.toOwnedSlice(allocator),
-        .allocator = allocator,
-    };
+    findings.deinit(allocator);
 }
 
 fn diffBoundingRect(

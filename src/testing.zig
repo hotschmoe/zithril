@@ -993,26 +993,7 @@ pub fn TestHarness(comptime State: type) type {
         pub fn expectSnapshotFile(self: Self, path: []const u8) !void {
             var snap = try Snapshot.fromBuffer(self.allocator, self.current_buf);
             defer snap.deinit();
-            snap.expectMatchesFile(self.allocator, path) catch |err| {
-                if (err == error.FileNotFound) {
-                    const update_mode = if (std.posix.getenv("ZITHRIL_UPDATE_SNAPSHOTS")) |v|
-                        std.mem.eql(u8, v, "1")
-                    else
-                        false;
-                    if (update_mode) {
-                        try snap.saveToFile(path);
-                        std.debug.print("SNAPSHOT CREATED: {s}\n", .{path});
-                        return;
-                    }
-                    std.debug.print(
-                        \\GOLDEN FILE NOT FOUND: {s}
-                        \\Run with saveSnapshot() first to create the baseline.
-                        \\
-                    , .{path});
-                    return error.TestExpectedEqual;
-                }
-                return err;
-            };
+            try snap.expectMatchesFile(self.allocator, path);
         }
     };
 }
