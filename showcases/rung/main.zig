@@ -28,7 +28,6 @@ pub fn main() !void {
     try app.run(allocator);
 }
 
-// Use zithril's panic handler to ensure terminal cleanup on abnormal exit
 pub const panic = zithril.terminal_panic;
 
 // ============================================================
@@ -60,9 +59,7 @@ test "rung: initial render via TestHarness" {
     });
     defer harness.deinit();
 
-    // After initial render, frame should have been drawn
     try std.testing.expectEqual(@as(u64, 1), harness.frame_count);
-    // Buffer should contain something (not all spaces)
     var snap = try harness.snapshot(testing_alloc);
     defer snap.deinit();
     try std.testing.expect(snap.text.len > 0);
@@ -84,11 +81,9 @@ test "rung: cursor movement" {
     const initial_x = state.cursor.x;
     const initial_y = state.cursor.y;
 
-    // Move right
     harness.pressSpecial(.right);
     try std.testing.expect(state.cursor.x >= initial_x);
 
-    // Move down
     harness.pressSpecial(.down);
     try std.testing.expect(state.cursor.y >= initial_y);
 }
@@ -106,7 +101,6 @@ test "rung: tick advances animation" {
     });
     defer harness.deinit();
 
-    // Ticks should process without crashing
     harness.tickN(10);
     try std.testing.expectEqual(@as(u64, 11), harness.frame_count);
 }

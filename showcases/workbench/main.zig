@@ -32,12 +32,8 @@ const mode_titles = [mode_count][]const u8{
     "Mouse Lab",
 };
 
-// -- Focus areas per mode --
-
 const ExplorerFocus = enum { tree, search, preview };
 const AgentsFocus = enum { agents, logs };
-
-// -- Data types --
 
 const AgentStatus = enum {
     idle,
@@ -109,8 +105,6 @@ const region_colors = [region_count]zithril.Color{ .red, .green, .blue, .yellow 
 const region_labels = [region_count][]const u8{ "Red", "Green", "Blue", "Yellow" };
 
 const max_log_entries = 32;
-
-// -- State --
 
 const State = struct {
     current_mode: Mode = .explorer,
@@ -194,8 +188,6 @@ const State = struct {
     }
 };
 
-// -- Explorer file data --
-
 const FileEntry = struct {
     name: []const u8,
     content: []const u8,
@@ -215,8 +207,6 @@ const tree_order_all = [_][]const u8{ "src/", "main.zig", "lib.zig", "docs/", "R
 const tree_order_src_only = [_][]const u8{ "src/", "main.zig", "lib.zig", "docs/", "build.zig" };
 const tree_order_docs_only = [_][]const u8{ "src/", "docs/", "README.md", "build.zig" };
 const tree_order_none = [_][]const u8{ "src/", "docs/", "build.zig" };
-
-// -- Agent sample data --
 
 const sample_agents = [_]Agent{
     .{ .name = "agent-alpha", .status = .running, .tasks_completed = 42, .tasks_total = 100, .last_activity = "2m ago" },
@@ -245,8 +235,6 @@ const sample_logs = [_]LogEntry{
     .{ .timestamp = "10:43:10", .level = .debug, .message = "Cache hit ratio: 94.2%" },
 };
 
-// -- Update --
-
 fn update(state: *State, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
@@ -256,7 +244,6 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
                     if (c == 'c' and key.modifiers.ctrl) return .quit;
 
                     if (!key.modifiers.any()) {
-                        // Mode switching
                         if (c >= '1' and c <= '3') {
                             state.current_mode = @enumFromInt(c - '1');
                             return .none;
@@ -445,8 +432,6 @@ fn updateMouseLab(state: *State, mouse: zithril.Mouse) void {
     }
 }
 
-// -- View --
-
 fn view(state: *State, frame: *FrameType) void {
     const area = frame.size();
 
@@ -456,7 +441,6 @@ fn view(state: *State, frame: *FrameType) void {
         zithril.Constraint.len(1),
     });
 
-    // Mode tabs
     frame.render(zithril.Tabs{
         .titles = &mode_titles,
         .selected = @intFromEnum(state.current_mode),
@@ -465,7 +449,6 @@ fn view(state: *State, frame: *FrameType) void {
         .divider = " | ",
     }, main_layout.get(0));
 
-    // Content
     const content_area = main_layout.get(1);
     switch (state.current_mode) {
         .explorer => renderExplorer(state, frame, content_area),
@@ -473,7 +456,6 @@ fn view(state: *State, frame: *FrameType) void {
         .mouse_lab => renderMouseLab(state, frame, content_area),
     }
 
-    // Status bar
     var status_buf: [80]u8 = undefined;
     const mode_str = mode_titles[@intFromEnum(state.current_mode)];
     const status = std.fmt.bufPrint(&status_buf, " Workbench | {s} | 1-3:mode Tab:focus j/k:nav q:quit", .{mode_str}) catch " Workbench";
@@ -944,8 +926,6 @@ fn renderMlEventLog(state: *State, frame: *FrameType, area: zithril.Rect) void {
     }
 }
 
-// -- Main --
-
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -983,7 +963,6 @@ test "workbench: initial render shows Explorer mode" {
     defer harness.deinit();
 
     try std.testing.expectEqual(Mode.explorer, state.current_mode);
-    // Tab bar should show the Explorer tab
     try harness.expectString(0, 0, "Explorer");
 }
 
@@ -1078,14 +1057,12 @@ test "workbench: explorer tree navigation" {
     });
     defer harness.deinit();
 
-    // Navigate down in tree
     harness.pressKey('j');
     try std.testing.expectEqual(@as(usize, 1), state.exp_tree_selected);
 
     harness.pressKey('j');
     try std.testing.expectEqual(@as(usize, 2), state.exp_tree_selected);
 
-    // Navigate up
     harness.pressKey('k');
     try std.testing.expectEqual(@as(usize, 1), state.exp_tree_selected);
 }
@@ -1125,7 +1102,6 @@ test "workbench: mouse lab click tracking" {
     harness.pressKey('3');
     try std.testing.expectEqual(Mode.mouse_lab, state.current_mode);
 
-    // Click updates mouse position
     harness.click(10, 10);
     try std.testing.expectEqual(@as(u16, 10), state.mouse_x);
     try std.testing.expectEqual(@as(u16, 10), state.mouse_y);
@@ -1167,7 +1143,6 @@ test "workbench: TestRecorder and TestPlayer demo" {
     var player = zithril.TestPlayer(256).init(recorder.getEvents());
     try std.testing.expectEqual(@as(usize, 4), player.remaining());
 
-    // Play events into a harness
     var state = State{};
     var harness = try zithril.TestHarness(State).init(testing_alloc, .{
         .state = &state,
@@ -1217,7 +1192,6 @@ test "workbench: auditKeyboardNav detects focus cycling" {
     defer result.deinit();
 
     try std.testing.expectEqual(zithril.AuditCategory.keyboard_navigation, result.category);
-    // Explorer mode has tab stops, so we should find some
     try std.testing.expect(result.findings.len > 0);
 }
 
@@ -1275,7 +1249,6 @@ test "workbench: snapshot comparison" {
     var snap1 = try harness.snapshot(testing_alloc);
     defer snap1.deinit();
 
-    // After switching mode, snapshot should differ
     harness.pressKey('2');
 
     var snap2 = try harness.snapshot(testing_alloc);

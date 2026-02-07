@@ -4,13 +4,11 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Get the rich_zig dependency
     const rich_zig = b.dependency("rich_zig", .{
         .target = target,
         .optimize = optimize,
     });
 
-    // Create the zithril module with rich_zig as a dependency
     const mod = b.addModule("zithril", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -19,7 +17,6 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    // Tests
     const update_snapshots = b.option(bool, "update-snapshots", "Auto-update golden files on mismatch") orelse false;
 
     const mod_tests = b.addTest(.{
@@ -34,7 +31,6 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
 
-    // Fuzz testing step
     const fuzz_step = b.step("fuzz", "Run fuzz tests");
     const fuzz_exe = b.addExecutable(.{
         .name = "fuzz",
@@ -51,7 +47,6 @@ pub fn build(b: *std.Build) void {
     fuzz_run.step.dependOn(b.getInstallStep());
     fuzz_step.dependOn(&fuzz_run.step);
 
-    // Showcases - polished applications in their own directories
     const showcases = [_]struct { name: []const u8, desc: []const u8 }{
         .{ .name = "gallery", .desc = "Widget gallery - every widget in tabbed pages" },
         .{ .name = "workbench", .desc = "Interactive workbench - focus, mouse, input, panels" },
@@ -84,7 +79,6 @@ pub fn build(b: *std.Build) void {
         );
         app_step.dependOn(&app_run.step);
 
-        // Showcase tests (QA companion tests embedded in main.zig)
         const app_tests = b.addTest(.{
             .root_module = app_module,
         });

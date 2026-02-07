@@ -41,8 +41,6 @@ const tab_titles = [tab_count][]const u8{
     "QA Audit",
 };
 
-// -- State --
-
 const State = struct {
     current_tab: GalleryTab = .basics,
     tick_count: u32 = 0,
@@ -58,9 +56,6 @@ const State = struct {
 
     // Monitoring tab
     mon_selected_process: usize = 0,
-
-    // Rich Text tab
-    // (uses tick_count for phase animation)
 
     // QA Audit tab
     audit_pass: u16 = 0,
@@ -99,8 +94,6 @@ const State = struct {
     }
 };
 
-// -- Update --
-
 fn update(state: *State, event: zithril.Event) zithril.Action {
     switch (event) {
         .key => |key| {
@@ -110,7 +103,6 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
                     if (c == 'c' and key.modifiers.ctrl) return .quit;
 
                     if (!key.modifiers.any()) {
-                        // Tab switching
                         if (c >= '1' and c <= '6') {
                             state.current_tab = @enumFromInt(c - '1');
                             return .none;
@@ -124,7 +116,6 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
                             return .none;
                         }
 
-                        // Tab-specific keys
                         switch (state.current_tab) {
                             .basics => switch (c) {
                                 '+' => state.count +|= 1,
@@ -193,8 +184,6 @@ fn update(state: *State, event: zithril.Event) zithril.Action {
     return .none;
 }
 
-// -- View --
-
 fn view(state: *State, frame: *FrameType) void {
     const area = frame.size();
 
@@ -204,7 +193,6 @@ fn view(state: *State, frame: *FrameType) void {
         zithril.Constraint.len(1),
     });
 
-    // Tab bar
     const tabs = zithril.Tabs{
         .titles = &tab_titles,
         .selected = @intFromEnum(state.current_tab),
@@ -214,7 +202,6 @@ fn view(state: *State, frame: *FrameType) void {
     };
     frame.render(tabs, main_layout.get(0));
 
-    // Content area
     const content_area = main_layout.get(1);
     switch (state.current_tab) {
         .basics => renderBasics(state, frame, content_area),
@@ -225,7 +212,6 @@ fn view(state: *State, frame: *FrameType) void {
         .qa_audit => renderQaAudit(state, frame, content_area),
     }
 
-    // Status bar
     frame.render(zithril.Text{
         .content = " 1-6:tab | left/right:navigate | q:quit | Tab-specific: see each tab",
         .style = zithril.Style.init().bg(.blue).fg(.white),
@@ -335,7 +321,6 @@ fn renderDataViz(state: *State, frame: *FrameType, area: zithril.Rect) void {
         zithril.Constraint.len(1),
     });
 
-    // Sub-tab navigation
     frame.render(zithril.Tabs{
         .titles = &dataviz_page_names,
         .selected = state.dataviz_page,
@@ -551,20 +536,14 @@ fn renderMonitoring(state: *State, frame: *FrameType, area: zithril.Rect) void {
         zithril.Constraint.len(1),
     });
 
-    // BigText header
     frame.render(zithril.BigText{
         .text = "DASH",
         .style = zithril.Style.init().fg(.cyan).bold(),
         .pixel_size = .half,
     }, main_layout.get(0));
 
-    // Sparkline trio
     renderMonSparklines(state, frame, main_layout.get(1));
-
-    // Gauges
     renderMonGauges(state, frame, main_layout.get(2));
-
-    // Process table
     renderMonProcessTable(state, frame, main_layout.get(3));
 
     var status_buf: [64]u8 = undefined;
@@ -677,14 +656,6 @@ fn renderMonProcessTable(state: *State, frame: *FrameType, area: zithril.Rect) v
 // TAB 5: RICH TEXT (from showcase/main.zig)
 // ============================================================
 
-const five_rows = [_]zithril.Constraint{
-    zithril.Constraint.len(1),
-    zithril.Constraint.len(1),
-    zithril.Constraint.len(1),
-    zithril.Constraint.len(1),
-    zithril.Constraint.len(1),
-};
-
 fn panelLines(
     frame: *FrameType,
     area: zithril.Rect,
@@ -699,7 +670,7 @@ fn panelLines(
     frame.render(block, area);
     const inner = block.inner(area);
     if (inner.height < 2 or inner.width < 4) return null;
-    return zithril.layout(inner, .vertical, &five_rows);
+    return zithril.layout(inner, .vertical, &([_]zithril.Constraint{zithril.Constraint.len(1)} ** 5));
 }
 
 fn renderRichText(state: *State, frame: *FrameType, area: zithril.Rect) void {
@@ -978,7 +949,6 @@ fn renderQaAudit(state: *State, frame: *FrameType, area: zithril.Rect) void {
     const inner = block.inner(area);
     if (inner.isEmpty()) return;
 
-    // Run audit on the current buffer if not yet run this cycle
     if (!state.audit_ran) {
         runBufferAudit(state, frame);
         state.audit_ran = true;
@@ -989,7 +959,6 @@ fn renderQaAudit(state: *State, frame: *FrameType, area: zithril.Rect) void {
         zithril.Constraint.flexible(1),
     });
 
-    // Summary header
     var summary_buf: [80]u8 = undefined;
     const summary = std.fmt.bufPrint(&summary_buf, "Contrast Analysis     [{d} pass] [{d} warn] [{d} fail]", .{
         state.audit_pass,
@@ -1017,7 +986,6 @@ fn renderQaAudit(state: *State, frame: *FrameType, area: zithril.Rect) void {
         }, zithril.Rect.init(summary_inner.x, summary_inner.y, summary_inner.width, 1));
     }
 
-    // Findings list
     const findings_area = content_layout.get(1);
     if (findings_area.isEmpty()) return;
 
@@ -1027,7 +995,6 @@ fn renderQaAudit(state: *State, frame: *FrameType, area: zithril.Rect) void {
         const line_area = zithril.Rect.init(findings_area.x, findings_area.y + y, findings_area.width, 1);
         const line_text = state.getAuditLine(i);
 
-        // Color based on content
         const style = if (std.mem.indexOf(u8, line_text, "PASS") != null)
             zithril.Style.init().fg(.green)
         else if (std.mem.indexOf(u8, line_text, "WARN") != null)
@@ -1054,7 +1021,6 @@ fn renderQaAudit(state: *State, frame: *FrameType, area: zithril.Rect) void {
         }, findings_area);
     }
 
-    // Render rate below findings
     if (y < findings_area.height and state.audit_line_count > 0) {
         const rate_area = zithril.Rect.init(findings_area.x, findings_area.y + y + 1, findings_area.width, 1);
         frame.render(zithril.Text{
@@ -1065,7 +1031,6 @@ fn renderQaAudit(state: *State, frame: *FrameType, area: zithril.Rect) void {
 }
 
 fn runBufferAudit(state: *State, frame: *FrameType) void {
-    // Scan the buffer for style regions and compute contrast
     state.audit_line_count = 0;
     state.audit_pass = 0;
     state.audit_warn = 0;
@@ -1075,7 +1040,6 @@ fn runBufferAudit(state: *State, frame: *FrameType) void {
     const width = buf.width;
     const height = buf.height;
 
-    // Sample a few rows to find style transitions
     var sample_row: u16 = 0;
     while (sample_row < height and state.audit_line_count < 14) : (sample_row += 3) {
         var col: u16 = 0;
@@ -1084,7 +1048,6 @@ fn runBufferAudit(state: *State, frame: *FrameType) void {
             const fg_color = cell.style.getForeground() orelse zithril.Color.white;
             const bg_color = cell.style.getBackground() orelse zithril.Color.black;
 
-            // Find extent of same-style region
             var end_col = col + 1;
             while (end_col < width) : (end_col += 1) {
                 const next_cell = buf.get(end_col, sample_row);
@@ -1093,25 +1056,23 @@ fn runBufferAudit(state: *State, frame: *FrameType) void {
                 if (!fg_color.eql(next_fg) or !bg_color.eql(next_bg)) break;
             }
 
-            // Skip empty/space regions
             if (end_col - col >= 2 and !isDefaultPair(fg_color, bg_color)) {
                 const fg_triplet = colorToTriplet(fg_color);
                 const bg_triplet = colorToTriplet(bg_color);
                 const ratio = fg_triplet.contrastRatio(bg_triplet);
                 const level = fg_triplet.wcagLevel(bg_triplet);
 
-                const severity_str: []const u8 = switch (level) {
-                    .aaa => "PASS",
-                    .aa => "PASS",
-                    .aa_large => "WARN",
-                    .fail => "FAIL",
-                };
-
                 switch (level) {
                     .aaa, .aa => state.audit_pass += 1,
                     .aa_large => state.audit_warn += 1,
                     .fail => state.audit_fail += 1,
                 }
+
+                const severity: []const u8 = switch (level) {
+                    .aaa, .aa => "PASS",
+                    .aa_large => "WARN",
+                    .fail => "FAIL",
+                };
 
                 var line_buf: [80]u8 = undefined;
                 const line = std.fmt.bufPrint(&line_buf, "({d},{d})-({d},{d}): {d:.1}:1  {s}  {s}", .{
@@ -1121,7 +1082,7 @@ fn runBufferAudit(state: *State, frame: *FrameType) void {
                     sample_row,
                     ratio,
                     wcagLevelStr(level),
-                    severity_str,
+                    severity,
                 }) catch "?";
                 state.setAuditLine(line);
             }
@@ -1137,7 +1098,6 @@ fn isDefaultPair(fg: zithril.Color, bg: zithril.Color) bool {
 
 fn colorToTriplet(color: zithril.Color) ColorTriplet {
     if (color.getTriplet()) |t| return t;
-    // Fallback: approximate standard colors
     const num = color.number orelse return ColorTriplet{ .r = 229, .g = 229, .b = 229 };
     const standard_triplets = [16]ColorTriplet{
         .{ .r = 0, .g = 0, .b = 0 },
@@ -1172,8 +1132,6 @@ fn colorToTriplet(color: zithril.Color) ColorTriplet {
         .b = if (bi == 0) 0 else @intCast(55 + @as(u16, bi) * 40),
     };
 }
-
-// -- Main --
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -1210,9 +1168,7 @@ test "gallery: initial render shows Basics tab" {
     });
     defer harness.deinit();
 
-    // Tab bar should be rendered on the first row
     try harness.expectString(0, 0, "Basics");
-    // Counter shows initial value on Basics tab
     try std.testing.expectEqual(GalleryTab.basics, state.current_tab);
 }
 
@@ -1249,22 +1205,17 @@ test "gallery: tab switching via number keys" {
     });
     defer harness.deinit();
 
-    // Start on Basics
     try std.testing.expectEqual(GalleryTab.basics, state.current_tab);
 
-    // Switch to Navigation (key '2')
     harness.pressKey('2');
     try std.testing.expectEqual(GalleryTab.navigation, state.current_tab);
 
-    // Switch to Data Viz (key '3')
     harness.pressKey('3');
     try std.testing.expectEqual(GalleryTab.data_viz, state.current_tab);
 
-    // Switch to QA Audit (key '6')
     harness.pressKey('6');
     try std.testing.expectEqual(GalleryTab.qa_audit, state.current_tab);
 
-    // Switch back to Basics (key '1')
     harness.pressKey('1');
     try std.testing.expectEqual(GalleryTab.basics, state.current_tab);
 }
@@ -1280,15 +1231,12 @@ test "gallery: tab switching via arrow keys" {
     });
     defer harness.deinit();
 
-    // Right arrow moves to next tab
     harness.pressSpecial(.right);
     try std.testing.expectEqual(GalleryTab.navigation, state.current_tab);
 
-    // Left arrow moves back
     harness.pressSpecial(.left);
     try std.testing.expectEqual(GalleryTab.basics, state.current_tab);
 
-    // Left arrow at start stays on first tab
     harness.pressSpecial(.left);
     try std.testing.expectEqual(GalleryTab.basics, state.current_tab);
 }
@@ -1334,18 +1282,15 @@ test "gallery: navigation tab list selection" {
     });
     defer harness.deinit();
 
-    // Switch to navigation tab
     harness.pressKey('2');
     try std.testing.expectEqual(GalleryTab.navigation, state.current_tab);
 
-    // Navigate down in the list
     harness.pressKey('j');
     try std.testing.expectEqual(@as(usize, 1), state.nav_selected);
 
     harness.pressKey('j');
     try std.testing.expectEqual(@as(usize, 2), state.nav_selected);
 
-    // Navigate up
     harness.pressKey('k');
     try std.testing.expectEqual(@as(usize, 1), state.nav_selected);
 }
@@ -1366,7 +1311,6 @@ test "gallery: snapshot captures buffer text" {
 
     try std.testing.expectEqual(@as(u16, 40), snap.width);
     try std.testing.expectEqual(@as(u16, 10), snap.height);
-    // Snapshot text should contain the tab title
     try std.testing.expect(std.mem.indexOf(u8, snap.text, "Basics") != null);
 }
 
@@ -1410,7 +1354,6 @@ test "gallery: auditContrast on rendered buffer" {
     var audit_result = try zithril.auditContrast(testing_alloc, buf);
     defer audit_result.deinit();
 
-    // Audit should complete without error
     try std.testing.expectEqual(zithril.AuditCategory.contrast, audit_result.category);
 }
 
