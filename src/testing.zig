@@ -26,6 +26,17 @@ pub const Cell = cell_mod.Cell;
 pub const Rect = geometry_mod.Rect;
 pub const Style = style_mod.Style;
 
+const is_windows = @import("builtin").os.tag == .windows;
+
+/// Cross-platform environment variable getter.
+fn getEnv(name: []const u8) ?[]const u8 {
+    if (is_windows) {
+        return std.process.getEnvVarOwned(std.heap.page_allocator, name) catch null;
+    } else {
+        return std.posix.getenv(name);
+    }
+}
+
 // ============================================================
 // EVENT RECORDING/PLAYBACK
 // ============================================================
@@ -587,7 +598,7 @@ pub const Snapshot = struct {
     /// Compare to a golden file and fail with diff on mismatch.
     /// If ZITHRIL_UPDATE_SNAPSHOTS=1, updates the file instead of failing.
     pub fn expectMatchesFile(self: Self, allocator: std.mem.Allocator, path: []const u8) !void {
-        const update_mode = if (std.posix.getenv("ZITHRIL_UPDATE_SNAPSHOTS")) |v|
+        const update_mode = if (getEnv("ZITHRIL_UPDATE_SNAPSHOTS")) |v|
             std.mem.eql(u8, v, "1")
         else
             false;
