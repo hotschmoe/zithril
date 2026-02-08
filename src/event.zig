@@ -26,10 +26,30 @@ pub const Event = union(enum) {
     command_result: CommandResult,
 };
 
-/// Keyboard event with key code and modifier state.
+/// Key action type for press/repeat/release reporting (Kitty keyboard protocol).
+pub const KeyAction = enum {
+    press,
+    repeat,
+    release,
+};
+
+/// Keyboard event with key code, modifier state, and action.
 pub const Key = struct {
     code: KeyCode,
     modifiers: Modifiers = .{},
+    action: KeyAction = .press,
+
+    pub fn isPress(self: Key) bool {
+        return self.action == .press;
+    }
+
+    pub fn isRepeat(self: Key) bool {
+        return self.action == .repeat;
+    }
+
+    pub fn isRelease(self: Key) bool {
+        return self.action == .release;
+    }
 };
 
 /// Key codes for keyboard input.
@@ -338,6 +358,27 @@ test "behavior: Size.area" {
 // ============================================================
 // REGRESSION TESTS - Edge cases
 // ============================================================
+
+test "behavior: Key.isPress default" {
+    const key = Key{ .code = .enter };
+    try std.testing.expect(key.isPress());
+    try std.testing.expect(!key.isRepeat());
+    try std.testing.expect(!key.isRelease());
+}
+
+test "behavior: Key.isRepeat" {
+    const key = Key{ .code = .{ .char = 'a' }, .action = .repeat };
+    try std.testing.expect(!key.isPress());
+    try std.testing.expect(key.isRepeat());
+    try std.testing.expect(!key.isRelease());
+}
+
+test "behavior: Key.isRelease" {
+    const key = Key{ .code = .escape, .action = .release };
+    try std.testing.expect(!key.isPress());
+    try std.testing.expect(!key.isRepeat());
+    try std.testing.expect(key.isRelease());
+}
 
 test "regression: Modifiers packed struct is 1 byte" {
     try std.testing.expectEqual(@as(usize, 1), @sizeOf(Modifiers));

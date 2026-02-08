@@ -126,6 +126,14 @@ pub const TerminalType = enum {
         };
     }
 
+    /// Returns whether this terminal supports the Kitty keyboard protocol.
+    pub fn supportsKittyKeyboard(self: TerminalType) bool {
+        return switch (self) {
+            .kitty, .wezterm, .alacritty, .gnome_terminal, .konsole => true,
+            else => false,
+        };
+    }
+
     /// Returns whether this terminal supports synchronized output (DEC Mode 2026).
     pub fn supportsSyncOutput(self: TerminalType) bool {
         return switch (self) {
@@ -190,6 +198,8 @@ pub const BackendConfig = struct {
     mouse_capture: bool = false,
     /// Enable bracketed paste mode (distinguish pasted text from typed).
     bracketed_paste: bool = false,
+    /// Enable Kitty keyboard protocol for enhanced key reporting.
+    kitty_keyboard: bool = false,
 };
 
 /// Terminal capabilities detected at runtime.
@@ -203,6 +213,7 @@ pub const TerminalCapabilities = struct {
     bracketed_paste: bool,
     alternate_screen: bool,
     sync_output: bool,
+    kitty_keyboard: bool,
 
     /// Create capabilities from detected terminal type.
     pub fn fromTerminalType(term_type: TerminalType, color: ColorSupport) TerminalCapabilities {
@@ -215,6 +226,7 @@ pub const TerminalCapabilities = struct {
             .bracketed_paste = term_type.supportsBracketedPaste(),
             .alternate_screen = term_type.supportsAlternateScreen(),
             .sync_output = term_type.supportsSyncOutput(),
+            .kitty_keyboard = term_type.supportsKittyKeyboard(),
         };
     }
 };
@@ -257,6 +269,9 @@ fn emergencyCleanupPosix() void {
 
     // Restore terminal based on saved config
     if (emergency_config) |config| {
+        if (config.kitty_keyboard) {
+            file.writeAll("\x1b[<u") catch {};
+        }
         if (config.bracketed_paste) {
             file.writeAll("\x1b[?2004l") catch {};
         }
@@ -292,6 +307,9 @@ fn emergencyCleanupWindows() void {
     // Restore terminal based on saved config
     if (emergency_config) |config| {
         const file = std.fs.File{ .handle = stdout_handle };
+        if (config.kitty_keyboard) {
+            file.writeAll("\x1b[<u") catch {};
+        }
         if (config.bracketed_paste) {
             file.writeAll("\x1b[?2004l") catch {};
         }
@@ -569,6 +587,10 @@ pub const Backend = struct {
             self.writeEscape(ENABLE_BRACKETED_PASTE);
         }
 
+        if (config.kitty_keyboard and caps.kitty_keyboard) {
+            self.writeEscape(ENABLE_KITTY_KEYBOARD);
+        }
+
         return self;
     }
 
@@ -666,6 +688,10 @@ pub const Backend = struct {
             self.writeEscape(ENABLE_BRACKETED_PASTE);
         }
 
+        if (config.kitty_keyboard and caps.kitty_keyboard) {
+            self.writeEscape(ENABLE_KITTY_KEYBOARD);
+        }
+
         return self;
     }
 
@@ -675,6 +701,11 @@ pub const Backend = struct {
     /// Safe to call multiple times.
     pub fn deinit(self: *Backend) void {
         if (!self.active) return;
+
+        // Disable Kitty keyboard protocol
+        if (self.config.kitty_keyboard and self.capabilities.kitty_keyboard) {
+            self.writeEscape(DISABLE_KITTY_KEYBOARD);
+        }
 
         // Disable bracketed paste
         if (self.config.bracketed_paste and self.capabilities.bracketed_paste) {
@@ -867,6 +898,9 @@ pub const Backend = struct {
 
     pub const SYNC_OUTPUT_BEGIN = "\x1b[?2026h";
     pub const SYNC_OUTPUT_END = "\x1b[?2026l";
+
+    pub const ENABLE_KITTY_KEYBOARD = "\x1b[>3u";
+    pub const DISABLE_KITTY_KEYBOARD = "\x1b[<u";
 };
 
 // ============================================================
@@ -1951,4 +1985,41 @@ test "behavior: Output.endSyncOutput writes correct sequence" {
     var out = TestOutput.initWithColorSystem(handle, .truecolor);
     out.endSyncOutput();
     try std.testing.expectEqualStrings("\x1b[?2026l", out.buffer[0..out.pos]);
+}
+
+// ============================================================
+// BEHAVIOR TESTS - Kitty keyboard protocol
+// ============================================================
+
+test "behavior: kitty keyboard escape sequences are correct" {
+    try std.testing.expectEqualStrings("\x1b[>3u", Backend.ENABLE_KITTY_KEYBOARD);
+    try std.testing.expectEqualStrings("\x1b[<u", Backend.DISABLE_KITTY_KEYBOARD);
+}
+
+test "sanity: TerminalType.supportsKittyKeyboard" {
+    try std.testing.expect(TerminalType.kitty.supportsKittyKeyboard());
+    try std.testing.expect(TerminalType.wezterm.supportsKittyKeyboard());
+    try std.testing.expect(TerminalType.alacritty.supportsKittyKeyboard());
+    try std.testing.expect(TerminalType.gnome_terminal.supportsKittyKeyboard());
+    try std.testing.expect(TerminalType.konsole.supportsKittyKeyboard());
+    try std.testing.expect(!TerminalType.xterm.supportsKittyKeyboard());
+    try std.testing.expect(!TerminalType.cmd_exe.supportsKittyKeyboard());
+    try std.testing.expect(!TerminalType.linux_console.supportsKittyKeyboard());
+    try std.testing.expect(!TerminalType.unknown.supportsKittyKeyboard());
+    try std.testing.expect(!TerminalType.iterm2.supportsKittyKeyboard());
+    try std.testing.expect(!TerminalType.windows_terminal.supportsKittyKeyboard());
+    try std.testing.expect(!TerminalType.tmux.supportsKittyKeyboard());
+}
+
+test "sanity: TerminalCapabilities includes kitty_keyboard" {
+    const caps_kitty = TerminalCapabilities.fromTerminalType(.kitty, .true_color);
+    try std.testing.expect(caps_kitty.kitty_keyboard);
+
+    const caps_xterm = TerminalCapabilities.fromTerminalType(.xterm, .extended);
+    try std.testing.expect(!caps_xterm.kitty_keyboard);
+}
+
+test "sanity: BackendConfig.kitty_keyboard defaults to false" {
+    const config = BackendConfig{};
+    try std.testing.expect(!config.kitty_keyboard);
 }

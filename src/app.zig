@@ -67,6 +67,9 @@ pub fn App(comptime State: type) type {
         /// Preserves original terminal content on exit.
         alternate_screen: bool,
 
+        /// Enable Kitty keyboard protocol for enhanced key reporting.
+        kitty_keyboard: bool,
+
         /// Configuration options for App initialization.
         pub const Config = struct {
             /// Pointer to user-owned state instance.
@@ -83,6 +86,8 @@ pub fn App(comptime State: type) type {
             paste_bracket: bool = false,
             /// Use alternate screen buffer.
             alternate_screen: bool = true,
+            /// Enable Kitty keyboard protocol for enhanced key reporting.
+            kitty_keyboard: bool = false,
         };
 
         /// Initialize an App with the given configuration.
@@ -95,6 +100,7 @@ pub fn App(comptime State: type) type {
                 .mouse_capture = config.mouse_capture,
                 .paste_bracket = config.paste_bracket,
                 .alternate_screen = config.alternate_screen,
+                .kitty_keyboard = config.kitty_keyboard,
             };
         }
 
@@ -106,6 +112,7 @@ pub fn App(comptime State: type) type {
                 .hide_cursor = true,
                 .mouse_capture = self.mouse_capture,
                 .bracketed_paste = self.paste_bracket,
+                .kitty_keyboard = self.kitty_keyboard,
             };
         }
 
@@ -641,6 +648,7 @@ test "config: App.Config has correct defaults" {
     try std.testing.expect(!config.mouse_capture);
     try std.testing.expect(!config.paste_bracket);
     try std.testing.expect(config.alternate_screen);
+    try std.testing.expect(!config.kitty_keyboard);
 }
 
 test "config: App stores configuration values" {
@@ -694,4 +702,20 @@ test "config: backendConfig uses defaults correctly" {
     try std.testing.expect(backend_config.hide_cursor);
     try std.testing.expect(!backend_config.mouse_capture);
     try std.testing.expect(!backend_config.bracketed_paste);
+    try std.testing.expect(!backend_config.kitty_keyboard);
+}
+
+test "config: kitty_keyboard wires through to backendConfig" {
+    var state = TestHelpers.SimpleState{};
+    const app = App(TestHelpers.SimpleState).init(.{
+        .state = &state,
+        .update = TestHelpers.simpleUpdate,
+        .view = TestHelpers.simpleView,
+        .kitty_keyboard = true,
+    });
+
+    try std.testing.expect(app.kitty_keyboard);
+
+    const backend_config = app.backendConfig();
+    try std.testing.expect(backend_config.kitty_keyboard);
 }

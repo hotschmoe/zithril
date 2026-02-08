@@ -1,0 +1,22 @@
+# Workbench Agents Mode scenario
+# Tests agent selection and log scrolling
+
+size 80 24
+
+# Switch to Agents mode
+key 2
+
+# Navigate agent list
+key j
+key j
+key k
+
+# Cycle focus to logs
+key tab
+
+# Scroll logs
+key j
+key j
+
+# Cycle focus back to agents
+key tab

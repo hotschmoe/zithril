@@ -1,0 +1,24 @@
+# Gallery Tab Switching scenario
+# Tests switching between all tabs via number keys
+
+size 80 24
+
+# Start on Basics tab (tab 1)
+# Switch to each tab
+key 2
+key 3
+key 4
+key 5
+key 6
+
+# Switch back to Basics
+key 1
+
+# Arrow key navigation
+key right
+key right
+key left
+
+# Quit
+key q
+expect_quit

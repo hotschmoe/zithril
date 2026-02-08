@@ -4,13 +4,11 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Get the rich_zig dependency
     const rich_zig = b.dependency("rich_zig", .{
         .target = target,
         .optimize = optimize,
     });
 
-    // Create the zithril module with rich_zig as a dependency
     const mod = b.addModule("zithril", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -19,94 +17,20 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    // Demo executable
-    const exe = b.addExecutable(.{
-        .name = "zithril",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "zithril", .module = mod },
-                .{ .name = "rich_zig", .module = rich_zig.module("rich_zig") },
-            },
-        }),
-    });
+    const update_snapshots = b.option(bool, "update-snapshots", "Auto-update golden files on mismatch") orelse false;
 
-    b.installArtifact(exe);
-
-    // Run step
-    const run_step = b.step("run", "Run the demo");
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    run_step.dependOn(&run_cmd.step);
-
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    // Tests
     const mod_tests = b.addTest(.{
         .root_module = mod,
     });
     const run_mod_tests = b.addRunArtifact(mod_tests);
 
-    const exe_tests = b.addTest(.{
-        .root_module = exe.root_module,
-    });
-    const run_exe_tests = b.addRunArtifact(exe_tests);
+    if (update_snapshots) {
+        run_mod_tests.setEnvironmentVariable("ZITHRIL_UPDATE_SNAPSHOTS", "1");
+    }
 
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_exe_tests.step);
 
-    // Examples - each example gets its own build target
-    const examples = [_][]const u8{
-        "counter",
-        "list",
-        "tabs",
-        "ralph",
-    };
-
-    var prev_step: *std.Build.Step = b.getInstallStep();
-
-    for (examples) |name| {
-        const example_exe = b.addExecutable(.{
-            .name = b.fmt("example-{s}", .{name}),
-            .root_module = b.createModule(.{
-                .root_source_file = b.path(b.fmt("examples/{s}.zig", .{name})),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "zithril", .module = mod },
-                    .{ .name = "rich_zig", .module = rich_zig.module("rich_zig") },
-                },
-            }),
-        });
-
-        b.installArtifact(example_exe);
-
-        // Chained run for "run-examples" step
-        const chained_run = b.addRunArtifact(example_exe);
-        chained_run.step.dependOn(b.getInstallStep());
-        chained_run.step.dependOn(prev_step);
-        prev_step = &chained_run.step;
-
-        // Standalone run for individual example
-        const standalone_run = b.addRunArtifact(example_exe);
-        standalone_run.step.dependOn(b.getInstallStep());
-
-        const example_step = b.step(
-            b.fmt("run-example-{s}", .{name}),
-            b.fmt("Run the {s} example", .{name}),
-        );
-        example_step.dependOn(&standalone_run.step);
-    }
-
-    const run_examples_step = b.step("run-examples", "Run all examples");
-    run_examples_step.dependOn(prev_step);
-
-    // Fuzz testing step (for CI/CD Option C)
     const fuzz_step = b.step("fuzz", "Run fuzz tests");
     const fuzz_exe = b.addExecutable(.{
         .name = "fuzz",
@@ -123,38 +47,51 @@ pub fn build(b: *std.Build) void {
     fuzz_run.step.dependOn(b.getInstallStep());
     fuzz_step.dependOn(&fuzz_run.step);
 
-    // Demos - larger applications in their own directories
-    const demos = [_]struct { name: []const u8, desc: []const u8 }{
+    const showcases = [_]struct { name: []const u8, desc: []const u8 }{
+        .{ .name = "gallery", .desc = "Widget gallery - every widget in tabbed pages" },
+        .{ .name = "workbench", .desc = "Interactive workbench - focus, mouse, input, panels" },
         .{ .name = "rung", .desc = "Ladder logic puzzle game" },
-        .{ .name = "dashboard", .desc = "System monitoring dashboard" },
-        .{ .name = "explorer", .desc = "File explorer with tree navigation" },
-        .{ .name = "dataviz", .desc = "Data visualization gallery" },
-        .{ .name = "showcase", .desc = "Rich text feature showcase" },
     };
 
-    for (demos) |demo| {
-        const demo_exe = b.addExecutable(.{
-            .name = demo.name,
-            .root_module = b.createModule(.{
-                .root_source_file = b.path(b.fmt("demos/{s}/main.zig", .{demo.name})),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "zithril", .module = mod },
-                    .{ .name = "rich_zig", .module = rich_zig.module("rich_zig") },
-                },
-            }),
+    for (showcases) |app| {
+        const app_module = b.createModule(.{
+            .root_source_file = b.path(b.fmt("showcases/{s}/main.zig", .{app.name})),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zithril", .module = mod },
+                .{ .name = "rich_zig", .module = rich_zig.module("rich_zig") },
+            },
         });
 
-        b.installArtifact(demo_exe);
+        const app_exe = b.addExecutable(.{
+            .name = app.name,
+            .root_module = app_module,
+        });
+        b.installArtifact(app_exe);
 
-        const demo_run = b.addRunArtifact(demo_exe);
-        demo_run.step.dependOn(b.getInstallStep());
+        const app_run = b.addRunArtifact(app_exe);
+        app_run.step.dependOn(b.getInstallStep());
 
-        const demo_step = b.step(
-            b.fmt("run-{s}", .{demo.name}),
-            b.fmt("Run {s}", .{demo.desc}),
+        const app_step = b.step(
+            b.fmt("run-{s}", .{app.name}),
+            b.fmt("Run {s}", .{app.desc}),
         );
-        demo_step.dependOn(&demo_run.step);
+        app_step.dependOn(&app_run.step);
+
+        const app_tests = b.addTest(.{
+            .root_module = app_module,
+        });
+        const run_app_tests = b.addRunArtifact(app_tests);
+        if (update_snapshots) {
+            run_app_tests.setEnvironmentVariable("ZITHRIL_UPDATE_SNAPSHOTS", "1");
+        }
+        test_step.dependOn(&run_app_tests.step);
+
+        const app_test_step = b.step(
+            b.fmt("test-{s}", .{app.name}),
+            b.fmt("Run {s} QA tests", .{app.name}),
+        );
+        app_test_step.dependOn(&run_app_tests.step);
     }
 }

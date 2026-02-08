@@ -152,16 +152,16 @@ A Zig TUI framework for building terminal user interfaces. Immediate mode render
 ## Zig Toolchain
 
 ```bash
-zig build                       # Build library
-zig build run-example-counter   # Run counter example
-zig build run-example-ralph     # Run reference app
-zig build run-rung              # Run ladder logic demo
-zig build run-dashboard         # Run system dashboard demo
-zig build run-explorer          # Run file explorer demo
-zig build run-dataviz           # Run data visualization gallery
-zig build run-showcase          # Run rich text feature showcase
-zig build test                  # Run all tests
-zig fmt src/                    # Format before commits
+zig build                       # Build library + showcases
+zig build run-gallery            # Run widget gallery showcase
+zig build run-workbench          # Run interactive workbench showcase
+zig build run-rung               # Run ladder logic puzzle game
+zig build test                   # Run all tests (library + showcase QA)
+zig build test-gallery           # Run gallery QA tests only
+zig build test-workbench         # Run workbench QA tests only
+zig build test-rung              # Run rung QA tests only
+zig build test -Dupdate-snapshots=true  # Run tests, auto-update golden files
+zig fmt src/ showcases/          # Format before commits
 ```
 
 ---
@@ -234,10 +234,20 @@ zig fmt src/                    # Format before commits
 
 ### Event
 
-- `.key` - KeyCode + modifiers (ctrl, alt, shift)
+- `.key` - KeyCode + modifiers (ctrl, alt, shift) + action (press, repeat, release)
 - `.mouse` - Position + kind (down, up, drag, scroll)
 - `.resize` - New width/height
 - `.tick` - Timer for animations/polling
+
+### KeyAction (Kitty keyboard protocol)
+
+| Action | Description |
+|--------|-------------|
+| `.press` | Key pressed (default for all events) |
+| `.repeat` | Key held / auto-repeat |
+| `.release` | Key released |
+
+Enable with `kitty_keyboard: true` in App config. Terminals without Kitty protocol support fall back to traditional input (all events report as `.press`).
 
 ### Action
 
@@ -513,7 +523,8 @@ When making commits, update `version` in `build.zig.zon`:
 - [x] Pretty printing (comptime Zig value formatter)
 - [x] Measurement protocol (constraint-to-measurement conversion)
 - [x] Extended style attributes (underline2, frame, encircle, overline)
-- [ ] Mouse event wiring to app event loop
+- [x] Kitty keyboard protocol (CSI u parsing, press/repeat/release actions)
+- [x] Mouse event wiring to app event loop
 - [ ] Async command dispatch in runtime
 - [ ] Image rendering via graphics protocols
 

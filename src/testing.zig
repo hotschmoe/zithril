@@ -26,6 +26,17 @@ pub const Cell = cell_mod.Cell;
 pub const Rect = geometry_mod.Rect;
 pub const Style = style_mod.Style;
 
+const is_windows = @import("builtin").os.tag == .windows;
+
+/// Cross-platform environment variable getter.
+fn getEnv(name: []const u8) ?[]const u8 {
+    if (is_windows) {
+        return std.process.getEnvVarOwned(std.heap.page_allocator, name) catch null;
+    } else {
+        return std.posix.getenv(name);
+    }
+}
+
 // ============================================================
 // EVENT RECORDING/PLAYBACK
 // ============================================================
@@ -531,6 +542,88 @@ pub const Snapshot = struct {
             .allocator = allocator,
         };
     }
+
+    /// Save snapshot text to a file.
+    /// Writes a header line with dimensions, then the text content.
+    /// Auto-creates parent directories if they don't exist.
+    pub fn saveToFile(self: Self, path: []const u8) !void {
+        if (std.fs.path.dirname(path)) |parent| {
+            try std.fs.cwd().makePath(parent);
+        }
+        const file = try std.fs.cwd().createFile(path, .{});
+        defer file.close();
+        var buf: [64]u8 = undefined;
+        const header = std.fmt.bufPrint(&buf, "# zithril-golden {d}x{d}\n", .{ self.width, self.height }) catch unreachable;
+        try file.writeAll(header);
+        try file.writeAll(self.text);
+    }
+
+    /// Load a snapshot from a golden file.
+    /// Parses the header line to extract dimensions.
+    pub fn loadFromFile(allocator: std.mem.Allocator, path: []const u8) !Self {
+        const file = try std.fs.cwd().openFile(path, .{});
+        defer file.close();
+        const raw = try file.readToEndAlloc(allocator, 1024 * 1024);
+        errdefer allocator.free(raw);
+
+        const prefix = "# zithril-golden ";
+        if (!std.mem.startsWith(u8, raw, prefix)) {
+            return error.InvalidGoldenFileHeader;
+        }
+        const after_prefix = raw[prefix.len..];
+        const newline_pos = std.mem.indexOfScalar(u8, after_prefix, '\n') orelse
+            return error.InvalidGoldenFileHeader;
+
+        const dim_str = after_prefix[0..newline_pos];
+        const x_pos = std.mem.indexOfScalar(u8, dim_str, 'x') orelse
+            return error.InvalidGoldenFileHeader;
+
+        const width = std.fmt.parseInt(u16, dim_str[0..x_pos], 10) catch
+            return error.InvalidGoldenFileHeader;
+        const height = std.fmt.parseInt(u16, dim_str[x_pos + 1 ..], 10) catch
+            return error.InvalidGoldenFileHeader;
+
+        const text_start = prefix.len + newline_pos + 1;
+        const text = try allocator.dupe(u8, raw[text_start..]);
+        allocator.free(raw);
+
+        return Self{
+            .text = text,
+            .width = width,
+            .height = height,
+            .allocator = allocator,
+        };
+    }
+
+    /// Compare to a golden file and fail with diff on mismatch.
+    /// If ZITHRIL_UPDATE_SNAPSHOTS=1, updates the file instead of failing.
+    pub fn expectMatchesFile(self: Self, allocator: std.mem.Allocator, path: []const u8) !void {
+        const update_mode = if (getEnv("ZITHRIL_UPDATE_SNAPSHOTS")) |v|
+            std.mem.eql(u8, v, "1")
+        else
+            false;
+
+        var loaded = loadFromFile(allocator, path) catch |err| {
+            if (err == error.FileNotFound and update_mode) {
+                try self.saveToFile(path);
+                std.debug.print("SNAPSHOT CREATED: {s}\n", .{path});
+                return;
+            }
+            return err;
+        };
+        defer loaded.deinit();
+        if (!self.eql(loaded)) {
+            if (update_mode) {
+                try self.saveToFile(path);
+                std.debug.print("SNAPSHOT UPDATED: {s}\n", .{path});
+                return;
+            }
+            const diff_text = try self.diff(allocator, loaded);
+            defer allocator.free(diff_text);
+            std.debug.print("SNAPSHOT MISMATCH: {s}\n\n{s}\n", .{ path, diff_text });
+            return error.TestExpectedEqual;
+        }
+    }
 };
 
 /// Convert a buffer to a plain text representation.
@@ -595,6 +688,325 @@ pub fn bufferToAnnotatedText(allocator: std.mem.Allocator, buf: Buffer) ![]const
     try buf_writer.writeAll("+" ++ "-" ** 40 ++ "+\n");
 
     return result.toOwnedSlice(allocator);
+}
+
+// ============================================================
+// TEST HARNESS
+// ============================================================
+
+/// High-level test harness that drives the full update/view/render cycle
+/// without a real terminal. Provides event injection and assertion APIs.
+///
+/// Usage:
+///   var state = MyState{};
+///   var harness = try TestHarness(MyState).init(allocator, .{
+///       .state = &state,
+///       .update = update,
+///       .view = view,
+///   });
+///   defer harness.deinit();
+///   harness.pressKey('j');
+///   try harness.expectString(0, 0, "Selected: item_1");
+pub fn TestHarness(comptime State: type) type {
+    return struct {
+        const Self = @This();
+        pub const MaxWidgets: usize = 64;
+        const FrameType = @import("frame.zig").Frame(MaxWidgets);
+        const Action = @import("action.zig").Action;
+
+        allocator: std.mem.Allocator,
+        state: *State,
+        update_fn: *const fn (*State, Event) Action,
+        view_fn: *const fn (*State, *FrameType) void,
+        current_buf: Buffer,
+        previous_buf: Buffer,
+        last_action: Action,
+        frame_count: u64,
+
+        pub const Config = struct {
+            state: *State,
+            update: *const fn (*State, Event) Action,
+            view: *const fn (*State, *FrameType) void,
+            width: u16 = 80,
+            height: u16 = 24,
+        };
+
+        pub fn init(allocator: std.mem.Allocator, config: Config) !Self {
+            var self = Self{
+                .allocator = allocator,
+                .state = config.state,
+                .update_fn = config.update,
+                .view_fn = config.view,
+                .current_buf = try Buffer.init(allocator, config.width, config.height),
+                .previous_buf = try Buffer.init(allocator, config.width, config.height),
+                .last_action = Action{ .none = {} },
+                .frame_count = 0,
+            };
+            // Initial render
+            self.render();
+            return self;
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.current_buf.deinit();
+            self.previous_buf.deinit();
+        }
+
+        // -- Core loop --
+
+        fn step(self: *Self, event: Event) void {
+            self.last_action = self.update_fn(self.state, event);
+            self.render();
+        }
+
+        fn render(self: *Self) void {
+            self.current_buf.clear();
+            var frame = FrameType.init(&self.current_buf);
+            self.view_fn(self.state, &frame);
+            @memcpy(self.previous_buf.cells, self.current_buf.cells);
+            self.frame_count += 1;
+        }
+
+        // -- Event injection --
+
+        pub fn pressKey(self: *Self, char: u21) void {
+            self.step(keyEvent(char));
+        }
+
+        pub fn pressKeyWith(self: *Self, code: KeyCode, mods: Modifiers) void {
+            self.step(Event{ .key = Key{ .code = code, .modifiers = mods } });
+        }
+
+        pub fn pressSpecial(self: *Self, code: KeyCode) void {
+            self.step(Event{ .key = Key{ .code = code } });
+        }
+
+        pub fn click(self: *Self, x: u16, y: u16) void {
+            self.step(mouseEvent(x, y, .down));
+            self.step(mouseEvent(x, y, .up));
+        }
+
+        pub fn rightClick(self: *Self, x: u16, y: u16) void {
+            self.step(Event{ .mouse = .{ .x = x, .y = y, .kind = .down, .modifiers = .{ .ctrl = true } } });
+            self.step(Event{ .mouse = .{ .x = x, .y = y, .kind = .up, .modifiers = .{ .ctrl = true } } });
+        }
+
+        pub fn mouseDown(self: *Self, x: u16, y: u16) void {
+            self.step(mouseEvent(x, y, .down));
+        }
+
+        pub fn mouseUp(self: *Self, x: u16, y: u16) void {
+            self.step(mouseEvent(x, y, .up));
+        }
+
+        pub fn drag(self: *Self, from_x: u16, from_y: u16, to_x: u16, to_y: u16) void {
+            self.step(mouseEvent(from_x, from_y, .down));
+            self.step(Event{ .mouse = .{ .x = to_x, .y = to_y, .kind = .drag } });
+            self.step(mouseEvent(to_x, to_y, .up));
+        }
+
+        pub fn hover(self: *Self, x: u16, y: u16) void {
+            self.step(Event{ .mouse = .{ .x = x, .y = y, .kind = .move } });
+        }
+
+        pub fn scroll(self: *Self, x: u16, y: u16, direction: MouseKind) void {
+            self.step(Event{ .mouse = .{ .x = x, .y = y, .kind = direction } });
+        }
+
+        pub fn resize(self: *Self, width: u16, height: u16) !void {
+            self.current_buf.deinit();
+            self.previous_buf.deinit();
+            self.current_buf = try Buffer.init(self.allocator, width, height);
+            self.previous_buf = try Buffer.init(self.allocator, width, height);
+            self.step(resizeEvent(width, height));
+        }
+
+        pub fn tick(self: *Self) void {
+            self.step(tickEvent());
+        }
+
+        pub fn tickN(self: *Self, n: u32) void {
+            var i: u32 = 0;
+            while (i < n) : (i += 1) {
+                self.tick();
+            }
+        }
+
+        pub fn inject(self: *Self, event: Event) void {
+            self.step(event);
+        }
+
+        // -- Assertions --
+
+        pub fn expectCell(self: Self, x: u16, y: u16, expected_char: u21) !void {
+            const cell = self.current_buf.get(x, y);
+            if (cell.char != expected_char) {
+                std.debug.print(
+                    \\CELL MISMATCH at ({d}, {d}):
+                    \\  Expected: '{u}' (U+{X:0>4})
+                    \\  Actual:   '{u}' (U+{X:0>4})
+                    \\
+                , .{ x, y, expected_char, expected_char, cell.char, cell.char });
+                return error.TestExpectedEqual;
+            }
+        }
+
+        pub fn expectString(self: Self, x: u16, y: u16, expected: []const u8) !void {
+            var current_x = x;
+            var iter = std.unicode.Utf8View.initUnchecked(expected).iterator();
+            var idx: usize = 0;
+            while (iter.nextCodepoint()) |expected_char| {
+                const cell = self.current_buf.get(current_x, y);
+                if (cell.char != expected_char) {
+                    std.debug.print(
+                        \\STRING MISMATCH at ({d}, {d}) index {d}:
+                        \\  Expected string: "{s}"
+                        \\  Mismatch at char: expected '{u}', got '{u}'
+                        \\
+                    , .{ x, y, idx, expected, expected_char, cell.char });
+                    return error.TestExpectedEqual;
+                }
+                current_x += if (cell.isWide()) 2 else 1;
+                idx += 1;
+            }
+        }
+
+        pub fn expectStyle(self: Self, x: u16, y: u16, comptime attr: style_mod.StyleAttribute) !void {
+            const cell = self.current_buf.get(x, y);
+            if (!cell.style.hasAttribute(attr)) {
+                std.debug.print(
+                    \\STYLE MISMATCH at ({d}, {d}):
+                    \\  Expected attribute: {s}
+                    \\  Cell char: '{u}'
+                    \\
+                , .{ x, y, @tagName(attr), cell.char });
+                return error.TestExpectedEqual;
+            }
+        }
+
+        pub fn expectEmpty(self: Self, x: u16, y: u16) !void {
+            const cell = self.current_buf.get(x, y);
+            if (cell.char != ' ' or !cell.style.isEmpty()) {
+                std.debug.print(
+                    \\EXPECTED EMPTY at ({d}, {d}):
+                    \\  Actual char: '{u}' (U+{X:0>4})
+                    \\  Has style: {}
+                    \\
+                , .{ x, y, cell.char, cell.char, !cell.style.isEmpty() });
+                return error.TestExpectedEqual;
+            }
+        }
+
+        pub fn expectAction(self: Self, expected: Action) !void {
+            const match = switch (expected) {
+                .none => self.last_action == .none,
+                .quit => self.last_action == .quit,
+                .command => self.last_action == .command,
+            };
+            if (!match) {
+                std.debug.print(
+                    \\ACTION MISMATCH:
+                    \\  Expected: {s}
+                    \\  Actual:   {s}
+                    \\
+                , .{ @tagName(expected), @tagName(self.last_action) });
+                return error.TestExpectedEqual;
+            }
+        }
+
+        pub fn expectQuit(self: Self) !void {
+            try self.expectAction(Action{ .quit = {} });
+        }
+
+        // -- Buffer access --
+
+        pub fn getCell(self: Self, x: u16, y: u16) Cell {
+            return self.current_buf.get(x, y);
+        }
+
+        pub fn getBuffer(self: *const Self) *const Buffer {
+            return &self.current_buf;
+        }
+
+        pub fn getText(self: Self, allocator: std.mem.Allocator) ![]const u8 {
+            return bufferToText(allocator, self.current_buf);
+        }
+
+        pub fn getRow(self: Self, allocator: std.mem.Allocator, y: u16) ![]const u8 {
+            if (y >= self.current_buf.height) {
+                return try allocator.dupe(u8, "");
+            }
+            var result: std.ArrayListUnmanaged(u8) = .{};
+            errdefer result.deinit(allocator);
+            var x: u16 = 0;
+            while (x < self.current_buf.width) : (x += 1) {
+                const cell = self.current_buf.get(x, y);
+                if (cell.width == 0) continue;
+                var char_buf: [4]u8 = undefined;
+                const len = std.unicode.utf8Encode(cell.char, &char_buf) catch 1;
+                try result.appendSlice(allocator, char_buf[0..len]);
+            }
+            return result.toOwnedSlice(allocator);
+        }
+
+        pub fn getRegion(self: Self, allocator: std.mem.Allocator, region: Rect) ![]const u8 {
+            var result: std.ArrayListUnmanaged(u8) = .{};
+            errdefer result.deinit(allocator);
+
+            const max_y = @min(region.y + region.height, self.current_buf.height);
+            const max_x = @min(region.x + region.width, self.current_buf.width);
+
+            var y = region.y;
+            while (y < max_y) : (y += 1) {
+                if (y > region.y) {
+                    try result.append(allocator, '\n');
+                }
+                var x = region.x;
+                while (x < max_x) : (x += 1) {
+                    const cell = self.current_buf.get(x, y);
+                    if (cell.width == 0) continue;
+                    var char_buf: [4]u8 = undefined;
+                    const len = std.unicode.utf8Encode(cell.char, &char_buf) catch 1;
+                    try result.appendSlice(allocator, char_buf[0..len]);
+                }
+            }
+
+            return result.toOwnedSlice(allocator);
+        }
+
+        // -- Snapshot --
+
+        pub fn snapshot(self: Self, allocator: std.mem.Allocator) !Snapshot {
+            return Snapshot.fromBuffer(allocator, self.current_buf);
+        }
+
+        pub fn expectSnapshot(self: Self, expected: []const u8) !void {
+            var snap = try Snapshot.fromBuffer(self.allocator, self.current_buf);
+            defer snap.deinit();
+            if (!snap.matches(expected)) {
+                var expected_snap = try Snapshot.fromText(self.allocator, expected, self.current_buf.width, self.current_buf.height);
+                defer expected_snap.deinit();
+                const diff_text = try expected_snap.diff(self.allocator, snap);
+                defer self.allocator.free(diff_text);
+                std.debug.print("SNAPSHOT MISMATCH:\n{s}\n", .{diff_text});
+                return error.TestExpectedEqual;
+            }
+        }
+
+        // -- Golden file operations --
+
+        pub fn saveSnapshot(self: Self, path: []const u8) !void {
+            var snap = try Snapshot.fromBuffer(self.allocator, self.current_buf);
+            defer snap.deinit();
+            try snap.saveToFile(path);
+        }
+
+        pub fn expectSnapshotFile(self: Self, path: []const u8) !void {
+            var snap = try Snapshot.fromBuffer(self.allocator, self.current_buf);
+            defer snap.deinit();
+            try snap.expectMatchesFile(self.allocator, path);
+        }
+    };
 }
 
 // ============================================================
@@ -1001,4 +1413,613 @@ test "regression: TestPlayer reset" {
     player.reset();
     try std.testing.expect(!player.isDone());
     try std.testing.expectEqual(@as(usize, 2), player.remaining());
+}
+
+// ============================================================
+// TEST HARNESS TESTS
+// ============================================================
+
+const HarnessTestHelpers = struct {
+    const CounterState = struct {
+        count: i32 = 0,
+        last_key: ?u21 = null,
+        last_mouse_x: ?u16 = null,
+        last_mouse_y: ?u16 = null,
+        ticks: u32 = 0,
+        width: u16 = 0,
+        height: u16 = 0,
+        quit_requested: bool = false,
+    };
+
+    const Action = @import("action.zig").Action;
+    const FrameType = @import("frame.zig").Frame(64);
+
+    fn counterUpdate(state: *CounterState, ev: Event) Action {
+        switch (ev) {
+            .key => |key| {
+                switch (key.code) {
+                    .char => |c| {
+                        state.last_key = c;
+                        if (c == 'q') {
+                            state.quit_requested = true;
+                            return Action{ .quit = {} };
+                        }
+                        if (c == '+') state.count += 1;
+                        if (c == '-') state.count -= 1;
+                    },
+                    else => {},
+                }
+            },
+            .mouse => |mouse| {
+                state.last_mouse_x = mouse.x;
+                state.last_mouse_y = mouse.y;
+            },
+            .tick => {
+                state.ticks += 1;
+            },
+            .resize => |size| {
+                state.width = size.width;
+                state.height = size.height;
+            },
+            else => {},
+        }
+        return Action{ .none = {} };
+    }
+
+    fn counterView(state: *CounterState, frame: *FrameType) void {
+        var count_buf: [32]u8 = undefined;
+        const count_str = std.fmt.bufPrint(&count_buf, "Count: {d}", .{state.count}) catch "?";
+        frame.buffer.setString(0, 0, count_str, Style.empty);
+
+        if (state.last_key) |k| {
+            var key_buf: [16]u8 = undefined;
+            const key_str = std.fmt.bufPrint(&key_buf, "Key: {c}", .{@as(u8, @intCast(k & 0x7f))}) catch "?";
+            frame.buffer.setString(0, 1, key_str, Style.empty);
+        }
+    }
+
+    fn styledView(state: *CounterState, frame: *FrameType) void {
+        _ = state;
+        frame.buffer.setString(0, 0, "Bold", Style.init().bold());
+        frame.buffer.setString(0, 1, "Normal", Style.empty);
+    }
+};
+
+test "sanity: TestHarness init and deinit" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    try std.testing.expectEqual(@as(u64, 1), harness.frame_count);
+    try std.testing.expectEqual(@as(u16, 40), harness.current_buf.width);
+    try std.testing.expectEqual(@as(u16, 10), harness.current_buf.height);
+}
+
+test "sanity: TestHarness default dimensions" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+    });
+    defer harness.deinit();
+
+    try std.testing.expectEqual(@as(u16, 80), harness.current_buf.width);
+    try std.testing.expectEqual(@as(u16, 24), harness.current_buf.height);
+}
+
+test "behavior: TestHarness pressKey updates state" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.pressKey('+');
+    try std.testing.expectEqual(@as(i32, 1), state.count);
+    try std.testing.expectEqual(@as(?u21, '+'), state.last_key);
+
+    harness.pressKey('+');
+    harness.pressKey('+');
+    try std.testing.expectEqual(@as(i32, 3), state.count);
+}
+
+test "behavior: TestHarness expectString checks buffer content" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    try harness.expectString(0, 0, "Count: 0");
+
+    harness.pressKey('+');
+    try harness.expectString(0, 0, "Count: 1");
+
+    harness.pressKey('-');
+    try harness.expectString(0, 0, "Count: 0");
+}
+
+test "behavior: TestHarness expectCell checks individual cells" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    try harness.expectCell(0, 0, 'C');
+    try harness.expectCell(1, 0, 'o');
+    try harness.expectCell(2, 0, 'u');
+    try harness.expectCell(3, 0, 'n');
+    try harness.expectCell(4, 0, 't');
+}
+
+test "behavior: TestHarness expectAction checks last action" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.pressKey('+');
+    try harness.expectAction(.{ .none = {} });
+}
+
+test "behavior: TestHarness expectQuit checks quit action" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.pressKey('q');
+    try harness.expectQuit();
+    try std.testing.expect(state.quit_requested);
+}
+
+test "behavior: TestHarness click generates down+up events" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.click(15, 7);
+    try std.testing.expectEqual(@as(?u16, 15), state.last_mouse_x);
+    try std.testing.expectEqual(@as(?u16, 7), state.last_mouse_y);
+}
+
+test "behavior: TestHarness tick advances tick count" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const initial_frame = harness.frame_count;
+    harness.tick();
+    try std.testing.expectEqual(@as(u32, 1), state.ticks);
+    try std.testing.expectEqual(initial_frame + 1, harness.frame_count);
+}
+
+test "behavior: TestHarness tickN advances multiple frames" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const initial_frame = harness.frame_count;
+    harness.tickN(5);
+    try std.testing.expectEqual(@as(u32, 5), state.ticks);
+    try std.testing.expectEqual(initial_frame + 5, harness.frame_count);
+}
+
+test "behavior: TestHarness resize reallocates buffers" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    try harness.resize(120, 40);
+    try std.testing.expectEqual(@as(u16, 120), harness.current_buf.width);
+    try std.testing.expectEqual(@as(u16, 40), harness.current_buf.height);
+    try std.testing.expectEqual(@as(u16, 120), state.width);
+    try std.testing.expectEqual(@as(u16, 40), state.height);
+}
+
+test "behavior: TestHarness inject allows raw events" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.inject(tickEvent());
+    try std.testing.expectEqual(@as(u32, 1), state.ticks);
+}
+
+test "behavior: TestHarness drag generates down/move/up sequence" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.drag(5, 5, 20, 15);
+    try std.testing.expectEqual(@as(?u16, 20), state.last_mouse_x);
+    try std.testing.expectEqual(@as(?u16, 15), state.last_mouse_y);
+}
+
+test "behavior: TestHarness hover generates move event" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.hover(12, 8);
+    try std.testing.expectEqual(@as(?u16, 12), state.last_mouse_x);
+    try std.testing.expectEqual(@as(?u16, 8), state.last_mouse_y);
+}
+
+test "behavior: TestHarness scroll generates scroll events" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.scroll(10, 5, .scroll_up);
+    try std.testing.expectEqual(@as(?u16, 10), state.last_mouse_x);
+    try std.testing.expectEqual(@as(?u16, 5), state.last_mouse_y);
+}
+
+test "behavior: TestHarness expectStyle checks style attributes" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.styledView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    try harness.expectStyle(0, 0, .bold);
+}
+
+test "behavior: TestHarness expectEmpty on default cell" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    try harness.expectEmpty(39, 9);
+}
+
+test "behavior: TestHarness getCell returns cell" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const cell = harness.getCell(0, 0);
+    try std.testing.expectEqual(@as(u21, 'C'), cell.char);
+}
+
+test "behavior: TestHarness getText returns full buffer text" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const text = try harness.getText(std.testing.allocator);
+    defer std.testing.allocator.free(text);
+    try std.testing.expect(std.mem.indexOf(u8, text, "Count: 0") != null);
+}
+
+test "behavior: TestHarness getRow returns single row" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const row = try harness.getRow(std.testing.allocator, 0);
+    defer std.testing.allocator.free(row);
+    try std.testing.expect(std.mem.startsWith(u8, row, "Count: 0"));
+}
+
+test "behavior: TestHarness getRow out of bounds returns empty" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const row = try harness.getRow(std.testing.allocator, 100);
+    defer std.testing.allocator.free(row);
+    try std.testing.expectEqualStrings("", row);
+}
+
+test "behavior: TestHarness snapshot creates Snapshot" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    var snap = try harness.snapshot(std.testing.allocator);
+    defer snap.deinit();
+
+    try std.testing.expectEqual(@as(u16, 40), snap.width);
+    try std.testing.expectEqual(@as(u16, 10), snap.height);
+    try std.testing.expect(std.mem.indexOf(u8, snap.text, "Count: 0") != null);
+}
+
+test "behavior: TestHarness expectSnapshot inline comparison" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 10,
+        .height = 1,
+    });
+    defer harness.deinit();
+
+    try harness.expectSnapshot("Count: 0  ");
+}
+
+test "behavior: TestHarness pressSpecial sends special key" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.pressSpecial(.{ .enter = {} });
+    try harness.expectAction(.{ .none = {} });
+}
+
+test "behavior: TestHarness pressKeyWith sends key with modifiers" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    harness.pressKeyWith(.{ .char = 'c' }, .{ .ctrl = true });
+    try harness.expectAction(.{ .none = {} });
+}
+
+test "behavior: TestHarness getBuffer returns buffer reference" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const buf = harness.getBuffer();
+    try std.testing.expectEqual(@as(u16, 40), buf.width);
+    try std.testing.expectEqual(@as(u16, 10), buf.height);
+}
+
+test "regression: TestHarness re-renders after each event" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    try harness.expectString(0, 0, "Count: 0");
+    harness.pressKey('+');
+    try harness.expectString(0, 0, "Count: 1");
+    harness.pressKey('+');
+    try harness.expectString(0, 0, "Count: 2");
+
+    const expected_frames = 1 + 2; // initial + 2 key presses
+    try std.testing.expectEqual(@as(u64, expected_frames), harness.frame_count);
+}
+
+test "regression: TestHarness initial render populates buffer" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    try harness.expectString(0, 0, "Count: 0");
+    try std.testing.expectEqual(@as(u64, 1), harness.frame_count);
+}
+
+test "behavior: TestHarness getRegion extracts rectangular region" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 40,
+        .height = 10,
+    });
+    defer harness.deinit();
+
+    const region = try harness.getRegion(std.testing.allocator, Rect{ .x = 0, .y = 0, .width = 8, .height = 1 });
+    defer std.testing.allocator.free(region);
+    try std.testing.expectEqualStrings("Count: 0", region);
+}
+
+test "behavior: TestHarness getRegion clamps to buffer bounds" {
+    var state = HarnessTestHelpers.CounterState{};
+    var harness = try TestHarness(HarnessTestHelpers.CounterState).init(std.testing.allocator, .{
+        .state = &state,
+        .update = HarnessTestHelpers.counterUpdate,
+        .view = HarnessTestHelpers.counterView,
+        .width = 10,
+        .height = 2,
+    });
+    defer harness.deinit();
+
+    const region = try harness.getRegion(std.testing.allocator, Rect{ .x = 5, .y = 0, .width = 100, .height = 100 });
+    defer std.testing.allocator.free(region);
+    try std.testing.expect(region.len > 0);
+}
+
+// ============================================================
+// SNAPSHOT FILE I/O TESTS
+// ============================================================
+
+test "behavior: Snapshot saveToFile and loadFromFile roundtrip" {
+    var buf = try Buffer.init(std.testing.allocator, 10, 2);
+    defer buf.deinit();
+    buf.setString(0, 0, "Hello", Style.empty);
+    buf.setString(0, 1, "World", Style.empty);
+
+    var snap1 = try Snapshot.fromBuffer(std.testing.allocator, buf);
+    defer snap1.deinit();
+
+    const path = "/tmp/zithril_test_roundtrip.golden";
+    try snap1.saveToFile(path);
+
+    var snap2 = try Snapshot.loadFromFile(std.testing.allocator, path);
+    defer snap2.deinit();
+
+    try std.testing.expect(snap1.eql(snap2));
+    try std.testing.expectEqual(@as(u16, 10), snap2.width);
+    try std.testing.expectEqual(@as(u16, 2), snap2.height);
+
+    // Clean up
+    std.fs.cwd().deleteFile(path) catch {};
+}
+
+test "behavior: Snapshot diff output format" {
+    var buf1 = try Buffer.init(std.testing.allocator, 10, 2);
+    defer buf1.deinit();
+    buf1.setString(0, 0, "Hello", Style.empty);
+    buf1.setString(0, 1, "World", Style.empty);
+
+    var buf2 = try Buffer.init(std.testing.allocator, 10, 2);
+    defer buf2.deinit();
+    buf2.setString(0, 0, "Hello", Style.empty);
+    buf2.setString(0, 1, "Zig!!", Style.empty);
+
+    var snap1 = try Snapshot.fromBuffer(std.testing.allocator, buf1);
+    defer snap1.deinit();
+
+    var snap2 = try Snapshot.fromBuffer(std.testing.allocator, buf2);
+    defer snap2.deinit();
+
+    const diff_text = try snap1.diff(std.testing.allocator, snap2);
+    defer std.testing.allocator.free(diff_text);
+
+    try std.testing.expect(std.mem.indexOf(u8, diff_text, "Line 1:") != null);
+    try std.testing.expect(std.mem.indexOf(u8, diff_text, "Expected:") != null);
+    try std.testing.expect(std.mem.indexOf(u8, diff_text, "Actual:") != null);
 }

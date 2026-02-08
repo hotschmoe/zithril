@@ -51,6 +51,7 @@ pub const event = @import("event.zig");
 pub const Event = event.Event;
 pub const Key = event.Key;
 pub const KeyCode = event.KeyCode;
+pub const KeyAction = event.KeyAction;
 pub const Modifiers = event.Modifiers;
 pub const Mouse = event.Mouse;
 pub const MouseKind = event.MouseKind;
@@ -165,10 +166,30 @@ pub const TestRecorder = testing.TestRecorder;
 pub const TestPlayer = testing.TestPlayer;
 pub const MockBackend = testing.MockBackend;
 pub const Snapshot = testing.Snapshot;
+pub const TestHarness = testing.TestHarness;
 pub const bufferToAnnotatedText = testing.bufferToAnnotatedText;
 pub const expectCell = testing.expectCell;
 pub const expectCellStyle = testing.expectCellStyle;
 pub const expectString = testing.expectString;
+
+// Scenario DSL
+pub const scenario = @import("scenario.zig");
+pub const ScenarioParser = scenario.ScenarioParser;
+pub const ScenarioRunner = scenario.ScenarioRunner;
+pub const ScenarioResult = scenario.ScenarioResult;
+pub const ScenarioDirective = scenario.Directive;
+
+// Audit utilities (QA analysis)
+pub const audit = @import("audit.zig");
+pub const AuditResult = audit.AuditResult;
+pub const AuditReport = audit.AuditReport;
+pub const AuditCategory = audit.AuditCategory;
+pub const Severity = audit.Severity;
+pub const AuditFinding = audit.Finding;
+pub const auditContrast = audit.auditContrast;
+pub const auditKeyboardNav = audit.auditKeyboardNav;
+pub const auditFocusVisibility = audit.auditFocusVisibility;
+pub const KeyboardAuditConfig = audit.KeyboardAuditConfig;
 
 // Widgets
 pub const widgets = @import("widgets.zig");
